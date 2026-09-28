@@ -1,0 +1,70 @@
+# ============================================================
+# Python / Backend
+# ============================================================
+
+backend/__pycache__/
+backend/**/__pycache__/
+
+backend/venv/
+backend/.venv/
+backend/env/
+
+backend/*.py[cod]
+backend/**/*.py[cod]
+
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+
+# Python environment files
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Backend logs
+backend/*.log
+backend/**/*.log
+
+# Backend local storage / uploaded files
+backend/storage/
+backend/uploads/
+
+
+# ============================================================
+# Node / Frontend
+# ============================================================
+
+frontend/node_modules/
+
+frontend/dist/
+frontend/build/
+
+frontend/.vite/
+
+# Frontend environment files
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Frontend logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+
+# ============================================================
+# General
+# ============================================================
+
+*.log
+*.tmp
+*.temp
+*.bak
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.vscode/
+.idea/

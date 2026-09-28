@@ -1,0 +1,157 @@
+                    ┌──────────────────┐
+                    │    FRONTEND      │
+                    │ Upload Document  │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │     FASTAPI      │
+                    │                  │
+                    │ File Metadata    │
+                    │ Case Ownership   │
+                    │ Upload Validation│
+                    └────────┬─────────┘
+                             │
+                 ┌───────────┴───────────┐
+                 ▼                       ▼
+        ┌────────────────┐      ┌────────────────┐
+        │ FILE STORAGE   │      │  PostgreSQL    │
+        │                │      │                │
+        │ Original PDF   │      │ File Metadata  │
+        │ Original Excel │      │ Processing     │
+        │ Original CSV   │      │ Status         │
+        └───────┬────────┘      └────────────────┘
+                │
+                ▼
+        ┌────────────────┐
+        │    RabbitMQ    │
+        │     Queue      │
+        └───────┬────────┘
+                │
+                ▼
+        ┌────────────────┐
+        │ Celery Worker  │
+        └───────┬────────┘
+                │
+                ▼
+╔══════════════════════════════════════════════╗
+║          DOCUMENT PROCESSING PIPELINE        ║
+╚══════════════════════════════════════════════╝
+                │
+                ▼
+        ┌──────────────────────┐
+        │ 1. FILE TYPE READER  │
+        │                      │
+        │ PDF                  │
+        │ Excel                │
+        │ CSV                  │
+        │ TXT                  │
+        └──────────┬───────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │ 2. RAW EXTRACTION    │
+        │                      │
+        │ Text                 │
+        │ Words                │
+        │ Coordinates          │
+        │ Pages                │
+        │ Tables               │
+        │ Rows                 │
+        └──────────┬───────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │ 3. TABLE REBUILDER   │
+        │                      │
+        │ Find header          │
+        │ Find columns         │
+        │ Find rows            │
+        │ Reconstruct cells    │
+        └──────────┬───────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │ 4. COLUMN UNDERSTAND │
+        │                      │
+        │ Rule Engine          │
+        │        ↓             │
+        │ Confidence Check     │
+        └──────────┬───────────┘
+                   │
+             confidence?
+              ┌────┴────┐
+              │         │
+            HIGH       LOW
+              │         │
+              │         ▼
+              │      ┌───────┐
+              │      │ Qwen  │
+              │      └───┬───┘
+              │          │
+              └────┬─────┘
+                   ▼
+        ┌──────────────────────┐
+        │ 5. UNIVERSAL MAPPER  │
+        │                      │
+        │ Any bank format      │
+        │        ↓             │
+        │ Universal fields     │
+        └──────────┬───────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │ 6. VALIDATION        │
+        │                      │
+        │ Dates                │
+        │ Amounts              │
+        │ Debit/Credit         │
+        │ Balance              │
+        │ Required fields      │
+        │ Duplicate rows       │
+        │ Data consistency     │
+        └──────────┬───────────┘
+                   │
+              valid?
+             ┌─────┴─────┐
+             │           │
+            YES          NO
+             │           │
+             │           ▼
+             │     ┌────────────┐
+             │     │ Retry /    │
+             │     │ Qwen /     │
+             │     │ Error      │
+             │     └────────────┘
+             │
+             ▼
+        ┌──────────────────────┐
+        │ 7. UNIVERSAL STORAGE │
+        │                      │
+        │ accounts             │
+        │ statements           │
+        │ transactions         │
+        └──────────┬───────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │ 8. ANALYSIS ENGINE   │
+        │                      │
+        │ Money Flow           │
+        │ Common Links         │
+        │ Circular             │
+        │ Layering             │
+        │ Funnel               │
+        │ Risk                 │
+        │ Graph                │
+        └──────────┬───────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │ 9. REPORT APIs       │
+        └──────────┬───────────┘
+                   │
+                   ▼
+             ┌───────────┐
+             │ FRONTEND  │
+             └───────────┘
