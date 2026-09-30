@@ -103,6 +103,15 @@ function CaseList() {
           .includes(search) ||
         String(caseData.status || "")
           .toLowerCase()
+          .includes(search) ||
+        String(caseData.io?.officer_name || "")
+          .toLowerCase()
+          .includes(search) ||
+        String(caseData.io?.designation || "")
+          .toLowerCase()
+          .includes(search) ||
+        String(caseData.io?.police_station || "")
+          .toLowerCase()
           .includes(search)
       );
     });

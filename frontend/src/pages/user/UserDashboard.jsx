@@ -1,8 +1,14 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import UserNavbar from "../../components/layout/UserNavbar";
 import UserFooter from "../../components/layout/UserFooter";
+<<<<<<< HEAD
 import { useAuth } from "../../context/AuthContext";
+=======
+import { getCases } from "../../services/api/case";
+import { getIOMasters } from "../../services/api/ioMaster";
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
 
 function UserDashboard() {
   const navigate = useNavigate();
@@ -13,12 +19,51 @@ function UserDashboard() {
     user?.permissions?.can_create_case !== false;
 
 
+  const [cases, setCases] = useState([]);
+  const [ioList, setIoList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDashboardData() {
+      try {
+        setLoading(true);
+        const [casesRes, ioRes] = await Promise.allSettled([
+          getCases(),
+          getIOMasters(),
+        ]);
+
+        if (isMounted) {
+          if (casesRes.status === "fulfilled" && Array.isArray(casesRes.value?.data)) {
+            setCases(casesRes.value.data);
+          }
+          if (ioRes.status === "fulfilled" && Array.isArray(ioRes.value?.data)) {
+            setIoList(ioRes.value.data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard data:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadDashboardData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleCreateCase = () => {
     navigate("/dashboard/cases/create");
   };
 
   const handleViewCases = () => {
     navigate("/dashboard/cases");
+  };
+
+  const handleIOMaster = () => {
+    navigate("/dashboard/io-master");
   };
 
   const handleReports = () => {
@@ -167,16 +212,17 @@ function UserDashboard() {
 
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 
               {/* =================================================
                   TOTAL CASES
               ================================================== */}
               <AnalysisStat
                 title="Analysis Cases"
-                value="00"
+                value={loading ? "..." : String(cases.length).padStart(2, "0")}
                 description="Total banking cases"
                 color="emerald"
+                onClick={handleViewCases}
                 icon={
                   <svg
                     width="20"
@@ -210,6 +256,34 @@ function UserDashboard() {
                       strokeWidth="1.5"
                       strokeLinecap="round"
                     />
+                  </svg>
+                }
+              />
+
+              {/* =================================================
+                  INVESTIGATING OFFICERS (IO)
+              ================================================== */}
+              <AnalysisStat
+                title="Investigating Officers"
+                value={loading ? "..." : String(ioList.length).padStart(2, "0")}
+                description="Master IO records"
+                color="teal"
+                onClick={handleIOMaster}
+                icon={
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
                 }
               />
@@ -386,61 +460,124 @@ function UserDashboard() {
 
               </div>
 
-              {/* Empty State */}
-              <div className="mt-6 rounded-xl border border-dashed border-white/[0.08] bg-white/[0.015] px-6 py-12 text-center">
-
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/10 bg-emerald-400/[0.05]">
-
-                  <svg
-                    width="26"
-                    height="26"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    className="text-emerald-400"
-                  >
-                    <path
-                      d="M4 7C4 5.9 4.9 5 6 5H10L12 7.5H18C19.1 7.5 20 8.4 20 9.5V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V7Z"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinejoin="round"
-                    />
-
-                    <path
-                      d="M8 12H16"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-
-                    <path
-                      d="M8 15H13"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-
+              {/* Recent Cases Content */}
+              {loading ? (
+                <div className="mt-8 flex flex-col items-center justify-center gap-3 py-10">
+                  <span className="h-7 w-7 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                  <p className="text-xs text-slate-500">Loading analysis cases...</p>
                 </div>
+              ) : cases.length === 0 ? (
+                /* Empty State */
+                <div className="mt-6 rounded-xl border border-dashed border-white/[0.08] bg-white/[0.015] px-6 py-12 text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/10 bg-emerald-400/[0.05]">
+                    <svg
+                      width="26"
+                      height="26"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="text-emerald-400"
+                    >
+                      <path
+                        d="M4 7C4 5.9 4.9 5 6 5H10L12 7.5H18C19.1 7.5 20 8.4 20 9.5V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V7Z"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinejoin="round"
+                      />
 
-                <h3 className="mt-5 text-sm font-semibold text-slate-200">
-                  No Analysis Cases Available
-                </h3>
+                      <path
+                        d="M8 12H16"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      />
 
-                <p className="mx-auto mt-2 max-w-lg text-xs leading-5 text-slate-500">
-                  Create a banking analysis case to upload bank statements,
-                  process transactions, analyze accounts and discover
-                  financial relationships.
-                </p>
+                      <path
+                        d="M8 15H13"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={handleCreateCase}
-                  className="mt-6 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300 transition hover:border-emerald-400/40 hover:bg-emerald-400/[0.1]"
-                >
-                  Create First Analysis Case
-                </button>
+                  <h3 className="mt-5 text-sm font-semibold text-slate-200">
+                    No Analysis Cases Available
+                  </h3>
 
-              </div>
+                  <p className="mx-auto mt-2 max-w-lg text-xs leading-5 text-slate-500">
+                    Create a banking analysis case to upload bank statements,
+                    process transactions, analyze accounts and discover
+                    financial relationships.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleCreateCase}
+                    className="mt-6 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300 transition hover:border-emerald-400/40 hover:bg-emerald-400/[0.1]"
+                  >
+                    Create First Analysis Case
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4 divide-y divide-white/[0.05]">
+                  {cases.slice(0, 4).map((caseItem) => (
+                    <div
+                      key={caseItem.id}
+                      onClick={() => navigate(`/dashboard/cases/${caseItem.id}`)}
+                      className="group flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3.5 px-3 rounded-xl transition hover:bg-white/[0.03] cursor-pointer"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="mt-1 h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-emerald-300 font-mono">
+                              {caseItem.case_number}
+                            </span>
+                            <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                              {caseItem.status}
+                            </span>
+                          </div>
+                          <h4 className="mt-0.5 text-sm font-semibold text-white group-hover:text-emerald-300 transition">
+                            {caseItem.case_name}
+                          </h4>
+                          {caseItem.io ? (
+                            <p className="mt-1 text-xs text-slate-400 flex items-center gap-1.5">
+                              <span className="text-[10px] uppercase font-semibold text-emerald-400/80">IO:</span>
+                              <strong className="text-slate-200">{caseItem.io.officer_name}</strong>
+                              <span className="text-[11px] text-slate-400">({caseItem.io.designation})</span>
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-xs text-slate-600 italic">No IO Assigned</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center">
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {caseItem.created_at
+                            ? new Date(caseItem.created_at).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "-"}
+                        </span>
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          className="text-slate-500 group-hover:text-emerald-300 transition"
+                        >
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
             </div>
 
@@ -515,6 +652,31 @@ function UserDashboard() {
                         strokeWidth="1.5"
                         strokeLinejoin="round"
                       />
+                    </svg>
+                  }
+                />
+
+                {/* Investigating Officers (IO Master) */}
+                <QuickAction
+                  title="Investigating Officers (IO)"
+                  description="Manage IO master records linked with cases"
+                  color="teal"
+                  onClick={handleIOMaster}
+                  icon={
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                   }
                 />
@@ -958,10 +1120,14 @@ function AnalysisStat({
   description,
   icon,
   color,
+  onClick,
 }) {
   const colors = {
     emerald:
       "border-emerald-400/10 bg-emerald-400/[0.06] text-emerald-400",
+
+    teal:
+      "border-teal-400/10 bg-teal-400/[0.06] text-teal-400",
 
     cyan:
       "border-cyan-400/10 bg-cyan-400/[0.06] text-cyan-400",
@@ -974,7 +1140,12 @@ function AnalysisStat({
   };
 
   return (
-    <div className="group rounded-2xl border border-white/[0.06] bg-[#0a1714]/80 p-5 shadow-xl backdrop-blur-xl transition duration-200 hover:border-white/[0.12] hover:bg-[#0b1916]">
+    <div
+      onClick={onClick}
+      className={`group rounded-2xl border border-white/[0.06] bg-[#0a1714]/80 p-5 shadow-xl backdrop-blur-xl transition duration-200 hover:border-white/[0.12] hover:bg-[#0b1916] ${
+        onClick ? "cursor-pointer hover:border-emerald-400/30" : ""
+      }`}
+    >
 
       <div className="flex items-start justify-between">
 
@@ -1020,6 +1191,9 @@ function QuickAction({
   const colors = {
     emerald:
       "border-emerald-400/10 bg-emerald-400/[0.06] text-emerald-400",
+
+    teal:
+      "border-teal-400/10 bg-teal-400/[0.05] text-teal-400",
 
     cyan:
       "border-cyan-400/10 bg-cyan-400/[0.05] text-cyan-400",

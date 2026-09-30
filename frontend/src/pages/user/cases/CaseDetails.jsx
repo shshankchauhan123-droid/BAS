@@ -29,6 +29,7 @@ function CaseDetails() {
   const navigate = useNavigate();
   const params = useParams();
   const { user } = useAuth();
+<<<<<<< HEAD
 
   const canUploadFiles =
     user?.role === "superadmin" ||
@@ -39,6 +40,9 @@ function CaseDetails() {
     user?.role === "superadmin" ||
     user?.role === "client_admin" ||
     user?.permissions?.can_delete_files !== false;
+=======
+  const isAdmin = user?.role === "admin";
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
 
   /*
    * ============================================================
@@ -1300,8 +1304,13 @@ useEffect(() => {
   // ============================================================
 
   async function handleDeleteFile(file) {
+<<<<<<< HEAD
     if (!canDeleteFiles) {
       setFilesError("You do not have permission to delete files.");
+=======
+    if (!isAdmin) {
+      alert("Case files cannot be deleted by users. Uploaded case files are protected evidence.");
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
       return;
     }
 
@@ -1887,7 +1896,32 @@ function goToNextTransactionPage() {
 
               </div>
 
-              <div className="shrink-0">
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/dashboard/cases/${caseId}/reports`
+                    )
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-400/[0.08] px-4 py-2.5 text-xs font-semibold text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.12)] transition-all duration-200 hover:border-emerald-400/50 hover:bg-emerald-400/[0.18] hover:text-white"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path
+                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  View Case Report
+                </button>
 
                 <span
                   className={`
@@ -1996,6 +2030,29 @@ function goToNextTransactionPage() {
                   </p>
 
                 </div>
+
+                {caseData.io && (
+                  <div className="rounded-[22px] border border-emerald-400/20 bg-[#061411]/80 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.10)] backdrop-blur-sm sm:col-span-2 xl:col-span-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
+                          INVESTIGATING OFFICER (IO)
+                        </p>
+                        <p className="mt-2 text-xl font-bold text-white">
+                          {caseData.io.officer_name}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="inline-flex rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                          {caseData.io.designation}
+                        </span>
+                        <span className="text-xs text-slate-300">
+                          Station / Branch: <strong className="text-white">{caseData.io.police_station}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               </div>
 
@@ -2757,6 +2814,7 @@ function goToNextTransactionPage() {
                                     </button>
                                   )}
 
+<<<<<<< HEAD
                                   {canDeleteFiles && (
                                     <button
                                       type="button"
@@ -2816,6 +2874,67 @@ function goToNextTransactionPage() {
                                       )}
   
                                     </button>
+=======
+                                  {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDeleteFile(
+                                        file
+                                      )
+                                    }
+                                    disabled={
+                                      deletingFileId ===
+                                      file.id
+                                    }
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-400/15 bg-red-400/[0.03] px-4 py-2.5 text-xs font-semibold text-red-300 transition hover:border-red-400/30 hover:bg-red-400/[0.07] disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+
+                                    {deletingFileId ===
+                                    file.id ? (
+                                      <>
+                                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-red-300/30 border-t-red-300" />
+
+                                        Deleting...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg
+                                          className="h-4 w-4"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="1.7"
+                                        >
+                                          <path
+                                            d="M4 7h16"
+                                            strokeLinecap="round"
+                                          />
+
+                                          <path
+                                            d="M10 11v6"
+                                            strokeLinecap="round"
+                                          />
+
+                                          <path
+                                            d="M14 11v6"
+                                            strokeLinecap="round"
+                                          />
+
+                                          <path d="M6 7l1 14h10l1-14" />
+
+                                          <path
+                                            d="M9 7V4h6v3"
+                                            strokeLinecap="round"
+                                          />
+                                        </svg>
+
+                                        Delete
+                                      </>
+                                    )}
+
+                                  </button>
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
                                   )}
 
                                 </div>

@@ -226,6 +226,17 @@ function CaseCard({ caseData, onOpen }) {
           </p>
         </div>
 
+        {caseData?.io && (
+          <div className="col-span-2 pt-2 border-t border-white/[0.04]">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-emerald-400/80">
+              Investigating Officer
+            </p>
+            <p className="mt-1 text-xs font-medium text-slate-200 truncate">
+              {caseData.io.officer_name} <span className="text-slate-400">({caseData.io.designation})</span>
+            </p>
+          </div>
+        )}
+
       </div>
 
       {/* =====================================================

@@ -8,7 +8,11 @@ from app.files.file_route import router as file_router
 from app.bank_transactions.bank_transaction_routes import (
     router as bank_transaction_router,
 )
+<<<<<<< HEAD
 from app.client.client_route import router as client_router
+=======
+from app.io_master.io_master_route import router as io_master_router
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
 
 
 app = FastAPI(
@@ -33,6 +37,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(client_router)
 app.include_router(case_router)
+app.include_router(io_master_router)
 app.include_router(user_router)
 app.include_router(file_router)
 app.include_router(bank_transaction_router)

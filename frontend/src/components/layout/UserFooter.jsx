@@ -76,11 +76,20 @@ function BASFooter() {
 
             <button
               type="button"
-              onClick={() => navigate("/cases")}
+              onClick={() => navigate("/dashboard/cases")}
               className="text-[10px] uppercase tracking-[0.12em] text-slate-600 transition hover:text-emerald-400"
             >
               Cases
             </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard/io-master")}
+              className="text-[10px] uppercase tracking-[0.12em] text-slate-600 transition hover:text-emerald-400"
+            >
+              IO Master
+            </button>
+
 
             <button
               type="button"

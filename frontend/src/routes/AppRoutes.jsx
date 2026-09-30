@@ -28,6 +28,10 @@ import UserDashboard from "../pages/user/UserDashboard";
 import CaseList from "../pages/user/cases/CaseList";
 import CreateCase from "../pages/user/cases/CreateCase";
 import CaseDetails from "../pages/user/cases/CaseDetails";
+import IOMasterList from "../pages/user/io_master/IOMasterList";
+import CaseReportsHub from "../pages/user/reports/CaseReportsHub";
+import CaseFileReport from "../pages/user/reports/CaseFileReport";
+import ReportsOverview from "../pages/user/reports/ReportsOverview";
 
 /* ============================================================
    ROUTE GUARDS & GLOBAL MODALS
@@ -124,7 +128,7 @@ function AppRoutes() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user"]}>
+              <RoleRoute allowedRoles={["user", "admin"]}>
                 <UserDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -140,18 +144,47 @@ function AppRoutes() {
           path="/dashboard/cases"
           element={
             <ProtectedRoute>
+<<<<<<< HEAD
               <RoleRoute allowedRoles={["user", "superadmin", "admin"]}>
+=======
+              <RoleRoute allowedRoles={["user", "admin"]}>
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
                 <CaseList />
               </RoleRoute>
             </ProtectedRoute>
           }
         />
 
+<<<<<<< HEAD
+=======
+        {/* =====================================================
+            IO MASTER
+        ====================================================== */}
+
+        <Route
+          path="/dashboard/io-master"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin"]}>
+                <IOMasterList />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            CREATE CASE
+
+            Authentication required
+            User role required
+        ====================================================== */}
+
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
         <Route
           path="/dashboard/cases/create"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user"]}>
+              <RoleRoute allowedRoles={["user", "admin"]}>
                 <CreateCase />
               </RoleRoute>
             </ProtectedRoute>
@@ -162,14 +195,73 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId"
           element={
             <ProtectedRoute>
+<<<<<<< HEAD
               <RoleRoute allowedRoles={["user", "superadmin", "admin"]}>
+=======
+              <RoleRoute allowedRoles={["user", "admin"]}>
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
                 <CaseDetails />
               </RoleRoute>
             </ProtectedRoute>
           }
         />
 
+<<<<<<< HEAD
         {/* Legacy /admin redirect */}
+=======
+        {/* =====================================================
+            CASE REPORTS HUB (Catalog of reports for a case)
+        ====================================================== */}
+
+        <Route
+          path="/dashboard/cases/:caseId/reports"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin"]}>
+                <CaseReportsHub />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            REPORT 1: FILE STATEMENT & TRANSACTIONS REPORT
+        ====================================================== */}
+
+        <Route
+          path="/dashboard/cases/:caseId/reports/file-statement"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin"]}>
+                <CaseFileReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            GENERAL REPORTS
+        ====================================================== */}
+
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin"]}>
+                <ReportsOverview />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            ADMIN DASHBOARD
+
+            Authentication required
+            Admin role required
+        ====================================================== */}
+
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
         <Route
           path="/admin"
           element={

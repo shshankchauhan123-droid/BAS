@@ -7,6 +7,7 @@ from app.processing.processing_service import process_bank_statement_first_stage
 # before ORM operations (like flush/commit) run in this isolated Celery worker context.
 from app.case.case_model import Case
 from app.user.user_model import User
+from app.io_master.io_master_model import IOMaster
 
 
 @celery_app.task(

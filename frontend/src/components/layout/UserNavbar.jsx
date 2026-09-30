@@ -151,6 +151,19 @@ function UserNavbar() {
     }
 
     /*
+     * IO Master
+     */
+
+    if (path === "/dashboard/io-master") {
+      return (
+        location.pathname === "/dashboard/io-master" ||
+        location.pathname.startsWith(
+          "/dashboard/io-master/"
+        )
+      );
+    }
+
+    /*
      * Reports
      */
 
@@ -410,6 +423,7 @@ function UserNavbar() {
             </button>
           )}
 
+<<<<<<< HEAD
           {!isSuperAdmin && !isClientAdmin && (
             <>
               <button
@@ -442,6 +456,64 @@ function UserNavbar() {
               </button>
             </>
           )}
+=======
+          <button
+            type="button"
+            onClick={() => goTo("/dashboard")}
+            className={desktopNavClass("/dashboard")}
+          >
+            Dashboard
+          </button>
+
+          {/* Cases */}
+
+          <button
+            type="button"
+            onClick={() =>
+              goTo("/dashboard/cases")
+            }
+            className={desktopNavClass(
+              "/dashboard/cases"
+            )}
+          >
+            Cases
+          </button>
+
+          {/* IO Master */}
+
+          <button
+            type="button"
+            onClick={() =>
+              goTo("/dashboard/io-master")
+            }
+            className={desktopNavClass(
+              "/dashboard/io-master"
+            )}
+          >
+            IO Master
+          </button>
+
+
+          {/* Reports */}
+
+          <button
+            type="button"
+            onClick={() => goTo("/reports")}
+            className={desktopNavClass("/reports")}
+          >
+            Reports
+          </button>
+
+          {/* Analysis */}
+
+          <button
+            type="button"
+            onClick={() => goTo("/analysis")}
+            className={desktopNavClass("/analysis")}
+          >
+            Analysis
+          </button>
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
         </nav>
 
         {/* =====================================================
@@ -859,6 +931,7 @@ function UserNavbar() {
               </button>
             )}
 
+<<<<<<< HEAD
             {!isSuperAdmin && !isClientAdmin && (
               <>
                 <button
@@ -891,6 +964,74 @@ function UserNavbar() {
                 </button>
               </>
             )}
+=======
+            <button
+              type="button"
+              onClick={() => goTo("/dashboard")}
+              className={mobileNavClass(
+                "/dashboard"
+              )}
+            >
+              Dashboard
+            </button>
+
+            {/* Cases */}
+
+            <button
+              type="button"
+              onClick={() =>
+                goTo("/dashboard/cases")
+              }
+              className={mobileNavClass(
+                "/dashboard/cases"
+              )}
+            >
+              Cases
+            </button>
+
+            {/* IO Master */}
+
+            <button
+              type="button"
+              onClick={() =>
+                goTo("/dashboard/io-master")
+              }
+              className={mobileNavClass(
+                "/dashboard/io-master"
+              )}
+            >
+              IO Master
+            </button>
+
+
+            {/* Reports */}
+
+            <button
+              type="button"
+              onClick={() =>
+                goTo("/reports")
+              }
+              className={mobileNavClass(
+                "/reports"
+              )}
+            >
+              Reports
+            </button>
+
+            {/* Analysis */}
+
+            <button
+              type="button"
+              onClick={() =>
+                goTo("/analysis")
+              }
+              className={mobileNavClass(
+                "/analysis"
+              )}
+            >
+              Analysis
+            </button>
+>>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
 
             {/* Logout */}
 
