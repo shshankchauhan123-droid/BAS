@@ -8,6 +8,7 @@ from app.files.file_route import router as file_router
 from app.bank_transactions.bank_transaction_routes import (
     router as bank_transaction_router,
 )
+from app.io_master.io_master_route import router as io_master_router
 
 
 app = FastAPI(
@@ -20,8 +21,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5176",
-        "http://127.0.0.1:5176",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(case_router)
+app.include_router(io_master_router)
 app.include_router(user_router)
 app.include_router(file_router)
 app.include_router(bank_transaction_router)

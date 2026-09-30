@@ -143,6 +143,19 @@ function UserNavbar() {
     }
 
     /*
+     * IO Master
+     */
+
+    if (path === "/dashboard/io-master") {
+      return (
+        location.pathname === "/dashboard/io-master" ||
+        location.pathname.startsWith(
+          "/dashboard/io-master/"
+        )
+      );
+    }
+
+    /*
      * Reports
      */
 
@@ -384,6 +397,21 @@ function UserNavbar() {
           >
             Cases
           </button>
+
+          {/* IO Master */}
+
+          <button
+            type="button"
+            onClick={() =>
+              goTo("/dashboard/io-master")
+            }
+            className={desktopNavClass(
+              "/dashboard/io-master"
+            )}
+          >
+            IO Master
+          </button>
+
 
           {/* Reports */}
 
@@ -818,6 +846,21 @@ function UserNavbar() {
             >
               Cases
             </button>
+
+            {/* IO Master */}
+
+            <button
+              type="button"
+              onClick={() =>
+                goTo("/dashboard/io-master")
+              }
+              className={mobileNavClass(
+                "/dashboard/io-master"
+              )}
+            >
+              IO Master
+            </button>
+
 
             {/* Reports */}
 

@@ -5,6 +5,7 @@ from app.core.database import SessionLocal
 from app.files.file_repository import get_file_by_id, update_file
 from app.case.case_model import Case
 from app.user.user_model import User
+from app.io_master.io_master_model import IOMaster
 
 from app.processing.pdf.pdf_extractor import extract_pdf_text
 from app.processing.pdf.pdf_table_extractor import extract_pdf_pages

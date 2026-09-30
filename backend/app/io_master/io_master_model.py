@@ -1,20 +1,18 @@
 from datetime import datetime, timezone
-
 from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
     Integer,
     String,
-    Text,
 )
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
 
-class Case(Base):
-    __tablename__ = "cases"
+class IOMaster(Base):
+    __tablename__ = "io_master"
 
     id = Column(
         Integer,
@@ -23,44 +21,28 @@ class Case(Base):
         autoincrement=True,
     )
 
-    case_number = Column(
-        String(50),
-        unique=True,
+    officer_name = Column(
+        String(150),
         nullable=False,
         index=True,
     )
 
-    case_name = Column(
-        String(255),
+    designation = Column(
+        String(100),
         nullable=False,
         index=True,
     )
 
-    description = Column(
-        Text,
-        nullable=True,
-    )
-
-    status = Column(
-        String(50),
+    police_station = Column(
+        String(200),
         nullable=False,
-        default="DRAFT",
         index=True,
     )
 
-    # User who created/owns this case
     created_by = Column(
         Integer,
         ForeignKey("users.id"),
         nullable=False,
-        index=True,
-    )
-
-    # Investigating Officer assigned to this case
-    io_id = Column(
-        Integer,
-        ForeignKey("io_master.id"),
-        nullable=True,
         index=True,
     )
 
@@ -78,4 +60,5 @@ class Case(Base):
     )
 
     # Relationships
-    io = relationship("IOMaster", back_populates="cases")
+    creator = relationship("User", foreign_keys=[created_by])
+    cases = relationship("Case", back_populates="io")

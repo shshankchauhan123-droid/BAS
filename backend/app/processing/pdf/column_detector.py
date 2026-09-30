@@ -9,6 +9,8 @@ class DetectedColumn:
     source_header: str
     target_field: str
     x_position: float
+    header_x0: float = 0.0
+    header_x1: float = 0.0
     left_boundary: float | None = None
     right_boundary: float | None = None
 
@@ -47,6 +49,55 @@ def _find_header_words(page: PDFPageContent) -> list:
             header_words.append(word)
 
     return header_words
+
+
+def _calculate_column_boundaries(columns: list[DetectedColumn]) -> None:
+    """
+    Calculate the horizontal boundaries (left_boundary and right_boundary)
+    between detected columns.
+    """
+    if not columns:
+        return
+
+    cols = sorted(
+        columns,
+        key=lambda c: c.header_x0 if c.header_x0 else c.x_position,
+    )
+
+    for i in range(len(cols) - 1):
+        left_col = cols[i]
+        right_col = cols[i + 1]
+
+        lx0 = left_col.header_x0 if left_col.header_x0 else left_col.x_position
+        lx1 = left_col.header_x1 if left_col.header_x1 else (lx0 + 30.0)
+        rx0 = right_col.header_x0 if right_col.header_x0 else right_col.x_position
+        rx1 = right_col.header_x1 if right_col.header_x1 else (rx0 + 30.0)
+
+        lf = left_col.target_field
+        rf = right_col.target_field
+
+        if lf == "cheque_number" and rf in ("description", "particulars"):
+            # Cheque numbers are short and contained within their column.
+            # Description starts immediately after cheque_number column.
+            boundary = lx1 + 6.0
+        elif lf in ("description", "particulars") and rf in ("debit", "credit", "amount"):
+            # Description text can be wide; debit column header marks the numeric column start.
+            boundary = rx0 - 15.0
+        elif rf in ("alpha", "branch", "code") and lf in ("balance", "amount", "credit"):
+            # Narrow trailing metadata column (like Init. Br) starts at its header;
+            # Balance numbers end right before it.
+            boundary = rx0 - 3.0
+        else:
+            if lx1 < rx0:
+                boundary = (lx1 + rx0) / 2.0
+            else:
+                boundary = (left_col.x_position + right_col.x_position) / 2.0
+
+        left_col.right_boundary = boundary
+        right_col.left_boundary = boundary
+
+    cols[0].left_boundary = None
+    cols[-1].right_boundary = None
 
 
 def detect_transaction_table(
@@ -100,33 +151,8 @@ def detect_transaction_table(
     used_indexes: set[int] = set()
 
     # --------------------------------------------------------
-    # Handle normal single-word headers.
-    # --------------------------------------------------------
-
-    for index, word in enumerate(main_group):
-
-        if index in used_indexes:
-            continue
-
-        target_field = find_target_field(word.text)
-
-        if target_field:
-
-            columns.append(
-                DetectedColumn(
-                    source_header=word.text,
-                    target_field=target_field,
-                    x_position=word.x0,
-                )
-            )
-
-            used_indexes.add(index)
-
-    # --------------------------------------------------------
-    # Handle two-word headers:
-    #
-    # Tran + Date
-    # Chq + No
+    # Handle two-word headers first (e.g., Tran Date, Chq No)
+    # so multi-word headers are not split into single words.
     # --------------------------------------------------------
 
     for index in range(len(main_group) - 1):
@@ -148,16 +174,47 @@ def detect_transaction_table(
 
         if target_field:
 
+            second_x1 = getattr(second, "x1", second.x0 + 30.0)
+
             columns.append(
                 DetectedColumn(
                     source_header=combined,
                     target_field=target_field,
                     x_position=first.x0,
+                    header_x0=first.x0,
+                    header_x1=second_x1,
                 )
             )
 
             used_indexes.add(index)
             used_indexes.add(next_index)
+
+    # --------------------------------------------------------
+    # Handle normal single-word headers.
+    # --------------------------------------------------------
+
+    for index, word in enumerate(main_group):
+
+        if index in used_indexes:
+            continue
+
+        target_field = find_target_field(word.text)
+
+        if target_field:
+
+            word_x1 = getattr(word, "x1", word.x0 + 30.0)
+
+            columns.append(
+                DetectedColumn(
+                    source_header=word.text,
+                    target_field=target_field,
+                    x_position=word.x0,
+                    header_x0=word.x0,
+                    header_x1=word_x1,
+                )
+            )
+
+            used_indexes.add(index)
 
     # --------------------------------------------------------
     # Handle "Init." + "Br".
@@ -184,11 +241,15 @@ def detect_transaction_table(
 
         if not already_exists:
 
+            init_x1 = getattr(init_word, "x1", init_word.x0 + 30.0)
+
             columns.append(
                 DetectedColumn(
                     source_header="Init. Br",
                     target_field="alpha",
                     x_position=init_word.x0,
+                    header_x0=init_word.x0,
+                    header_x1=init_x1,
                 )
             )
 
@@ -216,6 +277,9 @@ def detect_transaction_table(
     # Need at least three meaningful transaction columns.
     if len(unique_columns) < 3:
         return None
+
+    # Calculate left and right column boundaries
+    _calculate_column_boundaries(unique_columns)
 
     header_y_position = main_group[0].y0
 

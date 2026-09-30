@@ -249,6 +249,16 @@ def _get_column_for_x(
     if not detected_table.columns:
         return None
 
+    has_boundaries = any(
+        col.left_boundary is not None or col.right_boundary is not None
+        for col in detected_table.columns
+    )
+    if not has_boundaries:
+        return min(
+            detected_table.columns,
+            key=lambda c: abs(c.x_position - x_position),
+        )
+
     for column in detected_table.columns:
 
         left_boundary = column.left_boundary

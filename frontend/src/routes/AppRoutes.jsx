@@ -26,6 +26,10 @@ import UserDashboard from "../pages/user/UserDashboard";
 import CaseList from "../pages/user/cases/CaseList";
 import CreateCase from "../pages/user/cases/CreateCase";
 import CaseDetails from "../pages/user/cases/CaseDetails";
+import IOMasterList from "../pages/user/io_master/IOMasterList";
+import CaseReportsHub from "../pages/user/reports/CaseReportsHub";
+import CaseFileReport from "../pages/user/reports/CaseFileReport";
+import ReportsOverview from "../pages/user/reports/ReportsOverview";
 
 /* ============================================================
    ROUTE GUARDS
@@ -107,7 +111,7 @@ function AppRoutes() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user"]}>
+              <RoleRoute allowedRoles={["user", "admin"]}>
                 <UserDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -125,8 +129,23 @@ function AppRoutes() {
           path="/dashboard/cases"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user"]}>
+              <RoleRoute allowedRoles={["user", "admin"]}>
                 <CaseList />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            IO MASTER
+        ====================================================== */}
+
+        <Route
+          path="/dashboard/io-master"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin"]}>
+                <IOMasterList />
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -143,7 +162,7 @@ function AppRoutes() {
           path="/dashboard/cases/create"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user"]}>
+              <RoleRoute allowedRoles={["user", "admin"]}>
                 <CreateCase />
               </RoleRoute>
             </ProtectedRoute>
@@ -166,8 +185,53 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user"]}>
+              <RoleRoute allowedRoles={["user", "admin"]}>
                 <CaseDetails />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            CASE REPORTS HUB (Catalog of reports for a case)
+        ====================================================== */}
+
+        <Route
+          path="/dashboard/cases/:caseId/reports"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin"]}>
+                <CaseReportsHub />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            REPORT 1: FILE STATEMENT & TRANSACTIONS REPORT
+        ====================================================== */}
+
+        <Route
+          path="/dashboard/cases/:caseId/reports/file-statement"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin"]}>
+                <CaseFileReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            GENERAL REPORTS
+        ====================================================== */}
+
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin"]}>
+                <ReportsOverview />
               </RoleRoute>
             </ProtectedRoute>
           }

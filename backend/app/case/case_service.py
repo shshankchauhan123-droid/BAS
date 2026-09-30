@@ -34,6 +34,28 @@ def create_case(
     data: CaseCreateRequest,
     user_id: int,
 ):
+    from app.io_master.io_master_repository import (
+        get_ios_by_user,
+        get_io_by_id_and_user,
+    )
+
+    user_ios = get_ios_by_user(db=db, user_id=user_id)
+
+    # Compulsory: User must create an IO first before creating their first case
+    if not user_ios:
+        raise ValueError(
+            "No Investigating Officer found. You must create an Investigating Officer (IO) first before creating your first case."
+        )
+
+    assigned_io_id = data.io_id
+    if assigned_io_id:
+        io = get_io_by_id_and_user(db=db, io_id=assigned_io_id, user_id=user_id)
+        if not io:
+            raise ValueError("Selected Investigating Officer not found.")
+    else:
+        # Subsequent cases: Default to the user's existing IO if not explicitly specified
+        assigned_io_id = user_ios[0].id
+
     case_number = generate_case_number(db)
 
     new_case = Case(
@@ -46,6 +68,7 @@ def create_case(
         ),
         status="DRAFT",
         created_by=user_id,
+        io_id=assigned_io_id,
     )
 
     return repository_create_case(
@@ -112,6 +135,9 @@ def update_case(
             raise ValueError("Invalid case status")
 
         case.status = status_value
+
+    if data.io_id is not None:
+        case.io_id = data.io_id
 
     return repository_update_case(
         db=db,

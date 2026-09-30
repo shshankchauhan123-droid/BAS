@@ -5,6 +5,7 @@ from app.bank_transactions.bank_transaction_model import (
 )
 from app.bank_transactions.bank_transaction_repository import (
     create_transactions,
+    delete_transactions_by_file,
 )
 from app.processing.schemas.bank_statement import (
     BankTransaction as ParsedBankTransaction,
@@ -20,6 +21,11 @@ def save_parsed_transactions(
 
     if not parsed_transactions:
         return []
+
+    delete_transactions_by_file(
+        db=db,
+        file_id=file_id,
+    )
 
     transactions = []
 

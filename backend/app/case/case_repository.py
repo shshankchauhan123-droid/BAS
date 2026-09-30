@@ -1,4 +1,5 @@
-from sqlalchemy.orm import Session
+from typing import Optional
+from sqlalchemy.orm import Session, joinedload
 
 from app.case.case_model import Case
 
@@ -10,7 +11,6 @@ def create_case(
     db.add(case)
     db.commit()
     db.refresh(case)
-
     return case
 
 
@@ -20,6 +20,7 @@ def get_cases_by_user(
 ) -> list[Case]:
     return (
         db.query(Case)
+        .options(joinedload(Case.io))
         .filter(Case.created_by == user_id)
         .order_by(Case.created_at.desc())
         .all()
@@ -29,9 +30,10 @@ def get_cases_by_user(
 def get_case_by_id(
     db: Session,
     case_id: int,
-) -> Case | None:
+) -> Optional[Case]:
     return (
         db.query(Case)
+        .options(joinedload(Case.io))
         .filter(Case.id == case_id)
         .first()
     )
@@ -41,9 +43,10 @@ def get_case_by_id_and_user(
     db: Session,
     case_id: int,
     user_id: int,
-) -> Case | None:
+) -> Optional[Case]:
     return (
         db.query(Case)
+        .options(joinedload(Case.io))
         .filter(
             Case.id == case_id,
             Case.created_by == user_id,
@@ -54,7 +57,7 @@ def get_case_by_id_and_user(
 
 def get_last_case(
     db: Session,
-) -> Case | None:
+) -> Optional[Case]:
     return (
         db.query(Case)
         .order_by(Case.id.desc())
@@ -68,5 +71,4 @@ def update_case(
 ) -> Case:
     db.commit()
     db.refresh(case)
-
     return case

@@ -1,48 +1,44 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.case.case_controller import (
-    create_case,
-    get_cases,
-    get_case,
-    update_case,
-    delete_case,
-)
-
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
-
-from app.case.case_schema import (
-    CaseCreateRequest,
-    CaseUpdateRequest,
-    CaseResponse,
-    CaseListResponse,
+from app.io_master.io_master_controller import (
+    create_io_controller,
+    get_ios_controller,
+    get_io_controller,
+    update_io_controller,
+    delete_io_controller,
+)
+from app.io_master.io_master_schema import (
+    IOMasterCreateRequest,
+    IOMasterUpdateRequest,
+    IOMasterResponse,
+    IOMasterListResponse,
 )
 
-
 router = APIRouter(
-    prefix="/api/v1/cases",
-    tags=["Case Management"],
+    prefix="/api/v1/io-master",
+    tags=["IO Master"],
 )
 
 
 @router.post(
     "/",
-    response_model=CaseResponse,
+    response_model=IOMasterResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_case_route(
-    data: CaseCreateRequest,
+def create_io_route(
+    data: IOMasterCreateRequest,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     try:
-        return create_case(
+        return create_io_controller(
             db=db,
             data=data,
             user_id=current_user.id,
         )
-
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -52,19 +48,18 @@ def create_case_route(
 
 @router.get(
     "/",
-    response_model=CaseListResponse,
+    response_model=IOMasterListResponse,
     status_code=status.HTTP_200_OK,
 )
-def get_cases_route(
+def get_ios_route(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     try:
-        return get_cases(
+        return get_ios_controller(
             db=db,
             user_id=current_user.id,
         )
-
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -73,22 +68,21 @@ def get_cases_route(
 
 
 @router.get(
-    "/{case_id}",
-    response_model=CaseResponse,
+    "/{io_id}",
+    response_model=IOMasterResponse,
     status_code=status.HTTP_200_OK,
 )
-def get_case_route(
-    case_id: int,
+def get_io_route(
+    io_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     try:
-        return get_case(
+        return get_io_controller(
             db=db,
-            case_id=case_id,
+            io_id=io_id,
             user_id=current_user.id,
         )
-
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -97,53 +91,45 @@ def get_case_route(
 
 
 @router.put(
-    "/{case_id}",
-    response_model=CaseResponse,
+    "/{io_id}",
+    response_model=IOMasterResponse,
     status_code=status.HTTP_200_OK,
 )
-def update_case_route(
-    case_id: int,
-    data: CaseUpdateRequest,
+def update_io_route(
+    io_id: int,
+    data: IOMasterUpdateRequest,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     try:
-        return update_case(
+        return update_io_controller(
             db=db,
-            case_id=case_id,
+            io_id=io_id,
             data=data,
             user_id=current_user.id,
         )
-
     except ValueError as error:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         )
 
 
 @router.delete(
-    "/{case_id}",
+    "/{io_id}",
     status_code=status.HTTP_200_OK,
 )
-def delete_case_route(
-    case_id: int,
+def delete_io_route(
+    io_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    if getattr(current_user, "role", None) != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Users are not permitted to delete cases.",
-        )
-
     try:
-        return delete_case(
+        return delete_io_controller(
             db=db,
-            case_id=case_id,
+            io_id=io_id,
             user_id=current_user.id,
         )
-
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

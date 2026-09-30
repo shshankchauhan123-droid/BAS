@@ -147,6 +147,12 @@ def delete_file_route(
     current_user=Depends(get_current_user),
 ):
 
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Users are not permitted to delete case files. Uploaded case files are protected evidence.",
+        )
+
     try:
 
         delete_file_controller(
