@@ -48,6 +48,11 @@ class BankTransaction(Base):
         nullable=True,
     )
 
+    cheque_number = Column(
+        Text,
+        nullable=True,
+    )
+
     debit = Column(
         Numeric(20, 2),
         nullable=True,
@@ -63,42 +68,7 @@ class BankTransaction(Base):
         nullable=True,
     )
 
-    cheque_number = Column(
-        Text,
-        nullable=True,
-    )
-
-    reference_number = Column(
-        Text,
-        nullable=True,
-    )
-
-    alpha = Column(
-        Text,
-        nullable=True,
-    )
-
-    source_page = Column(
-        Integer,
-        nullable=True,
-    )
-
-    source_row = Column(
-        Integer,
-        nullable=True,
-    )
-
-    extraction_confidence = Column(
-        Numeric(5, 4),
-        nullable=True,
-    )
-
-    raw_narration = Column(
-        Text,
-        nullable=True,
-    )
-
-    raw_row = Column(
+    mode = Column(
         Text,
         nullable=True,
     )

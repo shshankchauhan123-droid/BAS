@@ -53,8 +53,7 @@ def get_transactions_by_file(
         )
         .order_by(
             BankTransaction.transaction_date.asc(),
-            BankTransaction.source_page.asc(),
-            BankTransaction.source_row.asc(),
+            BankTransaction.id.asc(),
         )
         .all()
     )
@@ -77,8 +76,7 @@ def get_transactions_by_file_paginated(
         )
         .order_by(
             BankTransaction.transaction_date.asc(),
-            BankTransaction.source_page.asc(),
-            BankTransaction.source_row.asc(),
+            BankTransaction.id.asc(),
         )
     )
 
@@ -111,8 +109,7 @@ def get_transactions_by_case(
         )
         .order_by(
             BankTransaction.transaction_date.asc(),
-            BankTransaction.source_page.asc(),
-            BankTransaction.source_row.asc(),
+            BankTransaction.id.asc(),
         )
         .all()
     )
@@ -135,8 +132,7 @@ def get_transactions_by_case_paginated(
         )
         .order_by(
             BankTransaction.transaction_date.asc(),
-            BankTransaction.source_page.asc(),
-            BankTransaction.source_row.asc(),
+            BankTransaction.id.asc(),
         )
     )
 
@@ -186,8 +182,6 @@ def get_filtered_transactions_by_case(
 
         query = query.filter(
             BankTransaction.description.ilike(search_value)
-            |
-            BankTransaction.reference_number.ilike(search_value)
             |
             BankTransaction.cheque_number.ilike(search_value)
         )
@@ -264,8 +258,7 @@ def get_filtered_transactions_by_case(
 
     query = query.order_by(
         BankTransaction.transaction_date.asc(),
-        BankTransaction.source_page.asc(),
-        BankTransaction.source_row.asc(),
+        BankTransaction.id.asc(),
     )
 
     # ========================================================

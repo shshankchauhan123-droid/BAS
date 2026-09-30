@@ -826,12 +826,23 @@ useEffect(() => {
   // FORMAT STATUS
   // ============================================================
 
-  function formatStatus(status) {
-    return String(
-      status || "UNKNOWN"
-    )
+  function formatFileStatus(file) {
+    if (!file) return "UNKNOWN";
+
+    const baseStatus = String(file.status || "UNKNOWN")
       .replaceAll("_", " ")
       .toUpperCase();
+
+    if (baseStatus === "PROCESSING" && file.processing_stage) {
+      const stageName = file.processing_stage
+        .split("_")
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+      const progress = file.processing_progress ? ` (${file.processing_progress})` : "";
+      return `PROCESSING... ${stageName}${progress}`;
+    }
+    
+    return baseStatus;
   }
 
   // ============================================================
@@ -2633,8 +2644,8 @@ function goToNextTransactionPage() {
 
                                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
 
-                                    {formatStatus(
-                                      file.status
+                                    {formatFileStatus(
+                                      file
                                     )}
 
                                   </span>

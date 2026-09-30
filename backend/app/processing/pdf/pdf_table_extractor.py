@@ -1,105 +1,144 @@
-from dataclasses import dataclass
-from pathlib import Path
+import os
+import re
 
-import pymupdf
+import camelot
+import pandas as pd
 
 
-@dataclass
-class PDFWord:
+def clean_cell(value):
     """
-    One word/token from a PDF with its position.
-    """
-
-    text: str
-
-    x0: float
-    y0: float
-    x1: float
-    y1: float
-
-
-@dataclass
-class PDFPageContent:
-    page_number: int
-    text: str
-    lines: list[str]
-    words: list[PDFWord]
-
-
-@dataclass
-class PDFDocumentContent:
-    file_path: str
-    page_count: int
-    pages: list[PDFPageContent]
-
-
-def extract_pdf_pages(file_path: str) -> PDFDocumentContent:
-    """
-    Extract PDF text, lines and word coordinates.
-
-    This is a generic extractor.
-    It does not contain bank-specific parsing logic.
+    Clean text extracted from a PDF table cell.
     """
 
-    path = Path(file_path)
+    if value is None:
+        return ""
 
-    if not path.exists():
+    value = str(value)
+
+    # Replace line breaks with spaces
+    value = value.replace("\n", " ")
+
+    # Remove multiple spaces
+    value = re.sub(r"\s+", " ", value)
+
+    return value.strip()
+
+
+def extract_tables_from_pdf(pdf_path: str) -> pd.DataFrame:
+    """
+    Extract all tables from a PDF using Camelot.
+
+    Returns:
+        pandas.DataFrame containing the raw extracted tables.
+
+    This function ONLY extracts data.
+
+    It does NOT:
+        - detect headers
+        - map columns
+        - validate transactions
+        - call Qwen
+        - save to database
+    """
+
+    print("=" * 60)
+    print("PDF TABLE EXTRACTION")
+    print("=" * 60)
+
+    # ------------------------------------------------------------
+    # STEP 1: CHECK PDF
+    # ------------------------------------------------------------
+
+    if not os.path.exists(pdf_path):
         raise FileNotFoundError(
-            f"PDF file does not exist: {file_path}"
+            f"PDF file not found: {pdf_path}"
         )
 
-    if not path.is_file():
-        raise ValueError(
-            f"Path is not a file: {file_path}"
-        )
+    print(f"Input PDF: {pdf_path}")
+    print()
 
-    if path.suffix.lower() != ".pdf":
-        raise ValueError(
-            f"Expected a PDF file, got: {path.suffix}"
-        )
+    # ------------------------------------------------------------
+    # STEP 2: EXTRACT TABLES
+    # ------------------------------------------------------------
 
-    pages: list[PDFPageContent] = []
+    print("Detecting tables...")
 
-    with pymupdf.open(file_path) as document:
-
-        for page_number, page in enumerate(
-            document,
-            start=1,
-        ):
-            text = page.get_text("text") or ""
-
-            text = text.strip()
-
-            lines = [
-                line.strip()
-                for line in text.splitlines()
-                if line.strip()
-            ]
-
-            raw_words = page.get_text("words")
-
-            words = [
-                PDFWord(
-                    text=str(word[4]),
-                    x0=float(word[0]),
-                    y0=float(word[1]),
-                    x1=float(word[2]),
-                    y1=float(word[3]),
-                )
-                for word in raw_words
-            ]
-
-            pages.append(
-                PDFPageContent(
-                    page_number=page_number,
-                    text=text,
-                    lines=lines,
-                    words=words,
-                )
-            )
-
-    return PDFDocumentContent(
-        file_path=str(path),
-        page_count=len(pages),
-        pages=pages,
+    tables = camelot.read_pdf(
+        pdf_path,
+        pages="all",
+        flavor="lattice",
     )
+
+    print(f"Tables detected: {len(tables)}")
+    print()
+
+    if len(tables) == 0:
+        raise ValueError(
+            "No tables were detected in the PDF."
+        )
+
+    # ------------------------------------------------------------
+    # STEP 3: CLEAN EACH TABLE
+    # ------------------------------------------------------------
+
+    extracted_tables = []
+
+    for index, table in enumerate(tables, start=1):
+
+        df = table.df.copy()
+
+        # Clean every cell
+        df = df.map(clean_cell)
+
+        # Remove completely empty rows
+        df = df[
+            df.apply(
+                lambda row: any(
+                    str(value).strip()
+                    for value in row
+                ),
+                axis=1,
+            )
+        ]
+
+        df = df.reset_index(drop=True)
+
+        # Keep source page information for debugging
+        df["_source_page"] = table.page
+
+        print(
+            f"Table {index}: "
+            f"Page={table.page}, "
+            f"Rows={len(df)}, "
+            f"Columns={len(df.columns) - 1}"
+        )
+
+        extracted_tables.append(df)
+
+    # ------------------------------------------------------------
+    # STEP 4: COMBINE ALL TABLES
+    # ------------------------------------------------------------
+
+    combined_df = pd.concat(
+        extracted_tables,
+        ignore_index=True,
+    )
+
+    print()
+    print("=" * 60)
+    print("EXTRACTION RESULT")
+    print("=" * 60)
+
+    print(f"Total rows: {len(combined_df)}")
+    print(
+        f"Total columns: "
+        f"{len(combined_df.columns) - 1}"
+    )
+
+    print()
+    print("RAW DATA PREVIEW:")
+    print(combined_df.head(10).to_string())
+
+    print("=" * 60)
+
+    return combined_df

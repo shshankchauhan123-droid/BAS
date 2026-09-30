@@ -68,6 +68,21 @@ class File(Base):
         index=True,
     )
 
+    raw_excel_path = Column(
+        String(255),
+        nullable=True,
+    )
+
+    processing_stage = Column(
+        String(100),
+        nullable=True,
+    )
+
+    processing_progress = Column(
+        String(50),
+        nullable=True,
+    )
+
     error_message = Column(
         Text,
         nullable=True,

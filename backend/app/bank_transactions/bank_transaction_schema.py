@@ -14,25 +14,15 @@ class BankTransactionData(BaseModel):
 
     transaction_date: Optional[date] = None
     description: Optional[str] = None
+    cheque_number: Optional[str] = None
 
     debit: Optional[Decimal] = None
     credit: Optional[Decimal] = None
     balance: Optional[Decimal] = None
 
-    cheque_number: Optional[str] = None
-    reference_number: Optional[str] = None
-    alpha: Optional[str] = None
-
-    source_page: Optional[int] = None
-    source_row: Optional[int] = None
-
-    extraction_confidence: Optional[Decimal] = None
-
-    raw_narration: Optional[str] = None
-    raw_row: Optional[str] = None
+    mode: Optional[str] = None
 
     created_at: datetime
-
 
 
 class BankTransactionListResponse(BaseModel):
