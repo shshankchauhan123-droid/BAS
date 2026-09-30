@@ -144,19 +144,13 @@ function AppRoutes() {
           path="/dashboard/cases"
           element={
             <ProtectedRoute>
-<<<<<<< HEAD
               <RoleRoute allowedRoles={["user", "superadmin", "admin"]}>
-=======
-              <RoleRoute allowedRoles={["user", "admin"]}>
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
                 <CaseList />
               </RoleRoute>
             </ProtectedRoute>
           }
         />
 
-<<<<<<< HEAD
-=======
         {/* =====================================================
             IO MASTER
         ====================================================== */}
@@ -165,7 +159,7 @@ function AppRoutes() {
           path="/dashboard/io-master"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
                 <IOMasterList />
               </RoleRoute>
             </ProtectedRoute>
@@ -179,7 +173,6 @@ function AppRoutes() {
             User role required
         ====================================================== */}
 
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
         <Route
           path="/dashboard/cases/create"
           element={
@@ -195,20 +188,14 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId"
           element={
             <ProtectedRoute>
-<<<<<<< HEAD
               <RoleRoute allowedRoles={["user", "superadmin", "admin"]}>
-=======
-              <RoleRoute allowedRoles={["user", "admin"]}>
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
                 <CaseDetails />
               </RoleRoute>
             </ProtectedRoute>
           }
         />
 
-<<<<<<< HEAD
         {/* Legacy /admin redirect */}
-=======
         {/* =====================================================
             CASE REPORTS HUB (Catalog of reports for a case)
         ====================================================== */}
@@ -217,7 +204,7 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
+              <RoleRoute allowedRoles={["user", "superadmin", "admin"]}>
                 <CaseReportsHub />
               </RoleRoute>
             </ProtectedRoute>
@@ -232,7 +219,7 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports/file-statement"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
+              <RoleRoute allowedRoles={["user", "superadmin", "admin"]}>
                 <CaseFileReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -247,7 +234,7 @@ function AppRoutes() {
           path="/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
+              <RoleRoute allowedRoles={["user", "superadmin", "admin"]}>
                 <ReportsOverview />
               </RoleRoute>
             </ProtectedRoute>
@@ -261,7 +248,6 @@ function AppRoutes() {
             Admin role required
         ====================================================== */}
 
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
         <Route
           path="/admin"
           element={

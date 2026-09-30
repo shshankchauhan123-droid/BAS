@@ -456,7 +456,6 @@ function UserNavbar() {
               </button>
             </>
           )}
-=======
           <button
             type="button"
             onClick={() => goTo("/dashboard")}
@@ -513,7 +512,6 @@ function UserNavbar() {
           >
             Analysis
           </button>
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
         </nav>
 
         {/* =====================================================
@@ -931,7 +929,6 @@ function UserNavbar() {
               </button>
             )}
 
-<<<<<<< HEAD
             {!isSuperAdmin && !isClientAdmin && (
               <>
                 <button
@@ -1031,7 +1028,6 @@ function UserNavbar() {
             >
               Analysis
             </button>
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
 
             {/* Logout */}
 

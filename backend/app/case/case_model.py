@@ -81,7 +81,6 @@ class Case(Base):
     # Relationships
     client = relationship("Client", back_populates="cases")
     creator = relationship("User", foreign_keys=[created_by])
-=======
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -163,4 +162,3 @@ class Case(Base):
 
     # Relationships
     io = relationship("IOMaster", back_populates="cases")
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b

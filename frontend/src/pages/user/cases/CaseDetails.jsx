@@ -29,7 +29,6 @@ function CaseDetails() {
   const navigate = useNavigate();
   const params = useParams();
   const { user } = useAuth();
-<<<<<<< HEAD
 
   const canUploadFiles =
     user?.role === "superadmin" ||
@@ -40,9 +39,7 @@ function CaseDetails() {
     user?.role === "superadmin" ||
     user?.role === "client_admin" ||
     user?.permissions?.can_delete_files !== false;
-=======
   const isAdmin = user?.role === "admin";
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
 
   /*
    * ============================================================
@@ -1304,13 +1301,10 @@ useEffect(() => {
   // ============================================================
 
   async function handleDeleteFile(file) {
-<<<<<<< HEAD
     if (!canDeleteFiles) {
       setFilesError("You do not have permission to delete files.");
-=======
     if (!isAdmin) {
       alert("Case files cannot be deleted by users. Uploaded case files are protected evidence.");
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
       return;
     }
 

@@ -3,12 +3,9 @@ import { useNavigate } from "react-router-dom";
 
 import UserNavbar from "../../components/layout/UserNavbar";
 import UserFooter from "../../components/layout/UserFooter";
-<<<<<<< HEAD
 import { useAuth } from "../../context/AuthContext";
-=======
 import { getCases } from "../../services/api/case";
 import { getIOMasters } from "../../services/api/ioMaster";
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b
 
 function UserDashboard() {
   const navigate = useNavigate();

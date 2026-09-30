@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -160,7 +159,7 @@ def delete_case(
 ):
     raise PermissionError("Cases cannot be deleted once created to ensure data and audit trail integrity.")
 
-=======
+
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -334,4 +333,3 @@ def delete_case(
         "case_number": case.case_number,
         "status": case.status,
     }
->>>>>>> d964aa477862435e3c0a549574c3fde9422a295b

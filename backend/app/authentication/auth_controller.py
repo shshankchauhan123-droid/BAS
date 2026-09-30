@@ -1,3 +1,4 @@
+from sqlalchemy.orm import Session
 from app.authentication.auth_schema import (
     FirstLoginPasswordChangeRequest,
     FirstLoginPasswordResponse,
@@ -204,4 +205,4 @@ def dismiss_first_login_controller(
     return FirstLoginPasswordResponse(
         message="First login prompt dismissed.",
         user=_format_user_response(user),
-    )
+    )
