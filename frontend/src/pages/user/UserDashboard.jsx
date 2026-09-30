@@ -2,9 +2,16 @@ import { useNavigate } from "react-router-dom";
 
 import UserNavbar from "../../components/layout/UserNavbar";
 import UserFooter from "../../components/layout/UserFooter";
+import { useAuth } from "../../context/AuthContext";
 
 function UserDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canCreateCase =
+    user?.role === "superadmin" ||
+    user?.role === "client_admin" ||
+    user?.permissions?.can_create_case !== false;
+
 
   const handleCreateCase = () => {
     navigate("/dashboard/cases/create");
@@ -101,36 +108,45 @@ function UserDashboard() {
               </div>
 
               {/* Create Case */}
-              <button
-                type="button"
-                onClick={handleCreateCase}
-                className="group flex items-center justify-center gap-3 rounded-xl bg-emerald-400 px-5 py-3.5 text-xs font-bold uppercase tracking-[0.12em] text-[#04100d] shadow-lg shadow-emerald-950/40 transition duration-200 hover:bg-emerald-300 hover:shadow-emerald-900/50"
-              >
-
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
+              {canCreateCase ? (
+                <button
+                  type="button"
+                  onClick={handleCreateCase}
+                  className="group flex items-center justify-center gap-3 rounded-xl bg-emerald-400 px-5 py-3.5 text-xs font-bold uppercase tracking-[0.12em] text-[#04100d] shadow-lg shadow-emerald-950/40 transition duration-200 hover:bg-emerald-300 hover:shadow-emerald-900/50"
                 >
-                  <path
-                    d="M12 5V19"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M12 5V19"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M5 12H19"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  Create Analysis Case
+                </button>
+              ) : (
+                <div
+                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-800/80 px-4 py-3 text-xs text-slate-400 cursor-not-allowed"
+                  title="Case creation is restricted by your organization administrator."
+                >
+                  <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span>Case Creation Locked</span>
+                </div>
+              )}
 
-                  <path
-                    d="M5 12H19"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-
-                Create Analysis Case
-
-              </button>
 
             </div>
 
@@ -448,34 +464,37 @@ function UserDashboard() {
               <div className="mt-6 space-y-3">
 
                 {/* Create Case */}
-                <QuickAction
-                  title="Create Analysis Case"
-                  description="Create a workspace for a new banking analysis"
-                  color="emerald"
-                  onClick={handleCreateCase}
-                  icon={
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <path
-                        d="M12 5V19"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                      />
+                {canCreateCase && (
+                  <QuickAction
+                    title="Create Analysis Case"
+                    description="Create a workspace for a new banking analysis"
+                    color="emerald"
+                    onClick={handleCreateCase}
+                    icon={
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <path
+                          d="M12 5V19"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
 
-                      <path
-                        d="M5 12H19"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  }
-                />
+                        <path
+                          d="M5 12H19"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    }
+                  />
+                )}
+
 
                 {/* Cases */}
                 <QuickAction

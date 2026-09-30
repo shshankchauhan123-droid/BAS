@@ -3,14 +3,18 @@ from sqlalchemy.orm import Session
 
 from app.files.file_schema import (
     FileListResponse,
+    FileSingleResponse,
     FileUploadResponse,
+    FileUpdateRequest,
 )
 from app.files.file_service import (
     delete_uploaded_file,
     get_case_files,
     get_file_for_view,
+    update_uploaded_file,
     upload_file,
 )
+from app.user.user_model import User
 
 
 # ============================================================
@@ -21,14 +25,14 @@ def upload_file_controller(
     db: Session,
     file: UploadFile,
     case_id: int,
-    user_id: int,
+    user: User,
 ) -> FileUploadResponse:
 
     uploaded_file = upload_file(
         db=db,
         file=file,
         case_id=case_id,
-        user_id=user_id,
+        user=user,
     )
 
     return FileUploadResponse(
@@ -80,17 +84,42 @@ def get_file_for_view_controller(
 
 
 # ============================================================
+# UPDATE FILE
+# ============================================================
+
+def update_file_controller(
+    db: Session,
+    file_id: int,
+    user: User,
+    data: FileUpdateRequest,
+) -> FileSingleResponse:
+
+    updated = update_uploaded_file(
+        db=db,
+        file_id=file_id,
+        user=user,
+        original_filename=data.original_filename,
+    )
+
+    return FileSingleResponse(
+        success=True,
+        message="File updated successfully",
+        data=updated,
+    )
+
+
+# ============================================================
 # DELETE FILE
 # ============================================================
 
 def delete_file_controller(
     db: Session,
     file_id: int,
-    user_id: int,
+    user: User,
 ) -> None:
 
     delete_uploaded_file(
         db=db,
         file_id=file_id,
-        user_id=user_id,
-    )
+        user=user,
+    )

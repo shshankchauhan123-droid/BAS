@@ -15,7 +15,6 @@ export function signupUser({
   });
 }
 
-
 export function loginUser({
   username,
   password,
@@ -29,7 +28,6 @@ export function loginUser({
   });
 }
 
-
 export function refreshAccessToken(
   refreshToken
 ) {
@@ -39,5 +37,26 @@ export function refreshAccessToken(
       refresh_token: refreshToken,
     }),
     skipAuthRefresh: true,
+  });
+}
+
+/**
+ * Change password on first login.
+ */
+export function changeFirstLoginPassword(newPassword) {
+  return apiRequest("/api/v1/auth/first-login-password", {
+    method: "POST",
+    body: JSON.stringify({
+      new_password: newPassword,
+    }),
+  });
+}
+
+/**
+ * Dismiss first login password change prompt (user decides to keep current password).
+ */
+export function dismissFirstLogin() {
+  return apiRequest("/api/v1/auth/dismiss-first-login", {
+    method: "POST",
   });
 }

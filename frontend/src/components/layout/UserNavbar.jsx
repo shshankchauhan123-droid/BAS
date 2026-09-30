@@ -115,6 +115,14 @@ function UserNavbar() {
   ============================================================ */
 
   const isActive = (path) => {
+    if (path === "/superadmin") {
+      return location.pathname === "/superadmin" || location.pathname.startsWith("/superadmin/");
+    }
+
+    if (path === "/client-admin") {
+      return location.pathname === "/client-admin" || location.pathname.startsWith("/client-admin/");
+    }
+
     /*
      * Dashboard should ONLY be active on:
      *
@@ -166,6 +174,19 @@ function UserNavbar() {
 
     return location.pathname === path;
   };
+
+  const isSuperAdmin =
+    String(displayRole).toLowerCase() === "superadmin" ||
+    String(displayRole).toLowerCase() === "admin";
+
+  const isClientAdmin =
+    String(displayRole).toLowerCase() === "client_admin";
+
+  const homePath = isSuperAdmin
+    ? "/superadmin"
+    : isClientAdmin
+    ? "/client-admin"
+    : "/dashboard";
 
   /* ============================================================
      NAVIGATION
@@ -308,7 +329,7 @@ function UserNavbar() {
 
         <button
           type="button"
-          onClick={() => goTo("/dashboard")}
+          onClick={() => goTo(homePath)}
           className="flex items-center gap-4"
         >
           {/* Logo Icon */}
@@ -360,50 +381,67 @@ function UserNavbar() {
         ====================================================== */}
 
         <nav className="hidden items-center gap-1 lg:flex">
+          {isSuperAdmin && (
+            <>
+              <button
+                type="button"
+                onClick={() => goTo("/superadmin")}
+                className={desktopNavClass("/superadmin")}
+              >
+                Clients & Tenants
+              </button>
+              <button
+                type="button"
+                onClick={() => goTo("/dashboard/cases")}
+                className={desktopNavClass("/dashboard/cases")}
+              >
+                All Cases
+              </button>
+            </>
+          )}
 
-          {/* Dashboard */}
+          {isClientAdmin && (
+            <button
+              type="button"
+              onClick={() => goTo("/client-admin")}
+              className={desktopNavClass("/client-admin")}
+            >
+              Team & Seats
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => goTo("/dashboard")}
-            className={desktopNavClass("/dashboard")}
-          >
-            Dashboard
-          </button>
-
-          {/* Cases */}
-
-          <button
-            type="button"
-            onClick={() =>
-              goTo("/dashboard/cases")
-            }
-            className={desktopNavClass(
-              "/dashboard/cases"
-            )}
-          >
-            Cases
-          </button>
-
-          {/* Reports */}
-
-          <button
-            type="button"
-            onClick={() => goTo("/reports")}
-            className={desktopNavClass("/reports")}
-          >
-            Reports
-          </button>
-
-          {/* Analysis */}
-
-          <button
-            type="button"
-            onClick={() => goTo("/analysis")}
-            className={desktopNavClass("/analysis")}
-          >
-            Analysis
-          </button>
+          {!isSuperAdmin && !isClientAdmin && (
+            <>
+              <button
+                type="button"
+                onClick={() => goTo("/dashboard")}
+                className={desktopNavClass("/dashboard")}
+              >
+                Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={() => goTo("/dashboard/cases")}
+                className={desktopNavClass("/dashboard/cases")}
+              >
+                Cases
+              </button>
+              <button
+                type="button"
+                onClick={() => goTo("/reports")}
+                className={desktopNavClass("/reports")}
+              >
+                Reports
+              </button>
+              <button
+                type="button"
+                onClick={() => goTo("/analysis")}
+                className={desktopNavClass("/analysis")}
+              >
+                Analysis
+              </button>
+            </>
+          )}
         </nav>
 
         {/* =====================================================
@@ -792,60 +830,67 @@ function UserNavbar() {
           </div>
 
           <div className="flex flex-col gap-2">
+            {isSuperAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => goTo("/superadmin")}
+                  className={mobileNavClass("/superadmin")}
+                >
+                  Clients & Tenants
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goTo("/dashboard/cases")}
+                  className={mobileNavClass("/dashboard/cases")}
+                >
+                  All Cases
+                </button>
+              </>
+            )}
 
-            {/* Dashboard */}
+            {isClientAdmin && (
+              <button
+                type="button"
+                onClick={() => goTo("/client-admin")}
+                className={mobileNavClass("/client-admin")}
+              >
+                Team & Seats
+              </button>
+            )}
 
-            <button
-              type="button"
-              onClick={() => goTo("/dashboard")}
-              className={mobileNavClass(
-                "/dashboard"
-              )}
-            >
-              Dashboard
-            </button>
-
-            {/* Cases */}
-
-            <button
-              type="button"
-              onClick={() =>
-                goTo("/dashboard/cases")
-              }
-              className={mobileNavClass(
-                "/dashboard/cases"
-              )}
-            >
-              Cases
-            </button>
-
-            {/* Reports */}
-
-            <button
-              type="button"
-              onClick={() =>
-                goTo("/reports")
-              }
-              className={mobileNavClass(
-                "/reports"
-              )}
-            >
-              Reports
-            </button>
-
-            {/* Analysis */}
-
-            <button
-              type="button"
-              onClick={() =>
-                goTo("/analysis")
-              }
-              className={mobileNavClass(
-                "/analysis"
-              )}
-            >
-              Analysis
-            </button>
+            {!isSuperAdmin && !isClientAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => goTo("/dashboard")}
+                  className={mobileNavClass("/dashboard")}
+                >
+                  Dashboard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goTo("/dashboard/cases")}
+                  className={mobileNavClass("/dashboard/cases")}
+                >
+                  Cases
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goTo("/reports")}
+                  className={mobileNavClass("/reports")}
+                >
+                  Reports
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goTo("/analysis")}
+                  className={mobileNavClass("/analysis")}
+                >
+                  Analysis
+                </button>
+              </>
+            )}
 
             {/* Logout */}
 

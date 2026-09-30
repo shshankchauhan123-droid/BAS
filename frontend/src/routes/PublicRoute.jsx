@@ -74,10 +74,22 @@ function PublicRoute({ children }) {
     .trim()
     .toLowerCase();
 
-  if (userRole === "admin") {
+  if (userRole === "superadmin" || userRole === "admin") {
     return (
       <Navigate
-        to="/admin"
+        to="/superadmin"
+        replace
+        state={{
+          from: location,
+        }}
+      />
+    );
+  }
+
+  if (userRole === "client_admin") {
+    return (
+      <Navigate
+        to="/client-admin"
         replace
         state={{
           from: location,

@@ -40,14 +40,20 @@ def create_case_route(
         return create_case(
             db=db,
             data=data,
-            user_id=current_user.id,
+            user=current_user,
         )
 
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         )
+
 
 
 @router.get(
@@ -62,7 +68,7 @@ def get_cases_route(
     try:
         return get_cases(
             db=db,
-            user_id=current_user.id,
+            user=current_user,
         )
 
     except ValueError as error:
@@ -86,7 +92,7 @@ def get_case_route(
         return get_case(
             db=db,
             case_id=case_id,
-            user_id=current_user.id,
+            user=current_user,
         )
 
     except ValueError as error:
@@ -112,7 +118,13 @@ def update_case_route(
             db=db,
             case_id=case_id,
             data=data,
-            user_id=current_user.id,
+            user=current_user,
+        )
+
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
         )
 
     except ValueError as error:
@@ -135,7 +147,13 @@ def delete_case_route(
         return delete_case(
             db=db,
             case_id=case_id,
-            user_id=current_user.id,
+            user=current_user,
+        )
+
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
         )
 
     except ValueError as error:

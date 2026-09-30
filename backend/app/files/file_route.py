@@ -16,13 +16,17 @@ from app.files.file_controller import (
     delete_file_controller,
     get_case_files_controller,
     get_file_for_view_controller,
+    update_file_controller,
     upload_file_controller,
 )
 
 from app.files.file_schema import (
     FileListResponse,
+    FileSingleResponse,
     FileUploadResponse,
+    FileUpdateRequest,
 )
+
 
 
 router = APIRouter(
@@ -53,7 +57,14 @@ def upload_file_route(
             db=db,
             file=file,
             case_id=case_id,
-            user_id=current_user.id,
+            user=current_user,
+        )
+
+    except PermissionError as error:
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
         )
 
     except ValueError as error:
@@ -62,6 +73,7 @@ def upload_file_route(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         )
+
 
 
 # ============================================================
@@ -134,6 +146,46 @@ def view_file_route(
 
 
 # ============================================================
+# UPDATE FILE
+# ============================================================
+
+@router.patch(
+    "/{file_id}",
+    response_model=FileSingleResponse,
+    status_code=status.HTTP_200_OK,
+)
+def update_file_route(
+    file_id: int,
+    data: FileUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+
+    try:
+
+        return update_file_controller(
+            db=db,
+            file_id=file_id,
+            user=current_user,
+            data=data,
+        )
+
+    except PermissionError as error:
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        )
+
+    except ValueError as error:
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        )
+
+
+# ============================================================
 # DELETE FILE
 # ============================================================
 
@@ -152,7 +204,7 @@ def delete_file_route(
         delete_file_controller(
             db=db,
             file_id=file_id,
-            user_id=current_user.id,
+            user=current_user,
         )
 
         return {
@@ -163,9 +215,16 @@ def delete_file_route(
             },
         }
 
+    except PermissionError as error:
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        )
+
     except ValueError as error:
 
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(error),
-        )
+        )

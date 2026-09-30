@@ -278,10 +278,22 @@ export async function apiRequest(
     }
 
 
-    const message =
-      data?.detail ||
-      data?.message ||
-      `Request failed with status ${response.status}`;
+    let message = `Request failed with status ${response.status}`;
+
+    if (typeof data?.detail === "string") {
+      message = data.detail;
+    } else if (Array.isArray(data?.detail)) {
+      message = data.detail
+        .map((item) => {
+          const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : "";
+          return field ? `${field}: ${item.msg}` : item.msg;
+        })
+        .join(" | ");
+    } else if (typeof data?.message === "string") {
+      message = data.message;
+    } else if (data?.detail && typeof data.detail === "object") {
+      message = JSON.stringify(data.detail);
+    }
 
     throw new Error(message);
   }
