@@ -14,6 +14,16 @@ def create_case(
     return case
 
 
+def get_all_cases(
+    db: Session,
+) -> list[Case]:
+    return (
+        db.query(Case)
+        .order_by(Case.created_at.desc())
+        .all()
+    )
+
+
 def get_cases_by_user(
     db: Session,
     user_id: int,

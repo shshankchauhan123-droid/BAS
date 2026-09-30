@@ -8,8 +8,10 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.client.client_model import Client
 
 
 class Case(Base):
@@ -20,6 +22,13 @@ class Case(Base):
         primary_key=True,
         index=True,
         autoincrement=True,
+    )
+
+    client_id = Column(
+        Integer,
+        ForeignKey("clients.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     case_number = Column(
@@ -67,3 +76,7 @@ class Case(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+    # Relationships
+    client = relationship("Client", back_populates="cases")
+    creator = relationship("User", foreign_keys=[created_by])

@@ -75,10 +75,19 @@ function RoleRoute({ children, allowedRoles = [] }) {
      * Send the user to their correct dashboard rather
      * than exposing the unauthorized page.
      */
-    if (userRole === "admin") {
+    if (userRole === "superadmin" || userRole === "admin") {
       return (
         <Navigate
-          to="/admin"
+          to="/superadmin"
+          replace
+        />
+      );
+    }
+
+    if (userRole === "client_admin") {
+      return (
+        <Navigate
+          to="/client-admin"
           replace
         />
       );

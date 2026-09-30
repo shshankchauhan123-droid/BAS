@@ -15,7 +15,6 @@ const AuthContext = createContext(null);
 const TOKEN_KEY = "antidrone_access_token";
 const REFRESH_TOKEN_KEY = "antidrone_refresh_token";
 const USER_KEY = "antidrone_user";
-const USER_ID_KEY = "bas_user_id";
 
 /* ============================================================
    AUTH PROVIDER
@@ -32,6 +31,9 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     try {
+      // Clean up deprecated redundant key if still present
+      localStorage.removeItem("bas_user_id");
+
       const storedToken =
         localStorage.getItem(TOKEN_KEY);
 
@@ -41,17 +43,13 @@ export function AuthProvider({ children }) {
       const storedUser =
         localStorage.getItem(USER_KEY);
 
-      const storedUserId =
-        localStorage.getItem(USER_ID_KEY);
-
       /*
        * Restore authentication state.
        *
-       * We now require:
-       *
+       * We require:
        * 1. Access token
        * 2. Refresh token
-       * 3. User information
+       * 3. User information (which already contains user ID)
        */
 
       if (
@@ -75,21 +73,6 @@ export function AuthProvider({ children }) {
         ) {
           setToken(storedToken);
           setUser(parsedUser);
-
-          /*
-           * Make sure the dedicated user ID
-           * also exists.
-           *
-           * This supports users who logged in
-           * before bas_user_id was introduced.
-           */
-
-          if (!storedUserId) {
-            localStorage.setItem(
-              USER_ID_KEY,
-              String(parsedUser.id)
-            );
-          }
         } else {
           /*
            * Stored user information is invalid.
@@ -101,7 +84,7 @@ export function AuthProvider({ children }) {
             REFRESH_TOKEN_KEY
           );
           localStorage.removeItem(USER_KEY);
-          localStorage.removeItem(USER_ID_KEY);
+          localStorage.removeItem("bas_user_id");
         }
       } else {
         /*
@@ -116,7 +99,7 @@ export function AuthProvider({ children }) {
           REFRESH_TOKEN_KEY
         );
         localStorage.removeItem(USER_KEY);
-        localStorage.removeItem(USER_ID_KEY);
+        localStorage.removeItem("bas_user_id");
       }
     } catch (error) {
       console.error(
@@ -133,7 +116,7 @@ export function AuthProvider({ children }) {
         REFRESH_TOKEN_KEY
       );
       localStorage.removeItem(USER_KEY);
-      localStorage.removeItem(USER_ID_KEY);
+      localStorage.removeItem("bas_user_id");
     } finally {
       setIsInitializing(false);
     }
@@ -219,21 +202,12 @@ export function AuthProvider({ children }) {
     );
 
     /* ----------------------------------------------------------
-       Store complete user object
+       Store complete user object (contains id, username, email, role)
     ---------------------------------------------------------- */
 
     localStorage.setItem(
       USER_KEY,
       JSON.stringify(authenticatedUser)
-    );
-
-    /* ----------------------------------------------------------
-       Store dedicated user ID
-    ---------------------------------------------------------- */
-
-    localStorage.setItem(
-      USER_ID_KEY,
-      String(authenticatedUser.id)
     );
 
     /* ----------------------------------------------------------
@@ -274,11 +248,11 @@ export function AuthProvider({ children }) {
     );
 
     /*
-     * Remove dedicated user ID.
+     * Clean up legacy user ID key if present.
      */
 
     localStorage.removeItem(
-      USER_ID_KEY
+      "bas_user_id"
     );
 
     /*
@@ -287,6 +261,23 @@ export function AuthProvider({ children }) {
 
     setToken(null);
     setUser(null);
+  }
+
+  /* ==========================================================
+     UPDATE USER
+  ========================================================== */
+
+  function updateUser(partialUser) {
+    setUser((prevUser) => {
+      if (!prevUser) return null;
+      const updatedUser = { ...prevUser, ...partialUser };
+      try {
+        localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+      } catch (err) {
+        console.error("Failed to update stored user:", err);
+      }
+      return updatedUser;
+    });
   }
 
   /* ==========================================================
@@ -324,6 +315,8 @@ export function AuthProvider({ children }) {
       login,
 
       logout,
+
+      updateUser,
     }),
     [
       token,

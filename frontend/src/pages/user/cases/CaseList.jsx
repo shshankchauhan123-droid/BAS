@@ -19,9 +19,16 @@ import CreateCaseModal from "../../../components/cases/CreateCaseModal";
 
 import BASNavbar from "../../../components/layout/UserNavbar";
 import BASFooter from "../../../components/layout/UserFooter";
+import { useAuth } from "../../../context/AuthContext";
 
 function CaseList() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canCreateCase =
+    user?.role === "superadmin" ||
+    user?.role === "client_admin" ||
+    user?.permissions?.can_create_case !== false;
+
 
   const [cases, setCases] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -362,55 +369,82 @@ function CaseList() {
 
               {/* CREATE BUTTON */}
 
-              <button
-                type="button"
-                onClick={() =>
-                  setIsModalOpen(true)
-                }
-                className="
-                  inline-flex
-                  w-fit
-                  items-center
-                  justify-center
-                  gap-3
-                  rounded-xl
-                  bg-emerald-400
-                  px-6
-                  py-3.5
-                  text-sm
-                  font-semibold
-                  text-[#03100d]
-                  shadow-[0_10px_30px_rgba(52,211,153,0.08)]
-                  transition-all
-                  duration-200
-                  hover:bg-emerald-300
-                  hover:shadow-[0_12px_35px_rgba(52,211,153,0.14)]
-                  active:scale-[0.98]
-                  lg:px-7
-                "
-              >
-
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
+              {canCreateCase ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsModalOpen(true)
+                  }
+                  className="
+                    inline-flex
+                    w-fit
+                    items-center
+                    justify-center
+                    gap-3
+                    rounded-xl
+                    bg-emerald-400
+                    px-6
+                    py-3.5
+                    text-sm
+                    font-semibold
+                    text-[#03100d]
+                    shadow-[0_10px_30px_rgba(52,211,153,0.08)]
+                    transition-all
+                    duration-200
+                    hover:bg-emerald-300
+                    hover:shadow-[0_12px_35px_rgba(52,211,153,0.14)]
+                    active:scale-[0.98]
+                    lg:px-7
+                  "
                 >
-                  <path
-                    d="M12 5v14"
-                    strokeLinecap="round"
-                  />
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      d="M12 5v14"
+                      strokeLinecap="round"
+                    />
 
-                  <path
-                    d="M5 12h14"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                    <path
+                      d="M5 12h14"
+                      strokeLinecap="round"
+                    />
+                  </svg>
 
-                CREATE NEW CASE
+                  CREATE NEW CASE
+                </button>
+              ) : (
+                <div
+                  className="
+                    inline-flex
+                    w-fit
+                    items-center
+                    justify-center
+                    gap-2.5
+                    rounded-xl
+                    border
+                    border-white/10
+                    bg-slate-800/80
+                    px-5
+                    py-3.5
+                    text-xs
+                    font-semibold
+                    text-slate-400
+                    cursor-not-allowed
+                  "
+                  title="Case creation is restricted by your organization administrator."
+                >
+                  <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span>CASE CREATION LOCKED</span>
+                </div>
+              )}
 
-              </button>
 
             </div>
 

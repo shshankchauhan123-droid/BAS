@@ -25,6 +25,8 @@ class SignupResponse(BaseModel):
     email: EmailStr
     role: str
     is_active: bool
+    client_id: int | None = None
+    first_login: bool = False
 
 
 # ============================================================
@@ -40,12 +42,19 @@ class LoginRequest(BaseModel):
     )
 
 
+from app.user.user_schema import UserPermissionsSchema
+
+
 class UserResponse(BaseModel):
     id: int
     username: str
     email: EmailStr
     role: str
     is_active: bool
+    client_id: int | None = None
+    first_login: bool = False
+    permissions: UserPermissionsSchema | None = None
+
 
 
 class LoginResponse(BaseModel):
@@ -67,3 +76,20 @@ class RefreshTokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
+
+
+# ============================================================
+# FIRST-TIME LOGIN PASSWORD CHANGE
+# ============================================================
+
+class FirstLoginPasswordChangeRequest(BaseModel):
+    new_password: str = Field(
+        min_length=8,
+        max_length=128,
+        description="New password to set for the account",
+    )
+
+
+class FirstLoginPasswordResponse(BaseModel):
+    message: str
+    user: UserResponse

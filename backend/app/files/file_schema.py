@@ -10,6 +10,17 @@ class FileUploadResponse(BaseModel):
     data: "FileData"
 
 
+class FileUpdateRequest(BaseModel):
+    original_filename: Optional[str] = None
+
+
+class FileSingleResponse(BaseModel):
+    success: bool
+    message: str
+    data: "FileData"
+
+
+
 class FileData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -13,6 +13,8 @@ from app.files.file_repository import (
     get_file_by_id_and_user,
     get_files_by_case_and_user,
 )
+from app.user.user_model import User
+
 
 from app.tasks.bank_statement_task import process_bank_statement
 
@@ -158,8 +160,14 @@ def upload_file(
     db: Session,
     file: UploadFile,
     case_id: int,
-    user_id: int,
+    user: User,
 ) -> File:
+    user_id = user.id
+    user_role = str(user.role).lower()
+    if user_role == "user":
+        perms = getattr(user, "permissions", None)
+        if perms and not perms.can_upload_files:
+            raise PermissionError("You do not have permission to upload files. Contact your company administrator.")
 
     # --------------------------------------------------------
     # Check case ownership
@@ -171,6 +179,7 @@ def upload_file(
         case_id=case_id,
         user_id=user_id,
     )
+
 
     if not case:
         raise ValueError(
@@ -369,12 +378,54 @@ def get_file_for_view(
 # ============================================================
 # DELETE FILE
 # ============================================================
+# UPDATE FILE
+# ============================================================
+
+def update_uploaded_file(
+    db: Session,
+    file_id: int,
+    user: User,
+    original_filename: str | None = None,
+) -> File:
+    user_id = user.id
+    user_role = str(user.role).lower()
+    if user_role == "user":
+        perms = getattr(user, "permissions", None)
+        if perms and not perms.can_update_files:
+            raise PermissionError("You do not have permission to update files. Contact your company administrator.")
+
+    file = get_file_by_id_and_user(
+        db=db,
+        file_id=file_id,
+        user_id=user_id,
+    )
+
+    if not file:
+        raise ValueError("File not found")
+
+    if original_filename is not None and original_filename.strip():
+        file.original_filename = original_filename.strip()
+
+    db.commit()
+    db.refresh(file)
+    return file
+
+
+# ============================================================
+# DELETE FILE
+# ============================================================
 
 def delete_uploaded_file(
     db: Session,
     file_id: int,
-    user_id: int,
+    user: User,
 ) -> None:
+    user_id = user.id
+    user_role = str(user.role).lower()
+    if user_role == "user":
+        perms = getattr(user, "permissions", None)
+        if perms and not perms.can_delete_files:
+            raise PermissionError("You do not have permission to delete files. Contact your company administrator.")
 
     # --------------------------------------------------------
     # Find file belonging to current user
@@ -390,6 +441,7 @@ def delete_uploaded_file(
         raise ValueError(
             "File not found"
         )
+
 
     # --------------------------------------------------------
     # Physical file

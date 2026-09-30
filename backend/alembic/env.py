@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from alembic import context
 
 from app.core.database import Base
+from app.client.client_model import Client
 from app.user.user_model import User
 from app.case.case_model import Case
 from app.files.file_model import File
