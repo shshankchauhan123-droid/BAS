@@ -168,8 +168,10 @@ function Login() {
 
       let dashboardPath = null;
 
-      if (role === "admin") {
-        dashboardPath = "/admin";
+      if (role === "superadmin" || role === "admin") {
+        dashboardPath = "/superadmin";
+      } else if (role === "client_admin") {
+        dashboardPath = "/client-admin";
       } else if (role === "user") {
         dashboardPath = "/dashboard";
       }
@@ -254,8 +256,10 @@ function Login() {
         color: "#f8fafc",
         iconColor: "#34d399",
         confirmButtonText:
-          role === "admin"
-            ? "Enter Admin Dashboard →"
+          role === "superadmin" || role === "admin"
+            ? "Enter SuperAdmin Control →"
+            : role === "client_admin"
+            ? "Enter Company Portal →"
             : "Enter BAS Dashboard →",
         confirmButtonColor: "#059669",
         allowOutsideClick: false,

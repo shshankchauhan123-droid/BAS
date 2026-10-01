@@ -5,14 +5,20 @@ from pathlib import Path
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
-from app.case.case_repository import get_case_by_id_and_user
+from app.case.case_repository import get_case_by_id, get_case_by_id_and_user
 from app.files.file_model import File
 from app.files.file_repository import (
     create_file,
     delete_file,
+    get_file_by_id,
     get_file_by_id_and_user,
+    get_files_by_case,
     get_files_by_case_and_user,
 )
+from app.user.user_model import User
+from app.audit.audit_service import record_audit_log
+from app.core.roles import ADMIN_ROLE, CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, USER_ROLE
+
 
 from app.tasks.bank_statement_task import process_bank_statement
 
@@ -158,19 +164,26 @@ def upload_file(
     db: Session,
     file: UploadFile,
     case_id: int,
-    user_id: int,
+    user: User,
 ) -> File:
+    user_id = user.id
+    user_role = str(user.role).lower()
+    if user_role == USER_ROLE:
+        perms = getattr(user, "permissions", None)
+        if perms and not perms.can_upload_files:
+            raise PermissionError("You do not have permission to upload files. Contact your company administrator.")
 
     # --------------------------------------------------------
     # Check case ownership
     # --------------------------------------------------------
-
-    # Check case ownership
-    case = get_case_by_id_and_user(
-        db=db,
-        case_id=case_id,
-        user_id=user_id,
-    )
+    if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        case = get_case_by_id(db=db, case_id=case_id)
+    else:
+        case = get_case_by_id_and_user(
+            db=db,
+            case_id=case_id,
+            user_id=user_id,
+        )
 
     if not case:
         raise ValueError(
@@ -228,6 +241,24 @@ def upload_file(
 
         process_bank_statement.delay(
             created_file.id
+        )
+
+        record_audit_log(
+            db=db,
+            actor=user,
+            action="FILE_UPLOADED",
+            entity_type="file",
+            entity_id=str(created_file.id),
+            entity_name=created_file.original_filename,
+            description=f"User {user.username} uploaded file '{created_file.original_filename}' to Case #{case.case_number}",
+            details={
+                "file_name": created_file.original_filename,
+                "file_size": created_file.file_size,
+                "mime_type": created_file.mime_type,
+                "case_id": case.id,
+                "case_number": case.case_number,
+            },
+            client_id=case.client_id,
         )
 
         print(
@@ -291,33 +322,30 @@ def upload_file(
 def get_case_files(
     db: Session,
     case_id: int,
-    user_id: int,
+    user: User,
 ) -> list[File]:
 
-    # --------------------------------------------------------
-    # Check case ownership
-    # --------------------------------------------------------
+    user_id = user.id
+    user_role = str(user.role).lower()
 
-    case = get_case_by_id_and_user(
-        db=db,
-        case_id=case_id,
-        user_id=user_id,
-    )
-
-    if not case:
-        raise ValueError(
-            "Case not found"
+    if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        case = get_case_by_id(db=db, case_id=case_id)
+        if not case:
+            raise ValueError("Case not found")
+        return get_files_by_case(db=db, case_id=case_id)
+    else:
+        case = get_case_by_id_and_user(
+            db=db,
+            case_id=case_id,
+            user_id=user_id,
         )
-
-    # --------------------------------------------------------
-    # Get files
-    # --------------------------------------------------------
-
-    return get_files_by_case_and_user(
-        db=db,
-        case_id=case_id,
-        user_id=user_id,
-    )
+        if not case:
+            raise ValueError("Case not found")
+        return get_files_by_case_and_user(
+            db=db,
+            case_id=case_id,
+            user_id=user_id,
+        )
 
 
 # ============================================================
@@ -327,18 +355,20 @@ def get_case_files(
 def get_file_for_view(
     db: Session,
     file_id: int,
-    user_id: int,
+    user: User,
 ) -> File:
 
-    # --------------------------------------------------------
-    # Find file belonging to current user
-    # --------------------------------------------------------
+    user_id = user.id
+    user_role = str(user.role).lower()
 
-    file = get_file_by_id_and_user(
-        db=db,
-        file_id=file_id,
-        user_id=user_id,
-    )
+    if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        file = get_file_by_id(db=db, file_id=file_id)
+    else:
+        file = get_file_by_id_and_user(
+            db=db,
+            file_id=file_id,
+            user_id=user_id,
+        )
 
     if not file:
         raise ValueError(
@@ -366,19 +396,20 @@ def get_file_for_view(
     return file
 
 
-# ============================================================
-# DELETE FILE
-# ============================================================
 
-def delete_uploaded_file(
+
+def update_uploaded_file(
     db: Session,
     file_id: int,
-    user_id: int,
-) -> None:
-
-    # --------------------------------------------------------
-    # Find file belonging to current user
-    # --------------------------------------------------------
+    user: User,
+    original_filename: str | None = None,
+) -> File:
+    user_id = user.id
+    user_role = str(user.role).lower()
+    if user_role == "user":
+        perms = getattr(user, "permissions", None)
+        if perms and not perms.can_update_files:
+            raise PermissionError("You do not have permission to update files. Contact your company administrator.")
 
     file = get_file_by_id_and_user(
         db=db,
@@ -387,9 +418,71 @@ def delete_uploaded_file(
     )
 
     if not file:
+        raise ValueError("File not found")
+
+    old_filename = file.original_filename
+    if original_filename is not None and original_filename.strip():
+        file.original_filename = original_filename.strip()
+
+    db.commit()
+    db.refresh(file)
+
+    record_audit_log(
+        db=db,
+        actor=user,
+        action="FILE_UPDATED",
+        entity_type="file",
+        entity_id=str(file.id),
+        entity_name=file.original_filename,
+        description=f"User {user.username} updated file '{file.original_filename}' in Case ID {file.case_id}",
+        details={
+            "old_filename": old_filename,
+            "new_filename": file.original_filename,
+            "case_id": file.case_id,
+        },
+        client_id=user.client_id,
+    )
+
+    return file
+
+
+# ============================================================
+# DELETE FILE
+# ============================================================
+
+def delete_uploaded_file(
+    db: Session,
+    file_id: int,
+    user: User,
+) -> None:
+    user_id = user.id
+    user_role = str(user.role).lower()
+    if user_role == USER_ROLE:
+        perms = getattr(user, "permissions", None)
+        if perms and not perms.can_delete_files:
+            raise PermissionError("You do not have permission to delete files. Contact your company administrator.")
+
+    # --------------------------------------------------------
+    # Find file belonging to current user or admin
+    # --------------------------------------------------------
+
+    if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        file = get_file_by_id(db=db, file_id=file_id)
+    else:
+        file = get_file_by_id_and_user(
+            db=db,
+            file_id=file_id,
+            user_id=user_id,
+        )
+
+    if not file:
         raise ValueError(
             "File not found"
         )
+
+    saved_file_id = str(file.id)
+    saved_filename = file.original_filename
+    saved_case_id = file.case_id
 
     # --------------------------------------------------------
     # Physical file
@@ -408,6 +501,21 @@ def delete_uploaded_file(
         delete_file(
             db=db,
             file=file,
+        )
+
+        record_audit_log(
+            db=db,
+            actor=user,
+            action="FILE_DELETED",
+            entity_type="file",
+            entity_id=saved_file_id,
+            entity_name=saved_filename,
+            description=f"User {user.username} deleted file '{saved_filename}' from Case ID {saved_case_id}",
+            details={
+                "file_name": saved_filename,
+                "case_id": saved_case_id,
+            },
+            client_id=user.client_id,
         )
 
     except Exception:

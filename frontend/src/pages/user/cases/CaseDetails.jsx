@@ -23,10 +23,22 @@ import {
 
 import BASNavbar from "../../../components/layout/UserNavbar";
 import BASFooter from "../../../components/layout/UserFooter";
+import { useAuth } from "../../../context/AuthContext";
 
 function CaseDetails() {
   const navigate = useNavigate();
   const params = useParams();
+  const { user } = useAuth();
+
+  const canUploadFiles =
+    user?.role === "superadmin" ||
+    user?.role === "client_admin" ||
+    user?.permissions?.can_upload_files !== false;
+
+  const canDeleteFiles =
+    user?.role === "superadmin" ||
+    user?.role === "client_admin" ||
+    user?.permissions?.can_delete_files !== false;
 
   /*
    * ============================================================
@@ -826,23 +838,12 @@ useEffect(() => {
   // FORMAT STATUS
   // ============================================================
 
-  function formatFileStatus(file) {
-    if (!file) return "UNKNOWN";
-
-    const baseStatus = String(file.status || "UNKNOWN")
+  function formatStatus(status) {
+    return String(
+      status || "UNKNOWN"
+    )
       .replaceAll("_", " ")
       .toUpperCase();
-
-    if (baseStatus === "PROCESSING" && file.processing_stage) {
-      const stageName = file.processing_stage
-        .split("_")
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-      const progress = file.processing_progress ? ` (${file.processing_progress})` : "";
-      return `PROCESSING... ${stageName}${progress}`;
-    }
-    
-    return baseStatus;
   }
 
   // ============================================================
@@ -980,6 +981,10 @@ useEffect(() => {
   // ============================================================
 
   function handleOpenUploadType() {
+    if (!canUploadFiles) {
+      setUploadError("You do not have permission to upload files.");
+      return;
+    }
     setUploadError("");
     setIsUploadTypeOpen(true);
   }
@@ -1011,6 +1016,11 @@ useEffect(() => {
   // ============================================================
 
   async function uploadSingleFile(file) {
+    if (!canUploadFiles) {
+      setUploadError("You do not have permission to upload files.");
+      return;
+    }
+
     if (!caseId) {
       setUploadError(
         "Invalid case ID. Please reopen the case."
@@ -1077,6 +1087,11 @@ useEffect(() => {
   // ============================================================
 
   async function handleFolderChange(event) {
+    if (!canUploadFiles) {
+      setUploadError("You do not have permission to upload files.");
+      return;
+    }
+
     const files = Array.from(event.target.files || []);
 
     // Allows selecting the same folder again.
@@ -1274,6 +1289,11 @@ useEffect(() => {
   // ============================================================
 
   async function handleDeleteFile(file) {
+    if (!canDeleteFiles) {
+      setFilesError("You do not have permission to delete files.");
+      return;
+    }
+
     if (!file?.id) {
       return;
     }
@@ -1856,7 +1876,32 @@ function goToNextTransactionPage() {
 
               </div>
 
-              <div className="shrink-0">
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/dashboard/cases/${caseId}/reports`
+                    )
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-400/[0.08] px-4 py-2.5 text-xs font-semibold text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.12)] transition-all duration-200 hover:border-emerald-400/50 hover:bg-emerald-400/[0.18] hover:text-white"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path
+                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  View Case Report
+                </button>
 
                 <span
                   className={`
@@ -1965,6 +2010,29 @@ function goToNextTransactionPage() {
                   </p>
 
                 </div>
+
+                {caseData.io && (
+                  <div className="rounded-[22px] border border-emerald-400/20 bg-[#061411]/80 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.10)] backdrop-blur-sm sm:col-span-2 xl:col-span-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
+                          INVESTIGATING OFFICER (IO)
+                        </p>
+                        <p className="mt-2 text-xl font-bold text-white">
+                          {caseData.io.officer_name}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="inline-flex rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                          {caseData.io.designation}
+                        </span>
+                        <span className="text-xs text-slate-300">
+                          Station / Branch: <strong className="text-white">{caseData.io.police_station}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               </div>
 
@@ -2144,6 +2212,7 @@ function goToNextTransactionPage() {
 
                       </div>
 
+                    {canUploadFiles ? (
                       <button
                         type="button"
                         onClick={handleOpenUploadType}
@@ -2187,6 +2256,14 @@ function goToNextTransactionPage() {
                         )}
 
                       </button>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs font-medium text-amber-300">
+                        <svg className="h-4 w-4 shrink-0 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Upload restricted by admin
+                      </div>
+                    )}
 
                     </div>
 
@@ -2644,8 +2721,8 @@ function goToNextTransactionPage() {
 
                                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
 
-                                    {formatFileStatus(
-                                      file
+                                    {formatStatus(
+                                      file.status
                                     )}
 
                                   </span>
@@ -2717,6 +2794,7 @@ function goToNextTransactionPage() {
                                     </button>
                                   )}
 
+                                  {canDeleteFiles && (
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -2775,6 +2853,7 @@ function goToNextTransactionPage() {
                                     )}
 
                                   </button>
+                                  )}
 
                                 </div>
 

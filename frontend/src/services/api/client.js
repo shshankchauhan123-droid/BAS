@@ -204,9 +204,9 @@ export async function apiRequest(
     );
 
   } catch (error) {
-
+    console.error(`[API Network Error] Request to ${API_BASE_URL}${endpoint} failed:`, error);
     throw new Error(
-      "Unable to connect to the server."
+      "Unable to connect to the backend server (FastAPI at " + API_BASE_URL + "). Please verify the backend is running."
     );
   }
 
@@ -278,10 +278,22 @@ export async function apiRequest(
     }
 
 
-    const message =
-      data?.detail ||
-      data?.message ||
-      `Request failed with status ${response.status}`;
+    let message = `Request failed with status ${response.status}`;
+
+    if (typeof data?.detail === "string") {
+      message = data.detail;
+    } else if (Array.isArray(data?.detail)) {
+      message = data.detail
+        .map((item) => {
+          const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : "";
+          return field ? `${field}: ${item.msg}` : item.msg;
+        })
+        .join(" | ");
+    } else if (typeof data?.message === "string") {
+      message = data.message;
+    } else if (data?.detail && typeof data.detail === "object") {
+      message = JSON.stringify(data.detail);
+    }
 
     throw new Error(message);
   }

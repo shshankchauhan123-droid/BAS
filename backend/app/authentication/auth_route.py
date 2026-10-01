@@ -4,25 +4,22 @@ from fastapi import (
     HTTPException,
     status,
 )
-
 from sqlalchemy.orm import Session
-
-from app.core.database import get_db
 
 from app.authentication.auth_controller import (
     login,
-    signup,
     refresh_access_token,
+    signup,
 )
-
 from app.authentication.auth_schema import (
     LoginRequest,
     LoginResponse,
-    SignupRequest,
-    SignupResponse,
     RefreshTokenRequest,
     RefreshTokenResponse,
+    SignupRequest,
+    SignupResponse,
 )
+from app.core.database import get_db
 
 
 router = APIRouter(
@@ -44,16 +41,13 @@ def signup_route(
     data: SignupRequest,
     db: Session = Depends(get_db),
 ):
-
     try:
-
         return signup(
             db=db,
             data=data,
         )
 
     except ValueError as error:
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
@@ -73,16 +67,13 @@ def login_route(
     data: LoginRequest,
     db: Session = Depends(get_db),
 ):
-
     try:
-
         return login(
             db=db,
             data=data,
         )
 
     except ValueError as error:
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(error),
@@ -102,16 +93,13 @@ def refresh_route(
     data: RefreshTokenRequest,
     db: Session = Depends(get_db),
 ):
-
     try:
-
         return refresh_access_token(
             db=db,
             data=data,
         )
 
     except ValueError as error:
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(error),

@@ -5,6 +5,7 @@ from app.processing.persistence.transaction_repository import (
     delete_transactions_by_file_id,
     bulk_insert_transactions,
 )
+from app.bank_transactions.transaction_mode_service import get_all_modes, detect_transaction_mode
 
 def persist_transactions(
     db: Session,
@@ -52,6 +53,14 @@ def persist_transactions(
     valid_df["transaction_date"] = pd.to_datetime(valid_df["transaction_date"], dayfirst=True, errors="coerce").dt.date
     valid_df = valid_df.replace({pd.NaT: None})
     
+    # Fetch file record to retrieve account metadata
+    from app.files.file_repository import get_file_by_id
+    file_record = get_file_by_id(db, file_id)
+    account_name = file_record.account_name if file_record else None
+    account_number = file_record.account_number if file_record else None
+    # Fetch available transaction modes
+    available_modes = get_all_modes(db)
+    
     for _, row in valid_df.iterrows():
         # Handle the case where pandas replace might leave some np.nan behind
         def clean_val(v):
@@ -59,16 +68,25 @@ def persist_transactions(
                 return None
             return v
 
+        current_mode = clean_val(row.get("mode"))
+        description_val = clean_val(row.get("description"))
+        
+        final_mode = current_mode
+        if not final_mode and description_val:
+            final_mode = detect_transaction_mode(description_val, available_modes)
+
         transaction = BankTransaction(
             file_id=file_id,
             case_id=case_id,
+            account_name=account_name,
+            account_number=account_number,
             transaction_date=clean_val(row.get("transaction_date")),
-            description=clean_val(row.get("description")),
+            description=description_val,
             cheque_number=clean_val(row.get("cheque_number")),
             debit=clean_val(row.get("debit")),
             credit=clean_val(row.get("credit")),
             balance=clean_val(row.get("balance")),
-            mode=clean_val(row.get("mode")),
+            mode=final_mode,
         )
         transactions.append(transaction)
         

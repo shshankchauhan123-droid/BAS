@@ -35,3 +35,17 @@ class BankTransactionListResponse(BaseModel):
     total_pages: int
 
     data: list[BankTransactionData]
+
+
+class TransactionSummaryData(BaseModel):
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    total_transactions: int = 0
+    total_debits: Decimal = Decimal("0.0")
+    total_credits: Decimal = Decimal("0.0")
+
+
+class TransactionSummaryResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[TransactionSummaryData] = None

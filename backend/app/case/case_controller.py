@@ -4,14 +4,14 @@ from app.case.case_schema import (
     CaseCreateRequest,
     CaseUpdateRequest,
 )
-
 from app.case.case_service import (
     create_case as service_create_case,
-    get_cases as service_get_cases,
-    get_case as service_get_case,
-    update_case as service_update_case,
     delete_case as service_delete_case,
+    get_case as service_get_case,
+    get_cases as service_get_cases,
+    update_case as service_update_case,
 )
+from app.user.user_model import User
 
 
 def create_case(
@@ -61,7 +61,7 @@ def get_case(
     )
 
     if not case:
-        raise ValueError("Case not found")
+        raise ValueError("Case not found or permission denied")
 
     return {
         "success": True,

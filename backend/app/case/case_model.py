@@ -8,6 +8,7 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
@@ -20,6 +21,13 @@ class Case(Base):
         primary_key=True,
         index=True,
         autoincrement=True,
+    )
+
+    client_id = Column(
+        Integer,
+        ForeignKey("clients.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     case_number = Column(
@@ -55,6 +63,21 @@ class Case(Base):
         index=True,
     )
 
+    # Investigating Officer assigned to this case
+    io_id = Column(
+        Integer,
+        ForeignKey("io_master.id"),
+        nullable=True,
+        index=True,
+    )
+
+    client_id = Column(
+        Integer,
+        ForeignKey("clients.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -67,3 +90,14 @@ class Case(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+    # Relationships
+    io = relationship("IOMaster", back_populates="cases")
+    client = relationship("Client", back_populates="cases")
+    creator = relationship("User", foreign_keys=[created_by])
+
+
+# Register related models with SQLAlchemy mapper
+import app.io_master.io_master_model  # noqa: E402, F401
+import app.client.client_model  # noqa: E402, F401
+import app.user.user_model  # noqa: E402, F401

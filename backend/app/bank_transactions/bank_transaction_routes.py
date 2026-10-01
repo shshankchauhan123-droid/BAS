@@ -11,10 +11,12 @@ from app.bank_transactions.bank_transaction_repository import (
     get_filtered_transactions_by_case,
     get_transactions_by_case_paginated,
     get_transactions_by_file_paginated,
+    get_file_transaction_summary,
 )
 
 from app.bank_transactions.bank_transaction_schema import (
     BankTransactionListResponse,
+    TransactionSummaryResponse,
 )
 
 
@@ -206,4 +208,25 @@ def search_case_transactions(
         page_size=page_size,
         total_pages=total_pages,
         data=transactions,
+    )
+
+
+# ============================================================
+# Get transactions summary by file
+# ============================================================
+
+@router.get(
+    "/file/{file_id}/summary",
+    response_model=TransactionSummaryResponse,
+)
+def get_file_summary(
+    file_id: int,
+    db: Session = Depends(get_db),
+):
+    summary_data = get_file_transaction_summary(db=db, file_id=file_id)
+
+    return TransactionSummaryResponse(
+        success=True,
+        message="File transaction summary retrieved successfully.",
+        data=summary_data,
     )

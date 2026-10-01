@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.bank_transactions.bank_transaction_model import BankTransaction
 
@@ -307,3 +308,50 @@ def delete_transactions_by_file(
     db.commit()
 
     return count
+
+
+# ============================================================
+# Get transactions summary by file
+# ============================================================
+
+def get_file_transaction_summary(db: Session, file_id: int):
+    # Calculate total transactions
+    total_transactions = (
+        db.query(func.count(BankTransaction.id))
+        .filter(BankTransaction.file_id == file_id)
+        .scalar()
+    ) or 0
+
+    # Calculate min and max dates
+    dates = (
+        db.query(
+            func.min(BankTransaction.transaction_date),
+            func.max(BankTransaction.transaction_date)
+        )
+        .filter(BankTransaction.file_id == file_id)
+        .first()
+    )
+    start_date = dates[0] if dates else None
+    end_date = dates[1] if dates else None
+
+    # Calculate total debits
+    total_debits = (
+        db.query(func.sum(BankTransaction.debit))
+        .filter(BankTransaction.file_id == file_id)
+        .scalar()
+    ) or Decimal("0.0")
+
+    # Calculate total credits
+    total_credits = (
+        db.query(func.sum(BankTransaction.credit))
+        .filter(BankTransaction.file_id == file_id)
+        .scalar()
+    ) or Decimal("0.0")
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_transactions": total_transactions,
+        "total_debits": total_debits,
+        "total_credits": total_credits
+    }

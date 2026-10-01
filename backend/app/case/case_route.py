@@ -43,6 +43,11 @@ def create_case_route(
             user_id=current_user.id,
         )
 
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -114,6 +119,11 @@ def update_case_route(
             data=data,
             user_id=current_user.id,
         )
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        )
 
     except ValueError as error:
         raise HTTPException(
@@ -131,11 +141,23 @@ def delete_case_route(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Users are not permitted to delete cases.",
+        )
+
     try:
         return delete_case(
             db=db,
             case_id=case_id,
             user_id=current_user.id,
+        )
+
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
         )
 
     except ValueError as error:

@@ -7,6 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     Numeric,
+    String,
     Text,
 )
 
@@ -35,6 +36,16 @@ class BankTransaction(Base):
         ForeignKey("cases.id"),
         nullable=False,
         index=True,
+    )
+
+    account_name = Column(
+        String(255),
+        nullable=True,
+    )
+
+    account_number = Column(
+        String(100),
+        nullable=True,
     )
 
     transaction_date = Column(

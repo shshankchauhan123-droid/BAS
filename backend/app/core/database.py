@@ -32,3 +32,31 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def ensure_database_schema(db=None):
+    from sqlalchemy import text
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        pass
+
+    for table_name, table in Base.metadata.tables.items():
+        for col in table.columns:
+            if col.name == "id":
+                continue
+            col_type = col.type.compile(engine.dialect)
+            sql = f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col.name} {col_type}"
+            try:
+                db.execute(text(sql))
+                db.commit()
+            except Exception:
+                db.rollback()
+
+    if should_close:
+        db.close()

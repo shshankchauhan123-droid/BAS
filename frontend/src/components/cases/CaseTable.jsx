@@ -208,6 +208,24 @@ function CaseTable({ cases = [], onOpen }) {
                 Case Name
               </th>
 
+              {/* Investigating Officer */}
+
+              <th
+                className="
+                  whitespace-nowrap
+                  px-6
+                  py-5
+                  text-left
+                  text-[10px]
+                  font-semibold
+                  uppercase
+                  tracking-[0.18em]
+                  text-slate-500
+                "
+              >
+                Investigating Officer
+              </th>
+
               {/* Status */}
 
               <th
@@ -373,6 +391,33 @@ function CaseTable({ cases = [], onOpen }) {
                       </p>
                     )}
 
+                  </td>
+
+                  {/* ==================================================
+                      INVESTIGATING OFFICER
+                  =================================================== */}
+
+                  <td className="whitespace-nowrap px-6 py-6">
+                    {caseData.io ? (
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-400/10 text-[10px] font-bold text-emerald-400">
+                            {caseData.io.officer_name?.charAt(0)?.toUpperCase() || "O"}
+                          </div>
+                          <span className="text-sm font-semibold text-slate-200">
+                            {caseData.io.officer_name}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          <span className="text-emerald-400/90 font-medium">{caseData.io.designation}</span>
+                          {caseData.io.police_station ? ` • ${caseData.io.police_station}` : ""}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-600 italic">
+                        Not Assigned
+                      </span>
+                    )}
                   </td>
 
                   {/* ==================================================

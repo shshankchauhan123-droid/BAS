@@ -1,14 +1,12 @@
 from pydantic import BaseModel, EmailStr, Field
 
+from app.user.user_schema import UserPermissionsSchema
 
-# ============================================================
-# SIGNUP
-# ============================================================
 
 class SignupRequest(BaseModel):
     username: str = Field(
         min_length=3,
-        max_length=50,
+        max_length=100,
     )
 
     email: EmailStr
@@ -25,11 +23,8 @@ class SignupResponse(BaseModel):
     email: EmailStr
     role: str
     is_active: bool
+    client_id: int | None = None
 
-
-# ============================================================
-# LOGIN
-# ============================================================
 
 class LoginRequest(BaseModel):
     username: str
@@ -46,6 +41,8 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: str
     is_active: bool
+    client_id: int | None = None
+    permissions: UserPermissionsSchema | None = None
 
 
 class LoginResponse(BaseModel):
@@ -54,10 +51,6 @@ class LoginResponse(BaseModel):
     token_type: str
     user: UserResponse
 
-
-# ============================================================
-# REFRESH
-# ============================================================
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str

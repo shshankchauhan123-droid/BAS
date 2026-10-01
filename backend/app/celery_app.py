@@ -1,5 +1,12 @@
 from celery import Celery
 
+# Ensure all SQLAlchemy models are registered in the Celery worker process
+import app.user.user_model  # noqa: F401
+import app.case.case_model  # noqa: F401
+import app.io_master.io_master_model  # noqa: F401
+import app.files.file_model  # noqa: F401
+import app.bank_transactions.bank_transaction_model  # noqa: F401
+
 celery_app = Celery(
     "bas",
     broker="amqp://guest:guest@localhost:5672//",

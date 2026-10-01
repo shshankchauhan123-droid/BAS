@@ -58,4 +58,34 @@ def get_current_user(
             detail="User account is inactive",
         )
 
+    # If user belongs to a client/company, verify the company is active
+    if user.client_id and user.client and not user.client.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Your company account has been deactivated by administrator.",
+        )
+
     return user
+
+
+def require_roles(allowed_roles: list[str]):
+    """
+    Dependency factory that checks if current user's role is in allowed_roles.
+    """
+    def role_checker(current_user=Depends(get_current_user)):
+        # Normalize comparison
+        user_role = str(current_user.role).lower()
+        normalized_allowed = [r.lower() for r in allowed_roles]
+
+        # Support 'admin' as alias for 'superadmin'
+        if "superadmin" in normalized_allowed and user_role == "admin":
+            return current_user
+
+        if user_role not in normalized_allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action.",
+            )
+        return current_user
+
+    return role_checker

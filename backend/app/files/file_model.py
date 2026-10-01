@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     Column,
     DateTime,
+    Date,
     ForeignKey,
     Integer,
     String,
@@ -85,6 +86,51 @@ class File(Base):
 
     error_message = Column(
         Text,
+        nullable=True,
+    )
+
+    account_name = Column(
+        String(255),
+        nullable=True,
+    )
+
+    account_number = Column(
+        String(100),
+        nullable=True,
+    )
+
+    bank_name = Column(
+        String(255),
+        nullable=True,
+    )
+
+    branch_name = Column(
+        String(255),
+        nullable=True,
+    )
+
+    ifsc = Column(
+        String(50),
+        nullable=True,
+    )
+
+    micr = Column(
+        String(50),
+        nullable=True,
+    )
+
+    account_type = Column(
+        String(100),
+        nullable=True,
+    )
+
+    statement_start_date = Column(
+        Date,
+        nullable=True,
+    )
+
+    statement_end_date = Column(
+        Date,
         nullable=True,
     )
 

@@ -115,6 +115,14 @@ function UserNavbar() {
   ============================================================ */
 
   const isActive = (path) => {
+    if (path === "/superadmin") {
+      return location.pathname === "/superadmin" || location.pathname.startsWith("/superadmin/");
+    }
+
+    if (path === "/client-admin") {
+      return location.pathname === "/client-admin" || location.pathname.startsWith("/client-admin/");
+    }
+
     /*
      * Dashboard should ONLY be active on:
      *
@@ -143,6 +151,19 @@ function UserNavbar() {
     }
 
     /*
+     * IO Master
+     */
+
+    if (path === "/dashboard/io-master") {
+      return (
+        location.pathname === "/dashboard/io-master" ||
+        location.pathname.startsWith(
+          "/dashboard/io-master/"
+        )
+      );
+    }
+
+    /*
      * Reports
      */
 
@@ -166,6 +187,19 @@ function UserNavbar() {
 
     return location.pathname === path;
   };
+
+  const isSuperAdmin =
+    String(displayRole).toLowerCase() === "superadmin" ||
+    String(displayRole).toLowerCase() === "admin";
+
+  const isClientAdmin =
+    String(displayRole).toLowerCase() === "client_admin";
+
+  const homePath = isSuperAdmin
+    ? "/superadmin"
+    : isClientAdmin
+    ? "/client-admin"
+    : "/dashboard";
 
   /* ============================================================
      NAVIGATION
@@ -384,6 +418,21 @@ function UserNavbar() {
           >
             Cases
           </button>
+
+          {/* IO Master */}
+
+          <button
+            type="button"
+            onClick={() =>
+              goTo("/dashboard/io-master")
+            }
+            className={desktopNavClass(
+              "/dashboard/io-master"
+            )}
+          >
+            IO Master
+          </button>
+
 
           {/* Reports */}
 
@@ -818,6 +867,21 @@ function UserNavbar() {
             >
               Cases
             </button>
+
+            {/* IO Master */}
+
+            <button
+              type="button"
+              onClick={() =>
+                goTo("/dashboard/io-master")
+              }
+              className={mobileNavClass(
+                "/dashboard/io-master"
+              )}
+            >
+              IO Master
+            </button>
+
 
             {/* Reports */}
 

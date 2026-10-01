@@ -11,6 +11,7 @@ from app.user.user_model import User
 from app.case.case_model import Case
 from app.files.file_model import File
 from app.bank_transactions.bank_transaction_model import BankTransaction
+from app.bank_transactions.transaction_mode_model import TransactionMode
 
 load_dotenv()
 

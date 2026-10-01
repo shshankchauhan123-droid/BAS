@@ -3,6 +3,8 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.io_master.io_master_schema import IOMasterData
+
 
 class CaseCreateRequest(BaseModel):
     case_name: str = Field(
@@ -14,6 +16,11 @@ class CaseCreateRequest(BaseModel):
     description: Optional[str] = Field(
         default=None,
         max_length=5000,
+    )
+
+    io_id: Optional[int] = Field(
+        default=None,
+        description="ID of the Investigating Officer assigned to this case",
     )
 
 
@@ -31,6 +38,8 @@ class CaseUpdateRequest(BaseModel):
 
     status: Optional[str] = None
 
+    io_id: Optional[int] = None
+
 
 class CaseData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -40,6 +49,8 @@ class CaseData(BaseModel):
     case_name: str
     description: Optional[str]
     status: str
+    io_id: Optional[int] = None
+    io: Optional[IOMasterData] = None
     created_at: datetime
     updated_at: datetime
 

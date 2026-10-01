@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -14,11 +14,18 @@ class User(Base):
         index=True,
     )
 
-    username: Mapped[str] = mapped_column(
-        String(50),
-        unique=True,
-        nullable=False,
+    client_id: Mapped[int | None] = mapped_column(
+        ForeignKey("clients.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
+    )
+
+    # Python name: username
+    # Database column: user_name
+    username: Mapped[str] = mapped_column(
+        "user_name",
+        String(100),
+        nullable=False,
     )
 
     email: Mapped[str] = mapped_column(
@@ -36,7 +43,6 @@ class User(Base):
     role: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
-        default="user",
     )
 
     is_active: Mapped[bool] = mapped_column(
@@ -45,7 +51,12 @@ class User(Base):
         default=True,
     )
 
-    
+    first_login: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=func.false(),
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -59,3 +70,20 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    client = relationship(
+        "Client",
+        back_populates="users",
+    )
+
+    permissions = relationship(
+        "UserPermission",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="joined",
+    )
+
+
+# Register related model
+import app.user.user_permission_model  # noqa: E402, F401

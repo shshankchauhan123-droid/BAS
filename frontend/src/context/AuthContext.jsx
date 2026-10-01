@@ -47,11 +47,10 @@ export function AuthProvider({ children }) {
       /*
        * Restore authentication state.
        *
-       * We now require:
-       *
+       * We require:
        * 1. Access token
        * 2. Refresh token
-       * 3. User information
+       * 3. User information (which already contains user ID)
        */
 
       if (
@@ -75,7 +74,6 @@ export function AuthProvider({ children }) {
         ) {
           setToken(storedToken);
           setUser(parsedUser);
-
           /*
            * Make sure the dedicated user ID
            * also exists.
@@ -290,6 +288,23 @@ export function AuthProvider({ children }) {
   }
 
   /* ==========================================================
+     UPDATE USER
+  ========================================================== */
+
+  function updateUser(partialUser) {
+    setUser((prevUser) => {
+      if (!prevUser) return null;
+      const updatedUser = { ...prevUser, ...partialUser };
+      try {
+        localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+      } catch (err) {
+        console.error("Failed to update stored user:", err);
+      }
+      return updatedUser;
+    });
+  }
+
+  /* ==========================================================
      AUTHENTICATION STATE
   ========================================================== */
 
@@ -324,6 +339,8 @@ export function AuthProvider({ children }) {
       login,
 
       logout,
+
+      updateUser,
     }),
     [
       token,

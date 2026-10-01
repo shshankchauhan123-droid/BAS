@@ -19,9 +19,16 @@ import CreateCaseModal from "../../../components/cases/CreateCaseModal";
 
 import BASNavbar from "../../../components/layout/UserNavbar";
 import BASFooter from "../../../components/layout/UserFooter";
+import { useAuth } from "../../../context/AuthContext";
 
 function CaseList() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canCreateCase =
+    user?.role === "superadmin" ||
+    user?.role === "client_admin" ||
+    user?.permissions?.can_create_case !== false;
+
 
   const [cases, setCases] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +102,15 @@ function CaseList() {
           .toLowerCase()
           .includes(search) ||
         String(caseData.status || "")
+          .toLowerCase()
+          .includes(search) ||
+        String(caseData.io?.officer_name || "")
+          .toLowerCase()
+          .includes(search) ||
+        String(caseData.io?.designation || "")
+          .toLowerCase()
+          .includes(search) ||
+        String(caseData.io?.police_station || "")
           .toLowerCase()
           .includes(search)
       );
