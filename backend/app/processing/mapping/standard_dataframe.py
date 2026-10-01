@@ -47,6 +47,27 @@ def create_standard_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     if "mode" not in new_df.columns:
         new_df["mode"] = None
         
+    import re
+    known_modes = ["UPI", "NEFT", "RTGS", "IMPS", "ATM", "CASH", "CHEQUE", "POS", "NACH", "ECS"]
+    
+    def extract_mode_from_desc(row):
+        current = row.get("mode")
+        if pd.isna(current) or not current:
+            desc = str(row.get("description", ""))
+            if desc and str(desc) != "nan":
+                # Strict match first
+                for m in known_modes:
+                    if re.search(r'\b' + re.escape(m) + r'\b', desc, re.IGNORECASE):
+                        return m
+                # Prefix match (ignoring POS to avoid POSTING collisions)
+                for m in known_modes:
+                    if m.upper() != "POS":
+                        if re.search(r'\b' + re.escape(m), desc, re.IGNORECASE):
+                            return m
+        return current
+        
+    new_df["mode"] = new_df.apply(extract_mode_from_desc, axis=1)
+        
     if "cheque_number" not in new_df.columns:
         new_df["cheque_number"] = None
         
