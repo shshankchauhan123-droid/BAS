@@ -37,54 +37,59 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
     print(f"\nFile:\n{file_record.file_path}\n")
     print("Extracting account metadata...\n")
 
-    try:
-        metadata = extract_account_metadata(file_record.file_path)
-        
-        file_record.account_name = metadata.account_name
-        file_record.account_number = metadata.account_number
-        file_record.bank_name = metadata.bank_name
-        file_record.branch_name = metadata.branch_name
-        file_record.ifsc = metadata.ifsc
-        file_record.micr = metadata.micr
-        file_record.account_type = metadata.account_type
-        file_record.statement_start_date = metadata.statement_start_date
-        file_record.statement_end_date = metadata.statement_end_date
-        
-        update_file(db, file_record)
+    file_extension = Path(file_record.file_path).suffix.lower()
 
-        print(f"Account Name: {metadata.account_name or 'None'}")
-        
-        # Mask account number for logs
-        if metadata.account_number:
-            masked_acc = metadata.account_number
-            if len(masked_acc) > 4:
-                masked_acc = "X" * (len(masked_acc) - 4) + masked_acc[-4:]
-            print(f"Account Number: {masked_acc}")
-        else:
-            print("Account Number: None")
+    if file_extension == ".pdf":
+        try:
+            metadata = extract_account_metadata(file_record.file_path)
             
-        print(f"Bank Name: {metadata.bank_name or 'None'}")
-        print(f"Branch: {metadata.branch_name or 'None'}")
-        print(f"IFSC: {metadata.ifsc or 'None'}")
-        print(f"MICR: {metadata.micr or 'None'}")
-        print(f"Account Type: {metadata.account_type or 'None'}")
-        print(f"Statement Start Date: {metadata.statement_start_date or 'None'}")
-        print(f"Statement End Date: {metadata.statement_end_date or 'None'}\n")
-        
-        print("ACCOUNT METADATA EXTRACTION SUCCESS")
-        print("============================================================\n")
+            file_record.account_name = metadata.account_name
+            file_record.account_number = metadata.account_number
+            file_record.bank_name = metadata.bank_name
+            file_record.branch_name = metadata.branch_name
+            file_record.ifsc = metadata.ifsc
+            file_record.micr = metadata.micr
+            file_record.account_type = metadata.account_type
+            file_record.statement_start_date = metadata.statement_start_date
+            file_record.statement_end_date = metadata.statement_end_date
+            
+            update_file(db, file_record)
 
-    except Exception as e:
-        print("ACCOUNT METADATA EXTRACTION FAILED\n")
-        print(f"Error: {str(e)}\n")
-        print("Status: FAILED\n")
-        print("============================================================")
-        raise e
+            print(f"Account Name: {metadata.account_name or 'None'}")
+            
+            # Mask account number for logs
+            if metadata.account_number:
+                masked_acc = metadata.account_number
+                if len(masked_acc) > 4:
+                    masked_acc = "X" * (len(masked_acc) - 4) + masked_acc[-4:]
+                print(f"Account Number: {masked_acc}")
+            else:
+                print("Account Number: None")
+                
+            print(f"Bank Name: {metadata.bank_name or 'None'}")
+            print(f"Branch: {metadata.branch_name or 'None'}")
+            print(f"IFSC: {metadata.ifsc or 'None'}")
+            print(f"MICR: {metadata.micr or 'None'}")
+            print(f"Account Type: {metadata.account_type or 'None'}")
+            print(f"Statement Start Date: {metadata.statement_start_date or 'None'}")
+            print(f"Statement End Date: {metadata.statement_end_date or 'None'}\n")
+            
+            print("ACCOUNT METADATA EXTRACTION SUCCESS")
+            print("============================================================\n")
+
+        except Exception as e:
+            print("ACCOUNT METADATA EXTRACTION FAILED\n")
+            print(f"Error: {str(e)}\n")
+            print("Status: FAILED\n")
+            print("============================================================")
+            raise e
+    else:
+        print(f"Skipping PDF metadata extraction for {file_extension} file.\n")
+        print("============================================================\n")
 
     # ------------------------------------------------------------
     # STAGE 1 - PDF TABLE EXTRACTION OR EXCEL BYPASS
     # ------------------------------------------------------------
-    file_extension = Path(file_record.file_path).suffix.lower()
 
     if file_extension == ".pdf":
         file_record.processing_stage = "pdf_table_extraction"
@@ -128,8 +133,23 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
         print("============================================================")
         print("STAGE 1 - EXCEL/CSV BYPASS")
         print("============================================================")
-        print("\nFile is Excel or CSV. Bypassing PDF extraction and using uploaded file as raw excel.\n")
-        file_record.raw_excel_path = file_record.file_path
+        print("\nFile is Excel or CSV. Creating raw Excel from uploaded file...\n")
+        
+        import pandas as pd
+        if file_extension == ".csv":
+            raw_df = pd.read_csv(file_record.file_path)
+        else:
+            raw_df = pd.read_excel(file_record.file_path)
+            
+        file_path = Path(file_record.file_path)
+        excel_filename = f"{file_path.stem}_raw.xlsx"
+        excel_path = file_path.parent / excel_filename
+        
+        saved_path = save_raw_excel(raw_df, str(excel_path))
+        print(f"Raw Excel saved:\n{saved_path}")
+        
+        print("\nSTAGE 1 RAW EXCEL SUCCESS\n")
+        file_record.raw_excel_path = saved_path
     else:
         raise ValueError(f"Unsupported file format for processing: {file_extension}")
 
@@ -237,7 +257,8 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
     from app.processing.mapping.qwen_header_mapper import map_headers_with_qwen
     
     try:
-        map_headers_with_qwen(normalized_headers, file_record.raw_excel_path, header_info['header_row_index'])
+        is_excel_mode = file_extension != ".pdf"
+        map_headers_with_qwen(normalized_headers, file_record.raw_excel_path, header_info['header_row_index'], is_excel=is_excel_mode)
         
         print("Status: PROCESSING")
         print("Stage: qwen_header_mapping")

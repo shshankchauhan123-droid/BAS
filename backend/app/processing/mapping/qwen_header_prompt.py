@@ -1,16 +1,11 @@
-def build_qwen_header_prompt(headers: list) -> str:
+def build_qwen_header_prompt(headers: list, allowed_fields: list) -> str:
     headers_str = "\n".join(f"- {h}" for h in headers)
+    allowed_str = "\n".join(allowed_fields)
 
     return f"""You map bank statement headers to BAS fields.
 
 Allowed fields:
-transaction_date
-description
-cheque_number
-debit
-credit
-balance
-mode
+{allowed_str}
 
 Rules:
 - Map every input header.
