@@ -69,6 +69,14 @@ def extract_tables_from_pdf(pdf_path: str) -> pd.DataFrame:
         flavor="lattice",
     )
 
+    if len(tables) == 0:
+        print("No tables detected with 'lattice' flavor. Falling back to 'stream' flavor...")
+        tables = camelot.read_pdf(
+            pdf_path,
+            pages="all",
+            flavor="stream",
+        )
+
     print(f"Tables detected: {len(tables)}")
     print()
 

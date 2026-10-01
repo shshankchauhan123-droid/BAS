@@ -23,7 +23,15 @@ def detect_transaction_mode(description: str, modes: List[str]) -> Optional[str]
         pattern = r'\b' + re.escape(mode) + r'\b'
         match = re.search(pattern, description, re.IGNORECASE)
         if match:
-            matched_modes.append((mode, match.start()))
+            matched_modes.append((mode, match.start(), True))
+            
+    if not matched_modes:
+        for mode in modes:
+            if mode.upper() != "POS":
+                pattern = r'\b' + re.escape(mode)
+                match = re.search(pattern, description, re.IGNORECASE)
+                if match:
+                    matched_modes.append((mode, match.start(), False))
             
     if not matched_modes:
         return None
