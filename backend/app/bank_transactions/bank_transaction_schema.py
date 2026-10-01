@@ -13,6 +13,8 @@ class BankTransactionData(BaseModel):
     case_id: int
 
     transaction_date: Optional[date] = None
+    account_name: Optional[str] = None
+    account_number: Optional[str] = None
     description: Optional[str] = None
     cheque_number: Optional[str] = None
 

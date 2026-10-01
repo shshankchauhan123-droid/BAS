@@ -29,7 +29,7 @@ export function getCaseTransactions(
 export function searchCaseTransactions(
   caseId,
   {
-    fileId = null,
+    file_ids = null,
     search = "",
     dateFrom = "",
     dateTo = "",
@@ -52,8 +52,8 @@ export function searchCaseTransactions(
 ) {
   const params = new URLSearchParams();
 
-  if (fileId) {
-    params.append("file_id", fileId);
+  if (file_ids) {
+    params.append("file_ids", file_ids);
   }
 
   if (search.trim()) {
@@ -134,6 +134,19 @@ export function searchCaseTransactions(
 export function getFileTransactionSummary(fileId) {
   return apiRequest(
     `/api/v1/bank-transactions/file/${fileId}/summary`,
+    {
+      method: "GET",
+    }
+  );
+}
+
+export function getCaseTransactionSummary(caseId, file_ids = null) {
+  let url = `/api/v1/bank-transactions/case/${caseId}/summary`;
+  if (file_ids) {
+    url += `?file_ids=${encodeURIComponent(file_ids)}`;
+  }
+  return apiRequest(
+    url,
     {
       method: "GET",
     }

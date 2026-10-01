@@ -160,6 +160,7 @@ def get_filtered_transactions_by_case(
     case_id: int,
     page: int,
     page_size: int,
+    file_ids: list[int] | None = None,
     search: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
@@ -173,6 +174,9 @@ def get_filtered_transactions_by_case(
             BankTransaction.case_id == case_id
         )
     )
+
+    if file_ids:
+        query = query.filter(BankTransaction.file_id.in_(file_ids))
 
     # ========================================================
     # Search
@@ -347,6 +351,50 @@ def get_file_transaction_summary(db: Session, file_id: int):
         .filter(BankTransaction.file_id == file_id)
         .scalar()
     ) or Decimal("0.0")
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_transactions": total_transactions,
+        "total_debits": total_debits,
+        "total_credits": total_credits
+    }
+
+
+# ============================================================
+# Get transactions summary by case and file_ids
+# ============================================================
+
+def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] | None = None):
+    # Calculate total transactions
+    query_count = db.query(func.count(BankTransaction.id)).filter(BankTransaction.case_id == case_id)
+    if file_ids:
+        query_count = query_count.filter(BankTransaction.file_id.in_(file_ids))
+    total_transactions = query_count.scalar() or 0
+
+    # Calculate min and max dates
+    query_dates = db.query(
+        func.min(BankTransaction.transaction_date),
+        func.max(BankTransaction.transaction_date)
+    ).filter(BankTransaction.case_id == case_id)
+    if file_ids:
+        query_dates = query_dates.filter(BankTransaction.file_id.in_(file_ids))
+    dates = query_dates.first()
+    
+    start_date = dates[0] if dates else None
+    end_date = dates[1] if dates else None
+
+    # Calculate total debits
+    query_debits = db.query(func.sum(BankTransaction.debit)).filter(BankTransaction.case_id == case_id)
+    if file_ids:
+        query_debits = query_debits.filter(BankTransaction.file_id.in_(file_ids))
+    total_debits = query_debits.scalar() or Decimal("0.0")
+
+    # Calculate total credits
+    query_credits = db.query(func.sum(BankTransaction.credit)).filter(BankTransaction.case_id == case_id)
+    if file_ids:
+        query_credits = query_credits.filter(BankTransaction.file_id.in_(file_ids))
+    total_credits = query_credits.scalar() or Decimal("0.0")
 
     return {
         "start_date": start_date,

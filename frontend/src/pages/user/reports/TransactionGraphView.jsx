@@ -71,10 +71,54 @@ export default function TransactionGraphView({
     let maxDebit = 0;
     let highValueCount = 0;
 
-    // Daily Flow Aggregation
+    // Determine bucketing strategy based on timespan
+    const minDate = sorted.length > 0 ? new Date(sorted[0].transaction_date) : new Date();
+    const maxDate = sorted.length > 0 ? new Date(sorted[sorted.length - 1].transaction_date) : new Date();
+    const spanDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) || 1;
+
+    let bucketType = "daily";
+    if (spanDays > 365) bucketType = "quarterly";
+    else if (spanDays > 90) bucketType = "monthly";
+    else if (spanDays > 30) bucketType = "weekly";
+
+    const getBucketKey = (dateStr) => {
+      if (!dateStr || dateStr === "Unknown") return { key: "Unknown", label: "Unknown" };
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return { key: "Unknown", label: "Unknown" };
+
+      if (bucketType === "daily") {
+        return { key: dateStr, label: dateStr };
+      } else if (bucketType === "weekly") {
+        const day = d.getDay();
+        const diff = d.getDate() - day;
+        const weekStart = new Date(d.setDate(diff));
+        const startStr = weekStart.toISOString().split('T')[0];
+        return { key: `W-${startStr}`, label: `Week of ${startStr}` };
+      } else if (bucketType === "monthly") {
+        const m = d.toLocaleString('default', { month: 'short' });
+        const y = d.getFullYear();
+        return { key: `${y}-${m}`, label: `${m} ${y}` };
+      } else if (bucketType === "quarterly") {
+        const q = Math.floor(d.getMonth() / 3) + 1;
+        const y = d.getFullYear();
+        return { key: `${y}-Q${q}`, label: `Q${q} ${y}` };
+      }
+    };
+
+    // Flow Aggregation
     const flowMap = new Map();
     const channelMap = new Map();
     const entityMap = new Map();
+
+    // Map to keep track of unique files and assign them stable index/colors
+    const fileColors = [
+      { credit: "from-emerald-500/80 to-emerald-400", debit: "from-rose-500/80 to-rose-400" },
+      { credit: "from-teal-500/80 to-teal-400", debit: "from-orange-500/80 to-orange-400" },
+      { credit: "from-cyan-500/80 to-cyan-400", debit: "from-pink-500/80 to-pink-400" },
+      { credit: "from-green-500/80 to-green-400", debit: "from-red-500/80 to-red-400" },
+      { credit: "from-lime-500/80 to-lime-400", debit: "from-fuchsia-500/80 to-fuchsia-400" }
+    ];
+    const fileMap = new Map();
 
     sorted.forEach((tx) => {
       const cr = Number(tx.credit) || 0;
@@ -95,23 +139,41 @@ export default function TransactionGraphView({
         if (dr >= 50000) highValueCount++;
       }
 
-      // Daily flow
-      if (!flowMap.has(dateStr)) {
-        flowMap.set(dateStr, {
-          date: dateStr,
+      const { key: bKey, label: bLabel } = getBucketKey(dateStr);
+      
+      const fileId = tx.file_id || "Unknown";
+      if (!fileMap.has(fileId)) {
+        fileMap.set(fileId, {
+          fileId,
+          colorIndex: fileMap.size % fileColors.length
+        });
+      }
+
+      // Time bucket flow
+      if (!flowMap.has(bKey)) {
+        flowMap.set(bKey, {
+          key: bKey,
+          label: bLabel,
           credit: 0,
           debit: 0,
           txCount: 0,
+          files: {},
           lastBalance: bal,
         });
       }
-      const dayEntry = flowMap.get(dateStr);
+      const dayEntry = flowMap.get(bKey);
       dayEntry.credit += cr;
       dayEntry.debit += dr;
       dayEntry.txCount += 1;
       if (bal !== null) {
         dayEntry.lastBalance = bal;
       }
+      
+      if (!dayEntry.files[fileId]) {
+        dayEntry.files[fileId] = { credit: 0, debit: 0 };
+      }
+      dayEntry.files[fileId].credit += cr;
+      dayEntry.files[fileId].debit += dr;
 
       // Channel detection
       const rawText = (tx.description || tx.raw_narration || "").toUpperCase();
@@ -168,7 +230,8 @@ export default function TransactionGraphView({
       }
     });
 
-    const dailyFlow = Array.from(flowMap.values());
+    const timeFlow = Array.from(flowMap.values());
+    const fileMetadata = Array.from(fileMap.values()).map(f => ({ ...f, colors: fileColors[f.colorIndex] }));
     const balanceHistory = sorted
       .filter((tx) => tx.balance !== null && tx.balance !== undefined)
       .map((tx) => ({
@@ -205,7 +268,8 @@ export default function TransactionGraphView({
       .slice(0, 6);
 
     return {
-      dailyFlow,
+      timeFlow,
+      fileMetadata,
       balanceHistory,
       channelDistribution,
       topDebits,
@@ -244,13 +308,13 @@ export default function TransactionGraphView({
     );
   }
 
-  const { dailyFlow, balanceHistory, channelDistribution, topDebits, topCredits, counterparties, metrics } = processedData;
+  const { timeFlow, fileMetadata, balanceHistory, channelDistribution, topDebits, topCredits, counterparties, metrics } = processedData;
 
   // ------------------------------------------------------------
   // SVG Chart Computations: Cash Flow Bar Chart
   // ------------------------------------------------------------
   const maxDayAmount = Math.max(
-    ...dailyFlow.map((d) => Math.max(d.credit, d.debit)),
+    ...timeFlow.map((d) => Math.max(d.credit, d.debit)),
     1000
   );
 
@@ -431,51 +495,90 @@ export default function TransactionGraphView({
         <div className="rounded-2xl border border-white/[0.08] bg-[#020b09] p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h5 className="text-sm font-bold text-white">Daily Inflow vs Outflow Distribution</h5>
-              <p className="text-xs text-slate-400">Comparing daily aggregated credits and debits over time</p>
+              <h5 className="text-sm font-bold text-white">Dynamic Cash Flow Timeline</h5>
+              <p className="text-xs text-slate-400">Comparing aggregated credits and debits over time, grouped by file</p>
             </div>
             <span className="text-[11px] font-mono text-slate-400">
-              {dailyFlow.length} Active Days
+              {timeFlow.length} Active Periods
             </span>
           </div>
 
-          {dailyFlow.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-500">No date distribution available</div>
+          {timeFlow.length === 0 ? (
+            <div className="py-12 text-center text-xs text-slate-500">No time distribution available</div>
           ) : (
             <div className="space-y-4">
-              <div className="h-56 w-full flex items-end gap-1.5 sm:gap-2 pt-6 pb-2 px-2 overflow-x-auto border-b border-white/[0.06]">
-                {dailyFlow.slice(-30).map((day, idx) => {
-                  const creditHeight = Math.max((day.credit / maxDayAmount) * 100, 2);
-                  const debitHeight = Math.max((day.debit / maxDayAmount) * 100, 2);
-
+              <div className="h-64 w-full flex items-end gap-1.5 sm:gap-3 pt-10 pb-2 px-2 overflow-x-auto border-b border-white/[0.06] relative">
+                {timeFlow.slice(-60).map((bucket, idx) => {
+                  const creditHeight = Math.max((bucket.credit / maxDayAmount) * 100, 2);
+                  const debitHeight = Math.max((bucket.debit / maxDayAmount) * 100, 2);
+                  
                   return (
                     <div
-                      key={day.date || idx}
-                      className="group relative flex-1 min-w-[18px] max-w-[36px] flex flex-col items-center justify-end h-full cursor-pointer"
-                      onMouseEnter={() => setHoveredPoint(day)}
+                      key={bucket.key || idx}
+                      className="group relative flex-1 min-w-[24px] max-w-[48px] flex flex-col items-center justify-end h-full cursor-pointer"
+                      onMouseEnter={() => setHoveredPoint(bucket)}
                       onMouseLeave={() => setHoveredPoint(null)}
                     >
                       {/* Tooltip */}
-                      <div className="absolute -top-16 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 whitespace-nowrap rounded-lg bg-slate-900 border border-white/10 px-2.5 py-1.5 text-[10px] shadow-2xl">
-                        <div className="font-bold text-white mb-0.5">{formatDate(day.date)}</div>
-                        <div className="text-emerald-400">Cr: +{formatCurrencyFull(day.credit)}</div>
-                        <div className="text-rose-400">Dr: -{formatCurrencyFull(day.debit)}</div>
+                      <div className="absolute bottom-[105%] mb-2 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 rounded-xl bg-[#061411] border border-white/10 p-3 shadow-2xl min-w-[180px]">
+                        <div className="font-bold text-white mb-2 text-xs border-b border-white/10 pb-1">{bucket.label}</div>
+                        <div className="space-y-2">
+                          {Object.entries(bucket.files).map(([fileId, amts]) => {
+                            if (amts.credit === 0 && amts.debit === 0) return null;
+                            return (
+                              <div key={fileId} className="flex flex-col gap-0.5 text-[10px]">
+                                <span className="text-slate-400 font-semibold text-[9px] uppercase tracking-wider">File #{fileId}</span>
+                                <div className="flex justify-between items-center gap-3">
+                                  <span className="text-emerald-400">Cr: +{formatCurrencyFull(amts.credit)}</span>
+                                  <span className="text-rose-400">Dr: -{formatCurrencyFull(amts.debit)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-white/10 flex justify-between items-center text-[11px] font-bold">
+                          <span className="text-emerald-400">+{formatCurrencyFull(bucket.credit)}</span>
+                          <span className="text-rose-400">-{formatCurrencyFull(bucket.debit)}</span>
+                        </div>
                       </div>
 
-                      {/* Bar Pair */}
+                      {/* Stacked Bar Pair */}
                       <div className="w-full flex items-end justify-center gap-0.5 h-full">
-                        <div
-                          style={{ height: `${creditHeight}%` }}
-                          className="w-1/2 rounded-t-sm bg-gradient-to-t from-emerald-500/60 to-emerald-400 transition-all group-hover:brightness-125"
-                        />
-                        <div
-                          style={{ height: `${debitHeight}%` }}
-                          className="w-1/2 rounded-t-sm bg-gradient-to-t from-rose-500/60 to-rose-400 transition-all group-hover:brightness-125"
-                        />
+                        {/* Stacked Credit Bar */}
+                        <div style={{ height: `${creditHeight}%` }} className="w-1/2 flex flex-col justify-end gap-[1px]">
+                          {Object.entries(bucket.files).map(([fileId, amts]) => {
+                            if (amts.credit === 0) return null;
+                            const hPct = (amts.credit / bucket.credit) * 100;
+                            const meta = fileMetadata.find(f => f.fileId === fileId);
+                            return (
+                              <div 
+                                key={fileId} 
+                                style={{ height: `${hPct}%` }} 
+                                className={`w-full rounded-[1px] bg-gradient-to-t ${meta?.colors?.credit || "from-emerald-500/80 to-emerald-400"} transition-all group-hover:brightness-125`}
+                              />
+                            );
+                          })}
+                        </div>
+                        
+                        {/* Stacked Debit Bar */}
+                        <div style={{ height: `${debitHeight}%` }} className="w-1/2 flex flex-col justify-end gap-[1px]">
+                          {Object.entries(bucket.files).map(([fileId, amts]) => {
+                            if (amts.debit === 0) return null;
+                            const hPct = (amts.debit / bucket.debit) * 100;
+                            const meta = fileMetadata.find(f => f.fileId === fileId);
+                            return (
+                              <div 
+                                key={fileId} 
+                                style={{ height: `${hPct}%` }} 
+                                className={`w-full rounded-[1px] bg-gradient-to-t ${meta?.colors?.debit || "from-rose-500/80 to-rose-400"} transition-all group-hover:brightness-125`}
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
 
-                      <span className="text-[9px] font-mono text-slate-500 mt-2 truncate w-full text-center">
-                        {String(day.date).slice(-2)}
+                      <span className="text-[9px] font-mono text-slate-500 mt-2 truncate w-full text-center" title={bucket.label}>
+                        {bucket.label.includes('Week') || bucket.label.includes('Q') ? bucket.label.split(' ')[0] : bucket.label.split(' ')[0].slice(0, 3)}
                       </span>
                     </div>
                   );
@@ -484,9 +587,9 @@ export default function TransactionGraphView({
 
               {/* Hover detail banner */}
               {hoveredPoint ? (
-                <div className="flex items-center justify-between bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-2 text-xs">
-                  <span className="font-semibold text-white">Date: {formatDate(hoveredPoint.date)}</span>
-                  <div className="flex items-center gap-4 font-mono">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 text-xs gap-3">
+                  <span className="font-semibold text-white">Time: {hoveredPoint.label}</span>
+                  <div className="flex flex-wrap items-center gap-4 font-mono">
                     <span className="text-emerald-400 font-bold">+Cr {formatCurrencyFull(hoveredPoint.credit)}</span>
                     <span className="text-rose-400 font-bold">-Dr {formatCurrencyFull(hoveredPoint.debit)}</span>
                     {hoveredPoint.lastBalance !== null && (
@@ -495,8 +598,8 @@ export default function TransactionGraphView({
                   </div>
                 </div>
               ) : (
-                <p className="text-[11px] text-slate-500 italic text-center">
-                  Hover over bars to inspect daily credits, debits, and closing balance.
+                <p className="text-[11px] text-slate-500 italic text-center py-2">
+                  Hover over bars to inspect time period credits, debits, closing balance, and file breakdown.
                 </p>
               )}
             </div>
