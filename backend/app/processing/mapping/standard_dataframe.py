@@ -17,13 +17,14 @@ def create_standard_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "debit",
         "credit",
         "balance",
-        "mode"
+        "mode",
+        "account_number",
+        "account_name"
     ]
     
     required_columns = [
         "transaction_date",
         "description",
-        "cheque_number",
         "debit",
         "credit",
         "balance"
@@ -42,9 +43,18 @@ def create_standard_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # Do not modify in-place
     new_df = df.copy()
     
-    # Add mode if missing
+    # Add optional columns if missing
     if "mode" not in new_df.columns:
         new_df["mode"] = None
+        
+    if "cheque_number" not in new_df.columns:
+        new_df["cheque_number"] = None
+        
+    if "account_number" not in new_df.columns:
+        new_df["account_number"] = None
+        
+    if "account_name" not in new_df.columns:
+        new_df["account_name"] = None
         
     # Identify removed columns
     removed_cols = [col for col in new_df.columns if col not in standard_columns]

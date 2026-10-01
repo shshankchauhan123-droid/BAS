@@ -78,8 +78,8 @@ def persist_transactions(
         transaction = BankTransaction(
             file_id=file_id,
             case_id=case_id,
-            account_name=account_name,
-            account_number=account_number,
+            account_name=clean_val(row.get("account_name")) or account_name,
+            account_number=clean_val(row.get("account_number")) or account_number,
             transaction_date=clean_val(row.get("transaction_date")),
             description=description_val,
             cheque_number=clean_val(row.get("cheque_number")),

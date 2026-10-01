@@ -7,21 +7,28 @@ import pandas as pd
 from app.processing.mapping.qwen_header_prompt import build_qwen_header_prompt
 from app.processing.mapping.header_normalize import normalize_header
 
-ALLOWED_FIELDS = {
-    "transaction_date",
-    "description",
-    "cheque_number",
-    "debit",
-    "credit",
-    "balance",
-    "mode"
-}
 
-def map_headers_with_qwen(normalized_headers: list[str], raw_excel_path: str, header_row_index):
+
+def map_headers_with_qwen(normalized_headers: list[str], raw_excel_path: str, header_row_index, is_excel=False):
     """
     Sends normalized headers to Qwen, validates the response, 
     and updates the raw Excel headers without modifying data.
     """
+    
+    ALLOWED_FIELDS = {
+        "transaction_date",
+        "description",
+        "cheque_number",
+        "debit",
+        "credit",
+        "balance",
+        "mode"
+    }
+    
+    if is_excel:
+        ALLOWED_FIELDS.add("account_number")
+        ALLOWED_FIELDS.add("account_name")
+
     qwen_model = os.getenv("QWEN_MODEL", "qwen3.5:0.8b")
     ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     
@@ -42,7 +49,7 @@ def map_headers_with_qwen(normalized_headers: list[str], raw_excel_path: str, he
     print()
     print("Sending headers to Qwen...\n")
 
-    prompt = build_qwen_header_prompt(normalized_headers)
+    prompt = build_qwen_header_prompt(normalized_headers, list(ALLOWED_FIELDS))
 
     try:
         req = urllib.request.Request(
