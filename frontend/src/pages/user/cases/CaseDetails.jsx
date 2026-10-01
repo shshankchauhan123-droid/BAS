@@ -2760,9 +2760,14 @@ function goToNextTransactionPage() {
                                   {String(file.status || "").toUpperCase() === "COMPLETED" && (
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        loadTransactions(file.id)
-                                      }
+                                      onClick={() => {
+                                        if (selectedTransactionFileId === file.id) {
+                                          setSelectedTransactionFileId(null);
+                                          setTransactions([]);
+                                        } else {
+                                          loadTransactions(file.id);
+                                        }
+                                      }}
                                       disabled={
                                         isTransactionsLoading &&
                                         selectedTransactionFileId === file.id
@@ -3079,6 +3084,7 @@ function goToNextTransactionPage() {
                             <tr>
                               <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">#</th>
                               <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Date</th>
+                              <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Mode</th>
                               <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Description</th>
                               <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Debit</th>
                               <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Credit</th>
@@ -3097,6 +3103,9 @@ function goToNextTransactionPage() {
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-300">
                                   {transaction.transaction_date || "-"}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                  {transaction.mode || "-"}
                                 </td>
                                 <td className="max-w-[420px] px-4 py-3 text-xs leading-5 text-slate-400" title={transaction.description || ""}>
                                   <div className="line-clamp-2">

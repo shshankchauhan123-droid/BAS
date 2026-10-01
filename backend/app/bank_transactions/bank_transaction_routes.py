@@ -12,12 +12,16 @@ from app.bank_transactions.bank_transaction_repository import (
     get_transactions_by_case_paginated,
     get_transactions_by_file_paginated,
     get_file_transaction_summary,
+    get_case_transaction_summary,
 )
+from app.files.file_service import get_case_files
+from fastapi import HTTPException
 
 from app.bank_transactions.bank_transaction_schema import (
     BankTransactionListResponse,
     TransactionSummaryResponse,
 )
+from app.dependencies.auth import get_current_user
 
 
 router = APIRouter(
@@ -131,6 +135,11 @@ def get_case_transactions(
 def search_case_transactions(
     case_id: int,
 
+    file_ids: str | None = Query(
+        default=None,
+        description="Comma-separated list of file IDs to filter by",
+    ),
+
     search: str | None = Query(
         default=None,
         description=(
@@ -180,12 +189,33 @@ def search_case_transactions(
     ),
 
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
+    parsed_file_ids = None
+    if file_ids:
+        try:
+            parsed_file_ids = [int(fid.strip()) for fid in file_ids.split(",") if fid.strip()]
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid file_ids format")
+            
+        if parsed_file_ids:
+            # Validate that all requested files belong to this case
+            valid_case_files = get_case_files(case_id=case_id, db=db, user=current_user)
+            valid_file_ids_set = {f.id for f in valid_case_files}
+            invalid_ids = [fid for fid in parsed_file_ids if fid not in valid_file_ids_set]
+            
+            if invalid_ids:
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Files {invalid_ids} do not belong to case {case_id}"
+                )
+
     transactions, total = get_filtered_transactions_by_case(
         db=db,
         case_id=case_id,
         page=page,
         page_size=page_size,
+        file_ids=parsed_file_ids,
         search=search,
         date_from=date_from,
         date_to=date_to,
@@ -228,5 +258,47 @@ def get_file_summary(
     return TransactionSummaryResponse(
         success=True,
         message="File transaction summary retrieved successfully.",
+        data=summary_data,
+    )
+
+
+# ============================================================
+# Get transactions summary by case and selected files
+# ============================================================
+
+@router.get(
+    "/case/{case_id}/summary",
+    response_model=TransactionSummaryResponse,
+)
+def get_case_summary(
+    case_id: int,
+    file_ids: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    parsed_file_ids = None
+    if file_ids:
+        try:
+            parsed_file_ids = [int(fid.strip()) for fid in file_ids.split(",") if fid.strip()]
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid file_ids format")
+            
+        if parsed_file_ids:
+            # Validate that all requested files belong to this case
+            valid_case_files = get_case_files(case_id=case_id, db=db, user=current_user)
+            valid_file_ids_set = {f.id for f in valid_case_files}
+            invalid_ids = [fid for fid in parsed_file_ids if fid not in valid_file_ids_set]
+            
+            if invalid_ids:
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Files {invalid_ids} do not belong to case {case_id}"
+                )
+
+    summary_data = get_case_transaction_summary(db=db, case_id=case_id, file_ids=parsed_file_ids)
+
+    return TransactionSummaryResponse(
+        success=True,
+        message="Case transaction summary retrieved successfully.",
         data=summary_data,
     )

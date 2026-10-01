@@ -9,7 +9,7 @@ import { getCase } from "../../../services/api/case";
 import { getCaseFiles } from "../../../services/api/file";
 import {
   searchCaseTransactions,
-  getFileTransactionSummary,
+  getCaseTransactionSummary,
 } from "../../../services/api/bankTransaction";
 import TransactionGraphView from "./TransactionGraphView";
 
@@ -51,7 +51,10 @@ function CaseFileReport() {
   const { caseId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const urlFileId = searchParams.get("fileId");
+  const urlFileIdsStr = searchParams.get("file_ids");
+  const initialFileIds = urlFileIdsStr
+    ? urlFileIdsStr.split(",").map(Number).filter(Boolean)
+    : [];
 
   // Case & Files state
   const [caseData, setCaseData] = useState(null);
@@ -59,12 +62,10 @@ function CaseFileReport() {
   const [isCaseLoading, setIsCaseLoading] = useState(true);
   const [caseError, setCaseError] = useState("");
 
-  // Selected file
-  const [selectedFileId, setSelectedFileId] = useState(
-    urlFileId ? Number(urlFileId) : null
-  );
+  // Selected files
+  const [selectedFileIds, setSelectedFileIds] = useState(initialFileIds);
 
-  // Summary report for selected file
+  // Summary report for selected files
   const [summary, setSummary] = useState(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
 
@@ -227,19 +228,16 @@ function CaseFileReport() {
       setCaseData(loadedCase);
       setFiles(loadedFiles);
 
-      // Automatically select initial file:
-      // Priority: URL fileId -> first completed file -> first file
-      if (urlFileId && loadedFiles.some((f) => f.id === Number(urlFileId))) {
-        setSelectedFileId(Number(urlFileId));
+      // Priority: URL file_ids -> all completed files
+      if (initialFileIds.length > 0) {
+        setSelectedFileIds(initialFileIds);
       } else {
-        const completedFile = loadedFiles.find(
+        const completedFiles = loadedFiles.filter(
           (f) => String(f.status || "").toUpperCase() === "COMPLETED"
         );
-        const fallbackId = completedFile?.id || loadedFiles[0]?.id || null;
-        if (fallbackId) {
-          setSelectedFileId(fallbackId);
-          setSearchParams({ fileId: String(fallbackId) });
-        }
+        const fallbackIds = completedFiles.map((f) => f.id);
+        setSelectedFileIds(fallbackIds);
+        setSearchParams({ file_ids: fallbackIds.join(",") });
       }
     } catch (err) {
       console.error("Failed to load case data:", err);
@@ -251,25 +249,32 @@ function CaseFileReport() {
     } finally {
       setIsCaseLoading(false);
     }
-  }, [caseId, urlFileId, setSearchParams]);
+  }, [caseId, urlFileIdsStr, setSearchParams]);
 
   useEffect(() => {
     loadCaseAndFiles();
   }, [loadCaseAndFiles]);
 
   // ------------------------------------------------------------
-  // Selected File Object
+  // Selected Files Object
   // ------------------------------------------------------------
-  const selectedFile = useMemo(() => {
-    return files.find((f) => f.id === selectedFileId) || null;
-  }, [files, selectedFileId]);
+  const selectedFilesData = useMemo(() => {
+    return files.filter((f) => selectedFileIds.includes(f.id));
+  }, [files, selectedFileIds]);
 
   // ------------------------------------------------------------
   // Handle File Selection Change
   // ------------------------------------------------------------
   const handleSelectFile = (fileId) => {
-    setSelectedFileId(fileId);
-    setSearchParams({ fileId: String(fileId) });
+    let newIds;
+    if (selectedFileIds.includes(fileId)) {
+      newIds = selectedFileIds.filter((id) => id !== fileId);
+    } else {
+      newIds = [...selectedFileIds, fileId];
+    }
+    setSelectedFileIds(newIds);
+    setSearchParams({ file_ids: newIds.join(",") });
+    
     // Reset filters and page
     setFilters((prev) => ({
       ...prev,
@@ -288,22 +293,22 @@ function CaseFileReport() {
   // Load Summary for Selected File
   // ------------------------------------------------------------
   const loadSummary = useCallback(async () => {
-    if (!selectedFileId) {
+    if (!caseId || selectedFileIds.length === 0) {
       setSummary(null);
       return;
     }
 
     try {
       setIsSummaryLoading(true);
-      const res = await getFileTransactionSummary(selectedFileId);
+      const res = await getCaseTransactionSummary(caseId, selectedFileIds.join(","));
       setSummary(res?.data || null);
     } catch (err) {
-      console.error("Failed to load file summary:", err);
+      console.error("Failed to load case summary:", err);
       setSummary(null);
     } finally {
       setIsSummaryLoading(false);
     }
-  }, [selectedFileId]);
+  }, [caseId, selectedFileIds]);
 
   useEffect(() => {
     loadSummary();
@@ -313,7 +318,7 @@ function CaseFileReport() {
   // Load Filtered Transactions for Selected File
   // ------------------------------------------------------------
   const loadFilteredTransactions = useCallback(async () => {
-    if (!caseId || !selectedFileId) {
+    if (!caseId || selectedFileIds.length === 0) {
       setTransactions([]);
       setTotalTransactions(0);
       setTotalPages(0);
@@ -325,7 +330,7 @@ function CaseFileReport() {
       setTxError("");
 
       const res = await searchCaseTransactions(caseId, {
-        fileId: selectedFileId,
+        file_ids: selectedFileIds.join(","),
         search: filters.search,
         dateFrom: filters.dateFrom,
         dateTo: filters.dateTo,
@@ -361,7 +366,7 @@ function CaseFileReport() {
     } finally {
       setIsTxLoading(false);
     }
-  }, [caseId, selectedFileId, filters]);
+  }, [caseId, selectedFileIds, filters]);
 
   useEffect(() => {
     loadFilteredTransactions();
@@ -548,7 +553,7 @@ function CaseFileReport() {
     link.setAttribute("href", encodedUri);
     link.setAttribute(
       "download",
-      `Report_${selectedFile?.original_filename || "file"}_${new Date().toISOString().slice(0, 10)}.csv`
+      `Report_Export_${new Date().toISOString().slice(0, 10)}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -640,15 +645,15 @@ function CaseFileReport() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-                1. Select File from this Case ({files.length} {files.length === 1 ? "File" : "Files"})
+                1. Select File(s) from this Case ({files.length} {files.length === 1 ? "File" : "Files"})
               </h2>
               <p className="text-xs text-slate-500">
-                Click on any file to load that specific file's filtered transactions and statement report.
+                Select one or more files to analyze transactions and generate the statement report.
               </p>
             </div>
-            {selectedFile && (
+            {selectedFilesData.length > 0 && (
               <span className="text-xs text-emerald-400 font-semibold hidden sm:inline-block">
-                Currently Viewing: {selectedFile.original_filename}
+                Currently Viewing: {selectedFilesData.length} selected statement(s)
               </span>
             )}
           </div>
@@ -669,7 +674,7 @@ function CaseFileReport() {
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {files.map((file) => {
-                const isSelected = file.id === selectedFileId;
+                const isSelected = selectedFileIds.includes(file.id);
                 const isCompleted = String(file.status || "").toUpperCase() === "COMPLETED";
 
                 return (
@@ -740,13 +745,13 @@ function CaseFileReport() {
         {/* ===================================================
             FILE REPORT SUMMARY CARDS
         ==================================================== */}
-        {selectedFile && (
+        {selectedFilesData.length > 0 && (
           <div className="mt-8 space-y-6">
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <span>Report Summary:</span>
-                  <span className="text-emerald-400">{selectedFile.original_filename}</span>
+                  <span className="text-emerald-400">{selectedFilesData.length} Selected Statement(s)</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Statement Period:{" "}
@@ -802,11 +807,8 @@ function CaseFileReport() {
                   </div>
                 </div>
                 <div className="mt-3 text-2xl font-bold text-rose-400">
-                  {summary ? formatCurrency(summary.total_debit) : "-"}
+                  {summary ? formatCurrency(summary.total_debits) : "-"}
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Peak Debit: {summary?.max_debit ? formatCurrency(summary.max_debit) : "-"}
-                </p>
               </div>
 
               {/* Total Credits (Deposits) */}
@@ -822,11 +824,8 @@ function CaseFileReport() {
                   </div>
                 </div>
                 <div className="mt-3 text-2xl font-bold text-emerald-400">
-                  {summary ? formatCurrency(summary.total_credit) : "-"}
+                  {summary ? formatCurrency(summary.total_credits) : "-"}
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Peak Credit: {summary?.max_credit ? formatCurrency(summary.max_credit) : "-"}
-                </p>
               </div>
 
               {/* Net Movement / Inflow-Outflow */}
@@ -843,14 +842,11 @@ function CaseFileReport() {
                 </div>
                 <div
                   className={`mt-3 text-2xl font-bold ${
-                    (summary?.net_movement || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                    (summary ? summary.total_credits - summary.total_debits : 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                   }`}
                 >
-                  {summary ? formatCurrency(summary.net_movement) : "-"}
+                  {summary ? formatCurrency(summary.total_credits - summary.total_debits) : "-"}
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Closing Balance: {summary?.closing_balance !== null ? formatCurrency(summary?.closing_balance) : "-"}
-                </p>
               </div>
             </div>
 
@@ -1843,12 +1839,13 @@ function CaseFileReport() {
                       <tr className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] font-bold uppercase tracking-wider text-slate-400">
                         <th className="py-3.5 px-4">#</th>
                         <th className="py-3.5 px-4 whitespace-nowrap">Date</th>
+                        <th className="py-3.5 px-4 whitespace-nowrap">Account Name</th>
+                        <th className="py-3.5 px-4 whitespace-nowrap">Account Number</th>
+                        <th className="py-3.5 px-4 whitespace-nowrap">Mode</th>
                         <th className="py-3.5 px-4 min-w-[280px]">Narration / Description</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap">Chq / Ref No</th>
                         <th className="py-3.5 px-4 text-right whitespace-nowrap text-rose-400">Debit (Dr)</th>
                         <th className="py-3.5 px-4 text-right whitespace-nowrap text-emerald-400">Credit (Cr)</th>
                         <th className="py-3.5 px-4 text-right whitespace-nowrap">Balance</th>
-                        <th className="py-3.5 px-4 text-center whitespace-nowrap">Source</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/[0.04]">
@@ -1862,11 +1859,17 @@ function CaseFileReport() {
                             <td className="py-3.5 px-4 font-mono whitespace-nowrap text-slate-200">
                               {formatDate(tx.transaction_date)}
                             </td>
-                            <td className="py-3.5 px-4 text-slate-200 break-words leading-relaxed max-w-md">
-                              {tx.description || tx.raw_narration || "-"}
+                            <td className="py-3.5 px-4 text-slate-200 whitespace-nowrap">
+                              {tx.account_name || "-"}
                             </td>
                             <td className="py-3.5 px-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">
-                              {tx.cheque_number || tx.reference_number || "-"}
+                              {tx.account_number || "-"}
+                            </td>
+                            <td className="py-3.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">
+                              {tx.mode || "-"}
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-200 break-words leading-relaxed max-w-md">
+                              {tx.description || tx.raw_narration || "-"}
                             </td>
                             <td className="py-3.5 px-4 text-right font-mono font-semibold text-rose-400 whitespace-nowrap">
                               {tx.debit !== null && tx.debit !== undefined ? formatCurrency(tx.debit) : "-"}
@@ -1876,10 +1879,6 @@ function CaseFileReport() {
                             </td>
                             <td className="py-3.5 px-4 text-right font-mono font-medium text-slate-200 whitespace-nowrap">
                               {tx.balance !== null && tx.balance !== undefined ? formatCurrency(tx.balance) : "-"}
-                            </td>
-                            <td className="py-3.5 px-4 text-center text-[10px] text-slate-500 font-mono whitespace-nowrap">
-                              {tx.source_page ? `P.${tx.source_page}` : ""}
-                              {tx.source_row ? ` R.${tx.source_row}` : ""}
                             </td>
                           </tr>
                         );
