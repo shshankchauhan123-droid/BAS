@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 
 import UserNavbar from "../../components/layout/UserNavbar";
 import UserFooter from "../../components/layout/UserFooter";
-import { getCases } from "../../services/api/case";
+import CreateCaseModal from "../../components/cases/CreateCaseModal";
+import { getCases, createCase } from "../../services/api/case";
 import { getIOMasters } from "../../services/api/ioMaster";
+import Swal from "sweetalert2";
 
 function UserDashboard() {
   const navigate = useNavigate();
@@ -44,8 +46,61 @@ function UserDashboard() {
     };
   }, []);
 
+  const [isCaseModalOpen, setIsCaseModalOpen] = useState(false);
+  const [isCreatingCase, setIsCreatingCase] = useState(false);
+
   const handleCreateCase = () => {
-    navigate("/dashboard/cases/create");
+    setIsCaseModalOpen(true);
+  };
+
+  const handleCaseSubmit = async (data) => {
+    try {
+      setIsCreatingCase(true);
+      const response = await createCase(data);
+      const createdCase = response?.data;
+
+      await Swal.fire({
+        icon: "success",
+        title: "Case Created",
+        text: createdCase?.case_number
+          ? `${createdCase.case_number} has been created successfully.`
+          : "The case has been created successfully.",
+        background: "#07110f",
+        color: "#f8fafc",
+        iconColor: "#34d399",
+        confirmButtonColor: "#059669",
+        confirmButtonText: "Open Case",
+      });
+
+      setIsCaseModalOpen(false);
+
+      if (createdCase?.id) {
+        navigate(`/dashboard/cases/${createdCase.id}`);
+      } else {
+        const casesRes = await getCases();
+        if (Array.isArray(casesRes?.data)) setCases(casesRes.data);
+      }
+    } catch (error) {
+      console.error("Failed to create case:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Unable to create the case.";
+
+      await Swal.fire({
+        icon: "error",
+        title: "Case Creation Failed",
+        text: message,
+        background: "#07110f",
+        color: "#f8fafc",
+        iconColor: "#f87171",
+        confirmButtonColor: "#dc2626",
+        confirmButtonText: "Try Again",
+      });
+      throw error;
+    } finally {
+      setIsCreatingCase(false);
+    }
   };
 
   const handleViewCases = () => {
@@ -1083,6 +1138,20 @@ function UserDashboard() {
           FOOTER
       ========================================================== */}
       <UserFooter />
+
+      {/* =========================================================
+          CREATE CASE MODAL
+      ========================================================== */}
+      <CreateCaseModal
+        isOpen={isCaseModalOpen}
+        onClose={() => {
+          if (!isCreatingCase) {
+            setIsCaseModalOpen(false);
+          }
+        }}
+        onSubmit={handleCaseSubmit}
+        isSubmitting={isCreatingCase}
+      />
 
     </div>
   );

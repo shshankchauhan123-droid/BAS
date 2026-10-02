@@ -221,33 +221,6 @@ function CreateCase() {
 
             </div>
 
-            {/* =================================================
-                CREATE CASE AREA
-            ================================================== */}
-
-            <div
-              className="
-                rounded-[22px]
-                border
-                border-white/[0.08]
-                bg-[#061411]/80
-                p-1
-                shadow-[0_20px_60px_rgba(0,0,0,0.12)]
-                backdrop-blur-sm
-              "
-            >
-
-              <CreateCaseModal
-                isOpen={true}
-                onClose={() =>
-                  navigate("/dashboard/cases")
-                }
-                onSubmit={handleCreateCase}
-                isSubmitting={isCreating}
-              />
-
-            </div>
-
           </div>
 
         </main>
@@ -259,6 +232,15 @@ function CreateCase() {
         <BASFooter />
 
       </div>
+
+      <CreateCaseModal
+        isOpen={true}
+        onClose={() =>
+          navigate("/dashboard/cases")
+        }
+        onSubmit={handleCreateCase}
+        isSubmitting={isCreating}
+      />
 
     </div>
   );

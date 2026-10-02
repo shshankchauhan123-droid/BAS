@@ -25,10 +25,6 @@ function CreateCaseModal({
 
   const hasZeroIOs = !loadingIOs && ioList.length === 0;
 
-  const selectedIO = ioList.find(
-    (io) => String(io.id) === String(formData?.io_id)
-  );
-
   // ------------------------------------------------------------
   // Reset form when modal opens
   // ------------------------------------------------------------
@@ -39,14 +35,6 @@ function CreateCaseModal({
       const res = await getIOMasters();
       const list = Array.isArray(res?.data) ? res.data : [];
       setIoList(list);
-
-      // If officers exist and no IO is currently selected, auto-select the first one
-      if (list.length > 0) {
-        setFormData((prev) => ({
-          ...prev,
-          io_id: prev.io_id || String(list[0].id),
-        }));
-      }
     } catch (e) {
       console.error("Failed to load IO list:", e);
     } finally {
@@ -70,16 +58,9 @@ function CreateCaseModal({
   const handleCreateIOQuick = async (data) => {
     try {
       setIsCreatingIO(true);
-      const res = await createIOMaster(data);
-      const createdIO = res?.data;
+      await createIOMaster(data);
       setIsIOModalOpen(false);
       await loadIOList();
-      if (createdIO?.id) {
-        setFormData((prev) => ({
-          ...prev,
-          io_id: String(createdIO.id),
-        }));
-      }
     } catch (err) {
       console.error("Failed to create IO:", err);
       throw err;
@@ -497,30 +478,6 @@ function CreateCaseModal({
                       </option>
                     ))}
                   </select>
-
-                  {/* Selected IO Summary & Designation Badge */}
-                  {selectedIO ? (
-                    <div className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[0.06] p-3.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                          Officer Assigned to Case
-                        </span>
-                        <span className="rounded-lg border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
-                          {selectedIO.designation}
-                        </span>
-                      </div>
-                      <p className="mt-1.5 text-sm font-semibold text-white">
-                        {selectedIO.officer_name}
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        Station / Branch: <span className="text-slate-200">{selectedIO.police_station}</span>
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-[10px] text-slate-500">
-                      Select an IO from the list above, or click "+ Add New IO" to register a different officer.
-                    </p>
-                  )}
                 </>
               )}
             </div>
