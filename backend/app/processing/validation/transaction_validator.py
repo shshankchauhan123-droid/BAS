@@ -29,9 +29,9 @@ def normalize_financial_value(val):
         s = s[1:].strip()
         
     # Dr / Cr suffixes
-    # Strip them from the end first to avoid confusing 'Cr' (Credit) with 'Cr' (Crore)
-    s = re.sub(r'\bcr\.?\s*$', '', s).strip()
-    s = re.sub(r'\bdr\.?\s*$', '', s).strip()
+    # Use non-word boundary tolerant regex to strip cr/dr at the exact end of string
+    s = re.sub(r'(?i)\s*cr\.?\s*$', '', s).strip()
+    s = re.sub(r'(?i)\s*dr\.?\s*$', '', s).strip()
 
     # Detect multiplier
     multiplier = 1.0
@@ -41,7 +41,7 @@ def normalize_financial_value(val):
     elif re.search(r'\bcrores?\b', s) or re.search(r'\bcr\b', s):
         multiplier = 10000000.0
         s = re.sub(r'\bcrores?\b|\bcr\b', '', s).strip()
-    elif s.endswith('k'):
+    elif s.endswith('k') and not s.endswith('ok'):
         multiplier = 1000.0
         s = s[:-1].strip()
     elif s.endswith('m'):
@@ -160,9 +160,44 @@ def validate_transactions(df: pd.DataFrame) -> pd.DataFrame:
     valid_count = vdf["_is_valid"].sum()
     invalid_count = len(vdf) - valid_count
     
-    print("VALIDATION RESULT:")
+    # Tally up all validation errors
+    from collections import Counter
+    error_tally = Counter()
+    invalid_rows_sample = []
+    
+    for idx, row in vdf.iterrows():
+        if not row["_is_valid"]:
+            for err in row["_validation_errors"]:
+                error_tally[err] += 1
+            if len(invalid_rows_sample) < 10:
+                invalid_rows_sample.append(row)
+    
+    print("============================================================")
+    print("STAGE 7 VALIDATION SUMMARY")
+    print("============================================================")
+    print(f"\nInput rows: {len(vdf)}")
     print(f"Valid rows: {valid_count}")
     print(f"Invalid rows: {invalid_count}\n")
+    
+    print("Validation errors:")
+    if not error_tally:
+        print("  None")
+    else:
+        for err, count in error_tally.most_common():
+            print(f"  {err}: {count}")
+    print()
+    
+    if invalid_rows_sample:
+        print("Sample invalid rows (max 10):")
+        for r in invalid_rows_sample:
+            print(f"  row={r.name}")
+            print(f"    date={r.get('transaction_date')}")
+            print(f"    description={r.get('description')}")
+            print(f"    debit={r.get('debit')}")
+            print(f"    credit={r.get('credit')}")
+            print(f"    balance={r.get('balance')}")
+            print(f"    errors={r.get('_validation_errors')}")
+            print("")
     
     # Format output correctly
     final_columns = [
@@ -180,10 +215,6 @@ def validate_transactions(df: pd.DataFrame) -> pd.DataFrame:
     # Reorder
     vdf = vdf[final_columns]
     
-    import json
-    print("FINAL COLUMNS:")
-    print(json.dumps(final_columns, indent=4))
-    print()
     print("STAGE 7 VALIDATION COMPLETED")
     print("============================================================")
     
