@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import BASNavbar from "../../../components/layout/UserNavbar";
 import DynamicModeWiseChart from "../../../components/dynamicReport/DynamicModeWiseChart";
 import { getCases } from "../../../services/api/case";
@@ -8,8 +8,12 @@ import { getCaseModeWise } from "../../../services/api/bankTransaction";
 
 export default function DynamicReportDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const paramCaseId = searchParams.get("caseId");
+  const paramFileId = searchParams.get("fileId");
+
   const [cases, setCases] = useState([]);
-  const [selectedCaseId, setSelectedCaseId] = useState("");
+  const [selectedCaseId, setSelectedCaseId] = useState(paramCaseId || "");
   
   const [files, setFiles] = useState([]);
   const [selectedFileIds, setSelectedFileIds] = useState(new Set());
@@ -32,7 +36,9 @@ export default function DynamicReportDashboard() {
         const res = await getCases();
         if (res?.data) {
           setCases(res.data);
-          if (res.data.length > 0) {
+          if (paramCaseId && res.data.some(c => c.id.toString() === paramCaseId.toString())) {
+            setSelectedCaseId(paramCaseId.toString());
+          } else if (res.data.length > 0 && !selectedCaseId) {
             setSelectedCaseId(res.data[0].id.toString());
           }
         }
@@ -44,7 +50,7 @@ export default function DynamicReportDashboard() {
       }
     }
     loadCases();
-  }, []);
+  }, [paramCaseId]);
 
   // 2. Fetch Files when Case changes
   useEffect(() => {
@@ -62,9 +68,13 @@ export default function DynamicReportDashboard() {
         const res = await getCaseFiles(selectedCaseId);
         if (res?.data) {
           setFiles(res.data);
-          // By default select all files
-          const allIds = new Set(res.data.map(f => f.id));
-          setSelectedFileIds(allIds);
+          if (paramFileId && res.data.some(f => f.id.toString() === paramFileId.toString())) {
+            setSelectedFileIds(new Set([Number(paramFileId)]));
+          } else {
+            // By default select all files
+            const allIds = new Set(res.data.map(f => f.id));
+            setSelectedFileIds(allIds);
+          }
         } else {
           setFiles([]);
           setSelectedFileIds(new Set());

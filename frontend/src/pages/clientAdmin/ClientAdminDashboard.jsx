@@ -4,6 +4,7 @@ import UserFooter from "../../components/layout/UserFooter";
 import { getUsers, createUser, updateUserStatus, updateUserPermissions } from "../../services/api/user";
 import { useAuth } from "../../context/AuthContext";
 import AuditLogTable from "../../components/audit/AuditLogTable";
+import AdminCaseReportSelector from "../../components/admin/AdminCaseReportSelector";
 
 const DEFAULT_PERMISSIONS = {
   // CASE
@@ -59,23 +60,80 @@ export default function ClientAdminDashboard() {
   const [editRightsError, setEditRightsError] = useState("");
 
 
-  const fetchTeam = async () => {
+  const fetchTeam = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
       const res = await getUsers();
       const list = res?.users || res?.items || (Array.isArray(res) ? res : []);
       setUsers(list);
       setQuota(res?.quota || null);
     } catch (err) {
-      setError(err?.message || "Failed to load team members.");
+      if (!silent) setError(err?.message || "Failed to load team members.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchTeam();
+  }, []);
+
+  // Real-time Admin Dashboard WebSocket listener
+  useEffect(() => {
+    let ws = null;
+    let reconnectTimeout = null;
+    let isMounted = true;
+
+    function connectWs() {
+      const token = localStorage.getItem("antidrone_access_token");
+      if (!token) return;
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+      const wsProto = baseUrl.startsWith("https") ? "wss" : "ws";
+      const host = baseUrl.replace(/^https?:\/\//, "");
+      const wsUrl = `${wsProto}://${host}/api/v1/ws/admin-dashboard?token=${encodeURIComponent(token)}`;
+
+      try {
+        ws = new WebSocket(wsUrl);
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data?.event === "dashboard_refresh") {
+              fetchTeam(true);
+            }
+          } catch (e) {
+            console.warn("WebSocket parse error:", e);
+          }
+        };
+
+        ws.onclose = (event) => {
+          // Reconnect after 3 seconds if not closed normally (1000) or rejected (1008)
+          if (isMounted && event.code !== 1000 && event.code !== 1008) {
+            reconnectTimeout = setTimeout(() => {
+              if (isMounted) connectWs();
+            }, 3000);
+          }
+        };
+
+        ws.onerror = () => {
+          // Connection failures trigger onclose
+        };
+      } catch (e) {
+        console.warn("WebSocket init error:", e);
+      }
+    }
+
+    connectWs();
+
+    return () => {
+      isMounted = false;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) {
+        ws.close(1000, "Dashboard unmounted");
+      }
+    };
   }, []);
 
   const handleToggleUserStatus = async (targetUser) => {
@@ -280,10 +338,27 @@ export default function ClientAdminDashboard() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("reports")}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition ${
+                activeTab === "reports"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-lg shadow-emerald-950/40"
+                  : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+              }`}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              View Case Report
+            </button>
           </div>
 
           {activeTab === "audit" ? (
             <AuditLogTable isSuperAdmin={false} />
+          ) : activeTab === "reports" ? (
+            <AdminCaseReportSelector />
           ) : (
             <>
           {/* Seat Limit Warning Banner */}

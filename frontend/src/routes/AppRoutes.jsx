@@ -246,7 +246,7 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <CaseReportsHub />
               </RoleRoute>
             </ProtectedRoute>
@@ -282,7 +282,7 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports/transaction-relationships"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <TransactionRelationshipReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -293,7 +293,7 @@ function AppRoutes() {
           path="/reports/transaction-relationships"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <TransactionRelationshipReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -309,7 +309,7 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports/file-statement"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <CaseFileReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -320,7 +320,7 @@ function AppRoutes() {
           path="/dashboard/reports/file-statement"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <CaseFileReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -331,7 +331,7 @@ function AppRoutes() {
           path="/reports/file-statement"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <CaseFileReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -346,7 +346,7 @@ function AppRoutes() {
           path="/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <CaseReportsHub />
               </RoleRoute>
             </ProtectedRoute>
@@ -357,7 +357,7 @@ function AppRoutes() {
           path="/dashboard/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <CaseReportsHub />
               </RoleRoute>
             </ProtectedRoute>
@@ -372,7 +372,7 @@ function AppRoutes() {
           path="/analysis"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -383,7 +383,7 @@ function AppRoutes() {
           path="/dashboard/analysis"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -394,7 +394,7 @@ function AppRoutes() {
           path="/reports/timeline"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -405,7 +405,7 @@ function AppRoutes() {
           path="/dashboard/reports/timeline"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -416,7 +416,7 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports/timeline"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>

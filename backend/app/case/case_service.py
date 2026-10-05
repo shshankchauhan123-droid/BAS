@@ -248,6 +248,7 @@ def create_case(
 def get_cases(
     db: Session,
     user_id: int,
+    target_user_id: int | None = None,
 ):
     user = get_user_by_id(db=db, user_id=user_id)
     if not user:
@@ -257,6 +258,21 @@ def get_cases(
 
     # SuperAdmin has global visibility across all cases
     if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        if target_user_id:
+            from sqlalchemy import or_
+            from sqlalchemy.orm import joinedload
+            return (
+                db.query(Case)
+                .options(joinedload(Case.io))
+                .filter(
+                    or_(
+                        Case.created_by == target_user_id,
+                        Case.assigned_to == target_user_id,
+                    )
+                )
+                .order_by(Case.created_at.desc())
+                .all()
+            )
         return get_all_cases(db=db)
 
     # Regular users strictly see cases they created or that are assigned to them
@@ -274,13 +290,23 @@ def get_cases(
         if not user.client_id:
             return []
         from sqlalchemy.orm import joinedload
-        return (
+        from sqlalchemy import or_
+        query = (
             db.query(Case)
             .options(joinedload(Case.io))
             .filter(Case.client_id == user.client_id)
-            .order_by(Case.created_at.desc())
-            .all()
         )
+        if target_user_id:
+            target_user = get_user_by_id(db=db, user_id=target_user_id)
+            if not target_user or target_user.client_id != user.client_id:
+                raise ValueError("Target user not found or not in your organization.")
+            query = query.filter(
+                or_(
+                    Case.created_by == target_user_id,
+                    Case.assigned_to == target_user_id,
+                )
+            )
+        return query.order_by(Case.created_at.desc()).all()
 
     return []
 

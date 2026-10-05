@@ -381,8 +381,18 @@ function CaseFileReport() {
       setCaseData(loadedCase);
       setFiles(loadedFiles);
 
-      // Do not auto-select files; user selects single or multiple files manually
-      setSelectedFileIds([]);
+      const queryFileId = searchParams.get("fileId");
+      if (queryFileId) {
+        const parsed = Number(queryFileId);
+        if (loadedFiles.some((f) => f.id === parsed)) {
+          setSelectedFileIds([parsed]);
+        } else {
+          setSelectedFileIds([]);
+        }
+      } else {
+        // Do not auto-select files; user selects single or multiple files manually
+        setSelectedFileIds([]);
+      }
     } catch (err) {
       console.error("Failed to load case data:", err);
       setCaseError(

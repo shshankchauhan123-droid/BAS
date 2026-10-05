@@ -61,6 +61,7 @@ def create_case_route(
     status_code=status.HTTP_200_OK,
 )
 def get_cases_route(
+    user_id: int | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -68,6 +69,7 @@ def get_cases_route(
         return get_cases(
             db=db,
             user_id=current_user.id,
+            target_user_id=user_id,
         )
 
     except PermissionError as error:

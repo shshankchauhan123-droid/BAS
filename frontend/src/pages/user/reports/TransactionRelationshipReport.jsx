@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import BASNavbar from "../../../components/layout/UserNavbar";
 import { getCases } from "../../../services/api/case";
 import { getCaseFiles } from "../../../services/api/file";
@@ -24,6 +24,8 @@ function formatCurrency(amount) {
 export default function TransactionRelationshipReport() {
   const { caseId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const queryFileId = searchParams.get("fileId");
 
   const [activeCaseId, setActiveCaseId] = useState(caseId || "");
   const [allCases, setAllCases] = useState([]);
@@ -124,7 +126,9 @@ export default function TransactionRelationshipReport() {
 
         setFiles(list);
 
-        if (list.length >= 1) {
+        if (queryFileId && list.some((f) => f.id.toString() === queryFileId.toString())) {
+          setSelectedFileIds([Number(queryFileId)]);
+        } else if (list.length >= 1) {
           setSelectedFileIds([list[0].id]);
         } else {
           setSelectedFileIds([]);

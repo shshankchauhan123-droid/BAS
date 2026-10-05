@@ -74,10 +74,20 @@ def login_route(
     db: Session = Depends(get_db),
 ):
     try:
-        return login(
+        response = login(
             db=db,
             data=data,
         )
+
+        # Notify active Admin dashboards of the successful login via WebSocket
+        try:
+            from app.websocket.connection_manager import manager
+            client_id = getattr(response.user, "client_id", None)
+            manager.trigger_dashboard_refresh(client_id=client_id)
+        except Exception:
+            pass
+
+        return response
 
     except ValueError as error:
         raise HTTPException(

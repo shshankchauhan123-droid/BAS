@@ -335,6 +335,11 @@ def get_case_files(
         if not case:
             raise ValueError("Case not found")
         return get_files_by_case(db=db, case_id=case_id)
+    elif user_role == CLIENT_ADMIN_ROLE:
+        case = get_case_by_id(db=db, case_id=case_id)
+        if not case or case.client_id != user.client_id:
+            raise ValueError("Case not found or permission denied")
+        return get_files_by_case(db=db, case_id=case_id)
     else:
         case = get_case_by_id_and_user(
             db=db,
@@ -365,6 +370,12 @@ def get_file_for_view(
 
     if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
         file = get_file_by_id(db=db, file_id=file_id)
+    elif user_role == CLIENT_ADMIN_ROLE:
+        file = get_file_by_id(db=db, file_id=file_id)
+        if file:
+            case = get_case_by_id(db=db, case_id=file.case_id)
+            if not case or case.client_id != user.client_id:
+                file = None
     else:
         file = get_file_by_id_and_user(
             db=db,

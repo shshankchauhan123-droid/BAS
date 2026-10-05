@@ -35,10 +35,12 @@ def create_case(
 def get_cases(
     db: Session,
     user_id: int,
+    target_user_id: int | None = None,
 ):
     cases = service_get_cases(
         db=db,
         user_id=user_id,
+        target_user_id=target_user_id,
     )
 
     return {

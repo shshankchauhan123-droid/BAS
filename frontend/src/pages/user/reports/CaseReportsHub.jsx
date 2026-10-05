@@ -7,9 +7,15 @@ import BASNavbar from "../../../components/layout/UserNavbar";
 import { getCase, getCases } from "../../../services/api/case";
 
 import { getCaseFiles } from "../../../services/api/file";
+import { getUsers } from "../../../services/api/user";
+import { useAuth } from "../../../context/AuthContext";
+import ClientAdminReportModal from "../../../components/admin/ClientAdminReportModal";
 
 export default function CaseReportsHub() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isClientAdmin = String(user?.role || "").toLowerCase() === "client_admin";
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const { caseId: paramCaseId } = useParams();
 
@@ -32,6 +38,100 @@ export default function CaseReportsHub() {
   const [selectedCategory, setSelectedCategory] = useState("all");
 
   // ============================================================
+  // Client Admin: 3-Dependent Dropdowns (User -> Case -> File)
+  // ============================================================
+  const [clientUsers, setClientUsers] = useState([]);
+  const [userCases, setUserCases] = useState([]);
+  const [caseFiles, setCaseFiles] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedCaseId, setSelectedCaseId] = useState("");
+  const [selectedFileId, setSelectedFileId] = useState("");
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingCases, setLoadingCases] = useState(false);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+
+  useEffect(() => {
+    if (!isClientAdmin) return;
+    let isMounted = true;
+    async function loadClientUsers() {
+      try {
+        setLoadingUsers(true);
+        const res = await getUsers();
+        const list = res?.users || res?.items || (Array.isArray(res) ? res : []);
+        if (isMounted) {
+          setClientUsers(list);
+        }
+      } catch (err) {
+        console.error("Failed to load client users:", err);
+      } finally {
+        if (isMounted) {
+          setLoadingUsers(false);
+        }
+      }
+    }
+    loadClientUsers();
+    return () => {
+      isMounted = false;
+    };
+  }, [isClientAdmin]);
+
+  const handleUserChange = async (e) => {
+    const newUserId = e.target.value;
+    setSelectedUserId(newUserId);
+    setSelectedCaseId("");
+    setSelectedFileId("");
+    setUserCases([]);
+    setCaseFiles([]);
+
+    if (!newUserId) return;
+
+    try {
+      setLoadingCases(true);
+      const res = await getCases(newUserId);
+      const list = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res)
+        ? res
+        : [];
+      setUserCases(list);
+    } catch (err) {
+      console.error("Failed to load cases for user:", err);
+    } finally {
+      setLoadingCases(false);
+    }
+  };
+
+  const handleCaseChange = async (e) => {
+    const newCaseId = e.target.value;
+    setSelectedCaseId(newCaseId);
+    setSelectedFileId("");
+    setCaseFiles([]);
+
+    if (!newCaseId) return;
+
+    setActiveCaseId(newCaseId);
+
+    try {
+      setLoadingFiles(true);
+      const res = await getCaseFiles(newCaseId);
+      const list = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res)
+        ? res
+        : [];
+      setCaseFiles(list);
+    } catch (err) {
+      console.error("Failed to load files for case:", err);
+    } finally {
+      setLoadingFiles(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    setSelectedFileId(e.target.value);
+  };
+
+  // ============================================================
   // Sync activeCaseId if paramCaseId changes
   // ============================================================
 
@@ -42,10 +142,11 @@ export default function CaseReportsHub() {
   }, [paramCaseId, activeCaseId]);
 
   // ============================================================
-  // Fetch all cases for case switcher
+  // Fetch all cases for case switcher (Normal User only)
   // ============================================================
 
   useEffect(() => {
+    if (isClientAdmin) return;
     let isMounted = true;
 
     async function fetchCases() {
@@ -258,8 +359,27 @@ export default function CaseReportsHub() {
   ];
 
   // ============================================================
-  // Filter Reports
+  // Filter Reports & Route Builder
   // ============================================================
+
+  const isClientAdminSelectionValid = Boolean(
+    selectedUserId && selectedCaseId && selectedFileId
+  );
+
+  const getReportRoute = (report) => {
+    if (isClientAdmin) {
+      if (report.id === "dynamic-timeline-report") {
+        return `/analysis?caseId=${encodeURIComponent(selectedCaseId)}&fileId=${encodeURIComponent(selectedFileId)}`;
+      }
+      if (report.id === "file-statement") {
+        return `/dashboard/cases/${encodeURIComponent(selectedCaseId)}/reports/file-statement?fileId=${encodeURIComponent(selectedFileId)}`;
+      }
+      if (report.id === "transaction-relationships") {
+        return `/dashboard/cases/${encodeURIComponent(selectedCaseId)}/reports/transaction-relationships?fileId=${encodeURIComponent(selectedFileId)}`;
+      }
+    }
+    return report.route;
+  };
 
   const filteredReports = reportsList.filter((report) => {
     const matchesCategory =
@@ -298,27 +418,49 @@ export default function CaseReportsHub() {
           ============================================================ */}
 
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <button
-              type="button"
-              onClick={() => navigate("/dashboard/cases")}
-              className="inline-flex items-center gap-2.5 rounded-xl border border-emerald-400/40 bg-[#06201a] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-300 shadow-[0_4px_16px_rgba(0,0,0,0.3)] transition-all duration-200 hover:border-emerald-400 hover:bg-emerald-400 hover:text-[#020b09] active:scale-95 cursor-pointer"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            {isClientAdmin ? (
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(true)}
+                className="inline-flex items-center gap-2.5 rounded-xl border border-emerald-400/50 bg-[#06201a] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-300 shadow-[0_4px_16px_rgba(0,0,0,0.3)] transition-all duration-200 hover:border-emerald-400 hover:bg-emerald-400 hover:text-[#020b09] active:scale-95 cursor-pointer"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2.5"
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-
-              Back to Cases
-            </button>
+                <svg
+                  className="h-4 w-4 text-emerald-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                VIEW CASE REPORT
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard/cases")}
+                className="inline-flex items-center gap-2.5 rounded-xl border border-emerald-400/40 bg-[#06201a] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-300 shadow-[0_4px_16px_rgba(0,0,0,0.3)] transition-all duration-200 hover:border-emerald-400 hover:bg-emerald-400 hover:text-[#020b09] active:scale-95 cursor-pointer"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2.5"
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
+                </svg>
+                Back to Cases
+              </button>
+            )}
 
             <div className="flex items-center gap-2 text-xs text-slate-400">
               <span
@@ -337,181 +479,378 @@ export default function CaseReportsHub() {
           </div>
 
           {/* ============================================================
-              Quick Case Switcher
+              Top Section: Client Admin (3 Dependent Dropdowns) vs User (Quick Case Switcher + Info Badges)
           ============================================================ */}
-
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-400/20 bg-[#061411]/90 px-4 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
-            <div className="flex flex-wrap items-center gap-3">
-              <label
-                htmlFor="hub-case-select"
-                className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300"
-              >
-                <svg
-                  className="h-4 w-4 text-emerald-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                  />
-                </svg>
-
-                Select / Switch Case:
-              </label>
-
-              <div className="relative min-w-[260px] sm:min-w-[340px]">
-                <select
-                  id="hub-case-select"
-                  value={activeCaseId || ""}
-                  onChange={(e) => handleSwitchCase(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-emerald-400/30 bg-[#020b09] px-3.5 py-2 pr-9 text-xs font-semibold text-emerald-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition cursor-pointer"
-                >
-                  <option value="" disabled>
-                    -- Choose a Case --
-                  </option>
-
-                  {allCases.map((c) => (
-                    <option
-                      key={c.id}
-                      value={c.id}
-                      className="bg-[#061411] text-white"
+          {isClientAdmin ? (
+            <div className="mt-6 rounded-2xl border border-emerald-400/20 bg-[#061411]/90 p-4 sm:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {/* 1. SELECT USER */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="hub-select-user"
+                      className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5"
                     >
-                      {c.case_name || "Untitled Case"}
-                    </option>
-                  ))}
-                </select>
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400/10 text-[10px] text-emerald-400 border border-emerald-400/30">
+                        1
+                      </span>
+                      Select User
+                    </label>
+                    {loadingUsers && (
+                      <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+                        <span className="h-2.5 w-2.5 animate-spin rounded-full border border-emerald-400 border-t-transparent" />
+                        Loading...
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <select
+                      id="hub-select-user"
+                      value={selectedUserId}
+                      onChange={handleUserChange}
+                      disabled={loadingUsers}
+                      className="w-full appearance-none rounded-xl border border-emerald-400/30 bg-[#020b09] px-3.5 py-2.5 pr-9 text-xs font-semibold text-emerald-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition cursor-pointer disabled:opacity-50"
+                    >
+                      <option value="">-- Choose a User --</option>
+                      {clientUsers.map((u) => (
+                        <option
+                          key={u.id}
+                          value={u.id}
+                          className="bg-[#061411] text-white"
+                        >
+                          {u.username} {u.email ? `(${u.email})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-emerald-400">
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
 
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-emerald-400">
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                {/* 2. SELECT CASE */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="hub-select-case"
+                      className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5"
+                    >
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400/10 text-[10px] text-emerald-400 border border-emerald-400/30">
+                        2
+                      </span>
+                      Select Case
+                    </label>
+                    {loadingCases && (
+                      <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+                        <span className="h-2.5 w-2.5 animate-spin rounded-full border border-emerald-400 border-t-transparent" />
+                        Loading...
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <select
+                      id="hub-select-case"
+                      value={selectedCaseId}
+                      onChange={handleCaseChange}
+                      disabled={!selectedUserId || loadingCases}
+                      className="w-full appearance-none rounded-xl border border-emerald-400/30 bg-[#020b09] px-3.5 py-2.5 pr-9 text-xs font-semibold text-emerald-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {!selectedUserId
+                          ? "-- Select User First --"
+                          : loadingCases
+                          ? "-- Loading Cases... --"
+                          : userCases.length === 0
+                          ? "No cases found for this user"
+                          : "-- Choose a Case --"}
+                      </option>
+                      {userCases.map((c) => (
+                        <option
+                          key={c.id}
+                          value={c.id}
+                          className="bg-[#061411] text-white"
+                        >
+                          {c.case_name || c.case_number || "Untitled Case"} (
+                          {c.case_number})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-emerald-400">
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. SELECT FILE */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="hub-select-file"
+                      className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5"
+                    >
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400/10 text-[10px] text-emerald-400 border border-emerald-400/30">
+                        3
+                      </span>
+                      Select File
+                    </label>
+                    {loadingFiles && (
+                      <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+                        <span className="h-2.5 w-2.5 animate-spin rounded-full border border-emerald-400 border-t-transparent" />
+                        Loading...
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <select
+                      id="hub-select-file"
+                      value={selectedFileId}
+                      onChange={handleFileChange}
+                      disabled={!selectedCaseId || loadingFiles}
+                      className="w-full appearance-none rounded-xl border border-emerald-400/30 bg-[#020b09] px-3.5 py-2.5 pr-9 text-xs font-semibold text-emerald-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {!selectedCaseId
+                          ? "-- Select Case First --"
+                          : loadingFiles
+                          ? "-- Loading Files... --"
+                          : caseFiles.length === 0
+                          ? "No files found for this case"
+                          : "-- Choose a File --"}
+                      </option>
+                      {caseFiles.map((f) => (
+                        <option
+                          key={f.id}
+                          value={f.id}
+                          className="bg-[#061411] text-white"
+                        >
+                          {f.original_filename}{" "}
+                          {f.bank_name ? `(${f.bank_name})` : ""} - {f.status}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-emerald-400">
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* ============================================================
+                  Quick Case Switcher
+              ============================================================ */}
+
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-400/20 bg-[#061411]/90 px-4 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+                <div className="flex flex-wrap items-center gap-3">
+                  <label
+                    htmlFor="hub-case-select"
+                    className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
+                    <svg
+                      className="h-4 w-4 text-emerald-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                      />
+                    </svg>
+
+                    Select / Switch Case:
+                  </label>
+
+                  <div className="relative min-w-[260px] sm:min-w-[340px]">
+                    <select
+                      id="hub-case-select"
+                      value={activeCaseId || ""}
+                      onChange={(e) => handleSwitchCase(e.target.value)}
+                      className="w-full appearance-none rounded-xl border border-emerald-400/30 bg-[#020b09] px-3.5 py-2 pr-9 text-xs font-semibold text-emerald-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 transition cursor-pointer"
+                    >
+                      <option value="" disabled>
+                        -- Choose a Case --
+                      </option>
+
+                      {allCases.map((c) => (
+                        <option
+                          key={c.id}
+                          value={c.id}
+                          className="bg-[#061411] text-white"
+                        >
+                          {c.case_name || "Untitled Case"}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-emerald-400">
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {loadingAllCases && (
+                    <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                      <span className="h-3 w-3 animate-spin rounded-full border border-emerald-400 border-t-transparent" />
+
+                      Loading cases...
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-xs text-slate-400">
+                  Total Cases:{" "}
+                  <span className="font-bold text-slate-200">
+                    {allCases.length}
+                  </span>
                 </div>
               </div>
 
-              {loadingAllCases && (
-                <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <span className="h-3 w-3 animate-spin rounded-full border border-emerald-400 border-t-transparent" />
+              {/* ============================================================
+                  Case Info Badges & Quick Metrics
+              ============================================================ */}
 
-                  Loading cases...
-                </span>
-              )}
-            </div>
+              <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                {/* Case Name & IO Name */}
 
-            <div className="text-xs text-slate-400">
-              Total Cases:{" "}
-              <span className="font-bold text-slate-200">
-                {allCases.length}
-              </span>
-            </div>
-          </div>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-bold text-emerald-300 shadow-sm">
+                    <svg
+                      className="h-4 w-4 text-emerald-400 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                      />
+                    </svg>
 
-          {/* ============================================================
-              Case Info Badges & Quick Metrics
-          ============================================================ */}
+                    <span className="text-slate-400 font-semibold text-xs">
+                      Case:
+                    </span>
 
-          <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            {/* Case Name & IO Name */}
+                    <span>
+                      {caseData?.case_name
+                        ? caseData.case_name
+                        : activeCaseId
+                        ? "Loading..."
+                        : "Please Select a Case"}
+                    </span>
+                  </div>
 
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-bold text-emerald-300 shadow-sm">
-                <svg
-                  className="h-4 w-4 text-emerald-400 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                  />
-                </svg>
+                  <div className="inline-flex items-center gap-1.5 rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-1.5 text-sm font-bold text-sky-200 shadow-sm">
+                    <svg
+                      className="h-4 w-4 text-sky-400 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+                    </svg>
 
-                <span className="text-slate-400 font-semibold text-xs">
-                  Case:
-                </span>
+                    <span className="text-slate-400 font-semibold text-xs">
+                      IO:
+                    </span>
 
-                <span>
-                  {caseData?.case_name
-                    ? caseData.case_name
-                    : activeCaseId
-                    ? "Loading..."
-                    : "Please Select a Case"}
-                </span>
+                    <span>
+                      {caseData?.io?.officer_name
+                        ? `${caseData.io.officer_name}${
+                            caseData.io.designation
+                              ? ` (${caseData.io.designation})`
+                              : ""
+                          }`
+                        : "Not Assigned"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Metrics */}
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="rounded-2xl border border-white/[0.08] bg-[#061411] px-4 py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Uploaded Statements
+                    </p>
+
+                    <p className="mt-0.5 text-base font-bold text-white">
+                      {files.length}{" "}
+                      {files.length === 1 ? "File" : "Files"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] px-4 py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/80">
+                      Active Reports
+                    </p>
+
+                    <p className="mt-0.5 text-base font-bold text-emerald-300">
+                      {reportsList.filter((report) => report.isReady).length}{" "}
+                      Available
+                    </p>
+                  </div>
+                </div>
               </div>
-
-              <div className="inline-flex items-center gap-1.5 rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-1.5 text-sm font-bold text-sky-200 shadow-sm">
-                <svg
-                  className="h-4 w-4 text-sky-400 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-
-                <span className="text-slate-400 font-semibold text-xs">
-                  IO:
-                </span>
-
-                <span>
-                  {caseData?.io?.officer_name
-                    ? `${caseData.io.officer_name}${
-                        caseData.io.designation
-                          ? ` (${caseData.io.designation})`
-                          : ""
-                      }`
-                    : "Not Assigned"}
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Metrics */}
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-2xl border border-white/[0.08] bg-[#061411] px-4 py-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Uploaded Statements
-                </p>
-
-                <p className="mt-0.5 text-base font-bold text-white">
-                  {files.length}{" "}
-                  {files.length === 1 ? "File" : "Files"}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] px-4 py-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/80">
-                  Active Reports
-                </p>
-
-                <p className="mt-0.5 text-base font-bold text-emerald-300">
-                  {reportsList.filter((report) => report.isReady).length}{" "}
-                  Available
-                </p>
-              </div>
-            </div>
-          </div>
+            </>
+          )}
 
           {/* ============================================================
               Error Message
@@ -724,24 +1063,35 @@ export default function CaseReportsHub() {
                     {report.isReady ? (
                       <button
                         type="button"
-                        onClick={() => navigate(report.route)}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 px-4 py-2.5 text-xs font-bold text-black shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-emerald-300 transition"
+                        disabled={isClientAdmin && !isClientAdminSelectionValid}
+                        onClick={() => navigate(getReportRoute(report))}
+                        className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+                          !isClientAdmin || isClientAdminSelectionValid
+                            ? "bg-gradient-to-r from-emerald-500 to-emerald-400 text-black shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-emerald-300 cursor-pointer"
+                            : "border border-white/[0.08] bg-white/[0.03] text-slate-500 cursor-not-allowed"
+                        }`}
                       >
-                        <span>Open Report</span>
+                        <span>
+                          {isClientAdmin && !isClientAdminSelectionValid
+                            ? "Select User, Case & File"
+                            : "Open Report"}
+                        </span>
 
-                        <svg
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M14 5l7 7m0 0l-7 7m7-7H3"
-                          />
-                        </svg>
+                        {(!isClientAdmin || isClientAdminSelectionValid) && (
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M14 5l7 7m0 0l-7 7m7-7H3"
+                            />
+                          </svg>
+                        )}
                       </button>
                     ) : (
                       <button
@@ -783,6 +1133,15 @@ export default function CaseReportsHub() {
                 Clear search & show all reports
               </button>
             </div>
+          )}
+
+          {/* Client Admin View Case Report Modal */}
+          {isClientAdmin && (
+            <ClientAdminReportModal
+              isOpen={isReportModalOpen}
+              onClose={() => setIsReportModalOpen(false)}
+              onCaseSelect={(newCaseId) => handleSwitchCase(newCaseId)}
+            />
           )}
         </main>
       </div>
