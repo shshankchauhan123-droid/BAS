@@ -21,7 +21,6 @@ from app.core.security import hash_password
 from app.user.user_model import User
 from app.user.user_repository import (
     get_user_by_email,
-    get_user_by_username,
 )
 
 
@@ -45,9 +44,6 @@ def create_client_with_admin(
     admin_data: ClientAdminCreate = data.admin
     cleaned_username = admin_data.username.strip()
     cleaned_email = admin_data.email.strip().lower()
-
-    if get_user_by_username(db, cleaned_username):
-        raise ValueError(f"Username '{cleaned_username}' is already taken.")
 
     if get_user_by_email(db, cleaned_email):
         raise ValueError(f"Email '{cleaned_email}' is already in use.")

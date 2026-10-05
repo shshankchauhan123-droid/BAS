@@ -1,4 +1,5 @@
 from typing import Optional
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.case.case_model import Case
@@ -20,6 +21,7 @@ def get_all_cases(
 ) -> list[Case]:
     return (
         db.query(Case)
+        .options(joinedload(Case.io))
         .order_by(Case.created_at.desc())
         .all()
     )
@@ -32,7 +34,12 @@ def get_cases_by_user(
     return (
         db.query(Case)
         .options(joinedload(Case.io))
-        .filter(Case.created_by == user_id)
+        .filter(
+            or_(
+                Case.created_by == user_id,
+                Case.assigned_to == user_id,
+            )
+        )
         .order_by(Case.created_at.desc())
         .all()
     )
@@ -60,7 +67,10 @@ def get_case_by_id_and_user(
         .options(joinedload(Case.io))
         .filter(
             Case.id == case_id,
-            Case.created_by == user_id,
+            or_(
+                Case.created_by == user_id,
+                Case.assigned_to == user_id,
+            ),
         )
         .first()
     )

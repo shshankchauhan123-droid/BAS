@@ -62,3 +62,7 @@ class IOMaster(Base):
     # Relationships
     creator = relationship("User", foreign_keys=[created_by])
     cases = relationship("Case", back_populates="io")
+
+    @property
+    def assigned_user_name(self) -> str | None:
+        return self.creator.username if self.creator else None

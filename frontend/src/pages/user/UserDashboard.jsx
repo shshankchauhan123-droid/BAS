@@ -3,11 +3,25 @@ import { useNavigate } from "react-router-dom";
 
 import UserNavbar from "../../components/layout/UserNavbar";
 import UserFooter from "../../components/layout/UserFooter";
-import { getCases } from "../../services/api/case";
+import { useAuth } from "../../context/AuthContext";
+import CreateCaseModal from "../../components/cases/CreateCaseModal";
+import { getCases ,createCase} from "../../services/api/case";
 import { getIOMasters } from "../../services/api/ioMaster";
+import Swal from "sweetalert2";
 
 function UserDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const userRole = String(user?.role || "").toLowerCase();
+  const isSuperAdmin = userRole === "superadmin" || userRole === "admin";
+  const isClientAdmin = userRole === "client_admin";
+  const isNormalUser = userRole === "user";
+
+  const canViewCases = !isNormalUser || user?.permissions?.can_view_cases !== false;
+  const canCreateCase = !isNormalUser || user?.permissions?.can_create_case !== false;
+  const canViewIO = !isNormalUser || user?.permissions?.can_view_io !== false;
+  const canViewReports = !isNormalUser || user?.permissions?.can_view_reports !== false;
 
   const [cases, setCases] = useState([]);
   const [ioList, setIoList] = useState([]);
@@ -18,6 +32,17 @@ function UserDashboard() {
     async function loadDashboardData() {
       try {
         setLoading(true);
+        const promises = [];
+        if (canViewCases) {
+          promises.push(getCases().catch(() => null));
+        } else {
+          promises.push(Promise.resolve(null));
+        }
+        if (canViewIO) {
+          promises.push(getIOMasters().catch(() => null));
+        } else {
+          promises.push(Promise.resolve(null));
+        }
         const [casesRes, ioRes] = await Promise.allSettled([
           getCases(),
           getIOMasters(),
@@ -42,10 +67,63 @@ function UserDashboard() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [canViewCases, canViewIO]);
+
+  const [isCaseModalOpen, setIsCaseModalOpen] = useState(false);
+  const [isCreatingCase, setIsCreatingCase] = useState(false);
 
   const handleCreateCase = () => {
-    navigate("/dashboard/cases/create");
+    setIsCaseModalOpen(true);
+  };
+
+  const handleCaseSubmit = async (data) => {
+    try {
+      setIsCreatingCase(true);
+      const response = await createCase(data);
+      const createdCase = response?.data;
+
+      await Swal.fire({
+        icon: "success",
+        title: "Case Created",
+        text: createdCase?.case_number
+          ? `${createdCase.case_number} has been created successfully.`
+          : "The case has been created successfully.",
+        background: "#07110f",
+        color: "#f8fafc",
+        iconColor: "#34d399",
+        confirmButtonColor: "#059669",
+        confirmButtonText: "Open Case",
+      });
+
+      setIsCaseModalOpen(false);
+
+      if (createdCase?.id) {
+        navigate(`/dashboard/cases/${createdCase.id}`);
+      } else {
+        const casesRes = await getCases();
+        if (Array.isArray(casesRes?.data)) setCases(casesRes.data);
+      }
+    } catch (error) {
+      console.error("Failed to create case:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Unable to create the case.";
+
+      await Swal.fire({
+        icon: "error",
+        title: "Case Creation Failed",
+        text: message,
+        background: "#07110f",
+        color: "#f8fafc",
+        iconColor: "#f87171",
+        confirmButtonColor: "#dc2626",
+        confirmButtonText: "Try Again",
+      });
+      throw error;
+    } finally {
+      setIsCreatingCase(false);
+    }
   };
 
   const handleViewCases = () => {
@@ -143,36 +221,38 @@ function UserDashboard() {
               </div>
 
               {/* Create Case */}
-              <button
-                type="button"
-                onClick={handleCreateCase}
-                className="group flex items-center justify-center gap-3 rounded-xl bg-emerald-400 px-5 py-3.5 text-xs font-bold uppercase tracking-[0.12em] text-[#04100d] shadow-lg shadow-emerald-950/40 transition duration-200 hover:bg-emerald-300 hover:shadow-emerald-900/50"
-              >
-
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
+              {canCreateCase && (
+                <button
+                  type="button"
+                  onClick={handleCreateCase}
+                  className="group flex items-center justify-center gap-3 rounded-xl bg-emerald-400 px-5 py-3.5 text-xs font-bold uppercase tracking-[0.12em] text-[#04100d] shadow-lg shadow-emerald-950/40 transition duration-200 hover:bg-emerald-300 hover:shadow-emerald-900/50"
                 >
-                  <path
-                    d="M12 5V19"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
 
-                  <path
-                    d="M5 12H19"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M12 5V19"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
 
-                Create Analysis Case
+                    <path
+                      d="M5 12H19"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
 
-              </button>
+                  Create Analysis Case
+
+                </button>
+              )}
 
             </div>
 
@@ -582,82 +662,88 @@ function UserDashboard() {
               <div className="mt-6 space-y-3">
 
                 {/* Create Case */}
-                <QuickAction
-                  title="Create Analysis Case"
-                  description="Create a workspace for a new banking analysis"
-                  color="emerald"
-                  onClick={handleCreateCase}
-                  icon={
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <path
-                        d="M12 5V19"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                      />
+                {canCreateCase && (
+                  <QuickAction
+                    title="Create Analysis Case"
+                    description="Create a workspace for a new banking analysis"
+                    color="emerald"
+                    onClick={handleCreateCase}
+                    icon={
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <path
+                          d="M12 5V19"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
 
-                      <path
-                        d="M5 12H19"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  }
-                />
+                        <path
+                          d="M5 12H19"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    }
+                  />
+                )}
 
                 {/* Cases */}
-                <QuickAction
-                  title="Bank Analysis Cases"
-                  description="View and manage your banking investigations"
-                  color="cyan"
-                  onClick={handleViewCases}
-                  icon={
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <path
-                        d="M4 7C4 5.9 4.9 5 6 5H10L12 7.5H18C19.1 7.5 20 8.4 20 9.5V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V7Z"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  }
-                />
+                {canViewCases && (
+                  <QuickAction
+                    title="Bank Analysis Cases"
+                    description="View and manage your banking investigations"
+                    color="cyan"
+                    onClick={handleViewCases}
+                    icon={
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <path
+                          d="M4 7C4 5.9 4.9 5 6 5H10L12 7.5H18C19.1 7.5 20 8.4 20 9.5V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V7Z"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    }
+                  />
+                )}
 
                 {/* Investigating Officers (IO Master) */}
-                <QuickAction
-                  title="Investigating Officers (IO)"
-                  description="Manage IO master records linked with cases"
-                  color="teal"
-                  onClick={handleIOMaster}
-                  icon={
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                  }
-                />
+                {canViewIO && (
+                  <QuickAction
+                    title="Investigating Officers (IO)"
+                    description="Manage IO master records linked with cases"
+                    color="teal"
+                    onClick={handleIOMaster}
+                    icon={
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    }
+                  />
+                )}
 
                 {/* Analysis */}
                 <QuickAction
@@ -706,48 +792,50 @@ function UserDashboard() {
                 />
 
                 {/* Reports */}
-                <QuickAction
-                  title="Analytical Reports"
-                  description="View generated banking analysis reports"
-                  color="amber"
-                  onClick={handleReports}
-                  icon={
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <path
-                        d="M6 3.5H14L18 7.5V20.5H6V3.5Z"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinejoin="round"
-                      />
+                {canViewReports && (
+                  <QuickAction
+                    title="Analytical Reports"
+                    description="View generated banking analysis reports"
+                    color="amber"
+                    onClick={handleReports}
+                    icon={
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <path
+                          d="M6 3.5H14L18 7.5V20.5H6V3.5Z"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
 
-                      <path
-                        d="M14 3.5V7.5H18"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinejoin="round"
-                      />
+                        <path
+                          d="M14 3.5V7.5H18"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
 
-                      <path
-                        d="M9 12H15"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                      />
+                        <path
+                          d="M9 12H15"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                        />
 
-                      <path
-                        d="M9 15.5H13"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  }
-                />
+                        <path
+                          d="M9 15.5H13"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    }
+                  />
+                )}
 
               </div>
 
@@ -1083,6 +1171,20 @@ function UserDashboard() {
           FOOTER
       ========================================================== */}
       <UserFooter />
+
+      {/* =========================================================
+          CREATE CASE MODAL
+      ========================================================== */}
+      <CreateCaseModal
+        isOpen={isCaseModalOpen}
+        onClose={() => {
+          if (!isCreatingCase) {
+            setIsCaseModalOpen(false);
+          }
+        }}
+        onSubmit={handleCaseSubmit}
+        isSubmitting={isCreatingCase}
+      />
 
     </div>
   );

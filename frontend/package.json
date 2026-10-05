@@ -10,10 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "echarts": "^6.1.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.3",
-    "sweetalert2": "^11.26.25"
+    "sweetalert2": "^11.26.25",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

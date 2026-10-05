@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 
 from app.authentication.auth_schema import (
+    FirstLoginPasswordRequest,
+    FirstLoginResponse,
     LoginRequest,
     LoginResponse,
     RefreshTokenRequest,
@@ -10,6 +12,8 @@ from app.authentication.auth_schema import (
     UserResponse,
 )
 from app.authentication.auth_service import (
+    change_first_login_password,
+    dismiss_first_login,
     login_user,
     signup_user,
 )
@@ -30,15 +34,18 @@ def _format_user_response(user: User) -> UserResponse:
             user.permissions
         )
     else:
-        # Superadmin has full application permissions.
-        if str(user.role).lower() == "superadmin":
+        # Superadmin / admin has full application permissions.
+        if str(user.role).lower() in {"superadmin", "admin"}:
             perms_schema = UserPermissionsSchema(
                 can_view_cases=True,
                 can_create_case=True,
-                can_update_case=True,
                 can_upload_files=True,
-                can_process_files=True,
-                can_update_files=True,
+                can_delete_files=True,
+                can_view_reports=True,
+                can_view_io=True,
+                can_create_io=True,
+                can_update_io=True,
+                can_delete_io=True,
             )
         else:
             perms_schema = None
@@ -51,6 +58,7 @@ def _format_user_response(user: User) -> UserResponse:
         is_active=user.is_active,
         client_id=user.client_id,
         permissions=perms_schema,
+        first_login=user.first_login,
     )
 
 
@@ -85,6 +93,7 @@ def login(
         db=db,
         username=data.username,
         password=data.password,
+        company_code=data.company_code,
     )
 
     access_token = create_access_token(
@@ -155,4 +164,38 @@ def refresh_access_token(
         access_token=new_access_token,
         refresh_token=new_refresh_token,
         token_type="bearer",
+    )
+
+
+def change_first_login_password_controller(
+    db: Session,
+    current_user: User,
+    data: FirstLoginPasswordRequest,
+) -> FirstLoginResponse:
+
+    updated_user = change_first_login_password(
+        db=db,
+        user=current_user,
+        new_password=data.new_password,
+    )
+
+    return FirstLoginResponse(
+        message="Password updated successfully",
+        user=_format_user_response(updated_user),
+    )
+
+
+def dismiss_first_login_controller(
+    db: Session,
+    current_user: User,
+) -> FirstLoginResponse:
+
+    updated_user = dismiss_first_login(
+        db=db,
+        user=current_user,
+    )
+
+    return FirstLoginResponse(
+        message="First login dismissed",
+        user=_format_user_response(updated_user),
     )

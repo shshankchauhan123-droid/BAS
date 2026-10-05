@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { getUsers } from "../../services/api/user";
 
 const DESIGNATION_OPTIONS = [
   "Sub-Inspector (SI)",
@@ -16,6 +17,7 @@ function CreateIOModal({
   onClose,
   onSubmit,
   isSubmitting = false,
+  isClientAdmin = false,
 }) {
   const [formData, setFormData] = useState({
     officer_name: "",
@@ -24,7 +26,33 @@ function CreateIOModal({
     police_station: "",
   });
 
+  const [companyUsers, setCompanyUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [error, setError] = useState("");
+
+  const loadCompanyUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const res = await getUsers();
+      const list = res?.users || res?.items || (Array.isArray(res) ? res : []);
+      const activeInvestigators = list.filter(
+        (u) => u.role === "user" && u.is_active === true
+      );
+      setCompanyUsers(activeInvestigators);
+      if (activeInvestigators.length > 0) {
+        setSelectedUserId(String(activeInvestigators[0].id));
+      } else {
+        setSelectedUserId("");
+      }
+    } catch (err) {
+      console.error("Failed to load company investigators for IO creation:", err);
+      setCompanyUsers([]);
+      setSelectedUserId("");
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -35,8 +63,14 @@ function CreateIOModal({
         police_station: "",
       });
       setError("");
+      if (isClientAdmin) {
+        loadCompanyUsers();
+      } else {
+        setCompanyUsers([]);
+        setSelectedUserId("");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, isClientAdmin]);
 
   if (!isOpen) {
     return null;
@@ -93,14 +127,27 @@ function CreateIOModal({
       return;
     }
 
+    if (isClientAdmin && !selectedUserId) {
+      setError("Please select an investigator for this IO record.");
+      return;
+    }
+
     try {
-      await onSubmit({
-        officer_name: officerName,
-        designation,
-        police_station: policeStation,
-      });
+      await onSubmit(
+        {
+          officer_name: officerName,
+          designation,
+          police_station: policeStation,
+        },
+        isClientAdmin ? Number(selectedUserId) : null
+      );
     } catch (err) {
       console.error("Create IO error:", err);
+      const message =
+        err?.response?.data?.detail ||
+        err?.message ||
+        "You do not have permission to create Investigating Officers.";
+      setError(message);
     }
   };
 
@@ -170,6 +217,41 @@ function CreateIOModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          {/* Assigned Investigator for Client Admin */}
+          {isClientAdmin && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                Assign to Investigator <span className="text-emerald-400">*</span>
+              </label>
+              {loadingUsers ? (
+                <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                  Loading investigators...
+                </div>
+              ) : companyUsers.length === 0 ? (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300">
+                  No active investigators found in your company. Please create or activate an investigator first.
+                </div>
+              ) : (
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => {
+                    setSelectedUserId(e.target.value);
+                    if (error) setError("");
+                  }}
+                  disabled={isSubmitting}
+                  className="w-full rounded-xl border border-emerald-400/20 bg-[#040e0b] px-4 py-3 text-sm text-white focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                >
+                  {companyUsers.map((u) => (
+                    <option key={u.id} value={u.id} className="bg-[#040e0b] text-white">
+                      {u.username} ({u.email})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
           {/* Officer Name */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">

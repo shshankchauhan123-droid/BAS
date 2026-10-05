@@ -55,7 +55,7 @@ class Case(Base):
         index=True,
     )
 
-    # User who created/owns this case
+    # User who created this case record
     created_by = Column(
         Integer,
         ForeignKey("users.id"),
@@ -63,17 +63,18 @@ class Case(Base):
         index=True,
     )
 
-    # Investigating Officer assigned to this case
-    io_id = Column(
+    # User/Investigator to whom this case is assigned
+    assigned_to = Column(
         Integer,
-        ForeignKey("io_master.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
 
-    client_id = Column(
+    # Investigating Officer assigned to this case
+    io_id = Column(
         Integer,
-        ForeignKey("clients.id", ondelete="SET NULL"),
+        ForeignKey("io_master.id"),
         nullable=True,
         index=True,
     )
@@ -95,6 +96,7 @@ class Case(Base):
     io = relationship("IOMaster", back_populates="cases")
     client = relationship("Client", back_populates="cases")
     creator = relationship("User", foreign_keys=[created_by])
+    assignee = relationship("User", foreign_keys=[assigned_to])
 
 
 # Register related models with SQLAlchemy mapper

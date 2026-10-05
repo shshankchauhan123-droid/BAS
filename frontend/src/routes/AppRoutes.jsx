@@ -9,7 +9,6 @@ import {
    AUTH PAGES
 ============================================================ */
 
-import Signup from "../pages/auth/Signup";
 import Login from "../pages/auth/Login";
 
 /* ============================================================
@@ -30,7 +29,9 @@ import CreateCase from "../pages/user/cases/CreateCase";
 import CaseDetails from "../pages/user/cases/CaseDetails";
 import IOMasterList from "../pages/user/io_master/IOMasterList";
 import CaseReportsHub from "../pages/user/reports/CaseReportsHub";
+import TransactionRelationshipReport from "../pages/user/reports/TransactionRelationshipReport";
 import CaseFileReport from "../pages/user/reports/CaseFileReport";
+import DynamicReportDashboard from "../pages/user/analysis/DynamicReportDashboard";
 import ReportsOverview from "../pages/user/reports/ReportsOverview";
 
 /* ============================================================
@@ -81,11 +82,7 @@ function AppRoutes() {
 
         <Route
           path="/signup"
-          element={
-            <PublicRoute>
-              <Signup />
-            </PublicRoute>
-          }
+          element={<Navigate to="/login" replace />}
         />
 
         <Route
@@ -135,7 +132,7 @@ function AppRoutes() {
           path="/dashboard/cases"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "client_admin"]}>
                 <CaseList />
               </RoleRoute>
             </ProtectedRoute>
@@ -163,7 +160,7 @@ function AppRoutes() {
           path="/dashboard/io-master"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "client_admin"]}>
                 <IOMasterList />
               </RoleRoute>
             </ProtectedRoute>
@@ -211,7 +208,7 @@ function AppRoutes() {
           path="/dashboard/cases"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "superadmin", "admin"]}>
+              <RoleRoute allowedRoles={["user", "superadmin", "admin", "client_admin"]}>
                 <CaseList />
               </RoleRoute>
             </ProtectedRoute>
@@ -234,7 +231,7 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "client_admin"]}>
                 <CaseDetails />
               </RoleRoute>
             </ProtectedRoute>
@@ -249,7 +246,7 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
                 <CaseReportsHub />
               </RoleRoute>
             </ProtectedRoute>
@@ -271,7 +268,7 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "superadmin", "admin"]}>
+              <RoleRoute allowedRoles={["user", "superadmin", "admin", "client_admin"]}>
                 <CaseDetails />
               </RoleRoute>
             </ProtectedRoute>
@@ -282,10 +279,59 @@ function AppRoutes() {
         ====================================================== */}
 
         <Route
+          path="/dashboard/cases/:caseId/reports/transaction-relationships"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <TransactionRelationshipReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/transaction-relationships"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <TransactionRelationshipReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+
+     {/* =====================================================
+            REPORT 1: FILE STATEMENT & TRANSACTIONS REPORT
+        ====================================================== */}
+
+        <Route
           path="/dashboard/cases/:caseId/reports/file-statement"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <CaseFileReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports/file-statement"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <CaseFileReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/file-statement"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
                 <CaseFileReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -300,8 +346,78 @@ function AppRoutes() {
           path="/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin"]}>
-                <ReportsOverview />
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <CaseReportsHub />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <CaseReportsHub />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            DYNAMIC DATA REPORT & TIMELINE VISUALIZATION
+        ====================================================== */}
+
+        <Route
+          path="/analysis"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <DynamicReportDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/analysis"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <DynamicReportDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/timeline"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <DynamicReportDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports/timeline"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <DynamicReportDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/cases/:caseId/reports/timeline"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin"]}>
+                <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
           }

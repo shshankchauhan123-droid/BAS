@@ -1,3 +1,5 @@
+from app.bank_transactions.bank_transaction_model import BankTransaction
+from app.files.file_schema import FileUpdateRequest
 import os
 import uuid
 from pathlib import Path
@@ -402,13 +404,13 @@ def update_uploaded_file(
     db: Session,
     file_id: int,
     user: User,
-    original_filename: str | None = None,
+    data: FileUpdateRequest,
 ) -> File:
     user_id = user.id
     user_role = str(user.role).lower()
     if user_role == "user":
         perms = getattr(user, "permissions", None)
-        if perms and not perms.can_update_files:
+        if perms and not perms.can_upload_files:
             raise PermissionError("You do not have permission to update files. Contact your company administrator.")
 
     file = get_file_by_id_and_user(
@@ -420,9 +422,46 @@ def update_uploaded_file(
     if not file:
         raise ValueError("File not found")
 
-    old_filename = file.original_filename
-    if original_filename is not None and original_filename.strip():
-        file.original_filename = original_filename.strip()
+    details = {}
+    
+    if data.original_filename is not None and data.original_filename.strip():
+        details["old_filename"] = file.original_filename
+        file.original_filename = data.original_filename.strip()
+        details["new_filename"] = file.original_filename
+
+    update_fields = [
+        'account_name', 'account_number', 'bank_name', 'branch_name', 
+        'ifsc', 'micr', 'account_type', 'statement_start_date', 'statement_end_date'
+    ]
+    
+    sync_account_name = False
+    sync_account_number = False
+
+    for field in update_fields:
+        val = getattr(data, field)
+        if val is not None:
+            if isinstance(val, str):
+                val = val.strip()
+            old_val = getattr(file, field)
+            if old_val != val:
+                setattr(file, field, val)
+                details[f"old_{field}"] = old_val
+                details[f"new_{field}"] = val
+                
+                if field == 'account_name':
+                    sync_account_name = True
+                if field == 'account_number':
+                    sync_account_number = True
+
+    if sync_account_name or sync_account_number:
+        # Perform bulk update on bank_transactions
+        update_stmt = {}
+        if sync_account_name:
+            update_stmt[BankTransaction.account_name] = file.account_name
+        if sync_account_number:
+            update_stmt[BankTransaction.account_number] = file.account_number
+            
+        db.query(BankTransaction).filter(BankTransaction.file_id == file_id).update(update_stmt, synchronize_session=False)
 
     db.commit()
     db.refresh(file)
@@ -434,12 +473,8 @@ def update_uploaded_file(
         entity_type="file",
         entity_id=str(file.id),
         entity_name=file.original_filename,
-        description=f"User {user.username} updated file '{file.original_filename}' in Case ID {file.case_id}",
-        details={
-            "old_filename": old_filename,
-            "new_filename": file.original_filename,
-            "case_id": file.case_id,
-        },
+        description=f"User {user.username} updated file metadata in Case ID {file.case_id}",
+        details=details,
         client_id=user.client_id,
     )
 

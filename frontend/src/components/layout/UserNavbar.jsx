@@ -143,10 +143,9 @@ function UserNavbar() {
 
     if (path === "/dashboard/cases") {
       return (
-        location.pathname === "/dashboard/cases" ||
-        location.pathname.startsWith(
-          "/dashboard/cases/"
-        )
+        (location.pathname === "/dashboard/cases" ||
+          location.pathname.startsWith("/dashboard/cases/")) &&
+        !location.pathname.includes("/reports")
       );
     }
 
@@ -170,7 +169,8 @@ function UserNavbar() {
     if (path === "/reports") {
       return (
         location.pathname === "/reports" ||
-        location.pathname.startsWith("/reports/")
+        location.pathname.startsWith("/reports/") ||
+        location.pathname.includes("/reports")
       );
     }
 
@@ -200,6 +200,14 @@ function UserNavbar() {
     : isClientAdmin
     ? "/client-admin"
     : "/dashboard";
+
+  const userRole = String(displayRole).toLowerCase();
+  const isNormalUser = userRole === "user";
+  const userPerms = userDetails?.permissions || user?.permissions;
+
+  const canViewCases = !isNormalUser || userPerms?.can_view_cases !== false;
+  const canViewIO = !isNormalUser || userPerms?.can_view_io !== false;
+  const canViewReports = !isNormalUser || userPerms?.can_view_reports !== false;
 
   /* ============================================================
      NAVIGATION
@@ -406,53 +414,55 @@ function UserNavbar() {
           </button>
 
           {/* Cases */}
-
-          <button
-            type="button"
-            onClick={() =>
-              goTo("/dashboard/cases")
-            }
-            className={desktopNavClass(
-              "/dashboard/cases"
-            )}
-          >
-            Cases
-          </button>
+          {canViewCases && (
+            <button
+              type="button"
+              onClick={() =>
+                goTo("/dashboard/cases")
+              }
+              className={desktopNavClass(
+                "/dashboard/cases"
+              )}
+            >
+              Cases
+            </button>
+          )}
 
           {/* IO Master */}
-
-          <button
-            type="button"
-            onClick={() =>
-              goTo("/dashboard/io-master")
-            }
-            className={desktopNavClass(
-              "/dashboard/io-master"
-            )}
-          >
-            IO Master
-          </button>
-
+          {canViewIO && (
+            <button
+              type="button"
+              onClick={() =>
+                goTo("/dashboard/io-master")
+              }
+              className={desktopNavClass(
+                "/dashboard/io-master"
+              )}
+            >
+              IO Master
+            </button>
+          )}
 
           {/* Reports */}
-
-          <button
-            type="button"
-            onClick={() => goTo("/reports")}
-            className={desktopNavClass("/reports")}
-          >
-            Reports
-          </button>
+          {canViewReports && (
+            <button
+              type="button"
+              onClick={() => goTo("/reports")}
+              className={desktopNavClass("/reports")}
+            >
+              Reports
+            </button>
+          )}
 
           {/* Analysis */}
 
-          <button
+          {/*<button
             type="button"
             onClick={() => goTo("/analysis")}
             className={desktopNavClass("/analysis")}
           >
             Analysis
-          </button>
+          </button> */}
         </nav>
 
         {/* =====================================================
@@ -855,47 +865,49 @@ function UserNavbar() {
             </button>
 
             {/* Cases */}
-
-            <button
-              type="button"
-              onClick={() =>
-                goTo("/dashboard/cases")
-              }
-              className={mobileNavClass(
-                "/dashboard/cases"
-              )}
-            >
-              Cases
-            </button>
+            {canViewCases && (
+              <button
+                type="button"
+                onClick={() =>
+                  goTo("/dashboard/cases")
+                }
+                className={mobileNavClass(
+                  "/dashboard/cases"
+                )}
+              >
+                Cases
+              </button>
+            )}
 
             {/* IO Master */}
-
-            <button
-              type="button"
-              onClick={() =>
-                goTo("/dashboard/io-master")
-              }
-              className={mobileNavClass(
-                "/dashboard/io-master"
-              )}
-            >
-              IO Master
-            </button>
-
+            {canViewIO && (
+              <button
+                type="button"
+                onClick={() =>
+                  goTo("/dashboard/io-master")
+                }
+                className={mobileNavClass(
+                  "/dashboard/io-master"
+                )}
+              >
+                IO Master
+              </button>
+            )}
 
             {/* Reports */}
-
-            <button
-              type="button"
-              onClick={() =>
-                goTo("/reports")
-              }
-              className={mobileNavClass(
-                "/reports"
-              )}
-            >
-              Reports
-            </button>
+            {canViewReports && (
+              <button
+                type="button"
+                onClick={() =>
+                  goTo("/reports")
+                }
+                className={mobileNavClass(
+                  "/reports"
+                )}
+              >
+                Reports
+              </button>
+            )}
 
             {/* Analysis */}
 

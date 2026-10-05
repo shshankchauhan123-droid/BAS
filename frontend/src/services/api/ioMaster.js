@@ -1,10 +1,12 @@
 import { apiRequest } from "./client";
 
 /**
- * Fetch all Investigating Officers (IO) created by the logged-in user.
+ * Fetch all Investigating Officers (IO) created by the logged-in user,
+ * or for an assigned user if called by an Admin.
  */
-export function getIOMasters() {
-  return apiRequest("/api/v1/io-master/", {
+export function getIOMasters(userId = null) {
+  const url = userId ? `/api/v1/io-master/?user_id=${userId}` : "/api/v1/io-master/";
+  return apiRequest(url, {
     method: "GET",
   });
 }
@@ -25,8 +27,9 @@ export function getIOMaster(ioId) {
  * - designation (string)
  * - police_station (string)
  */
-export function createIOMaster({ officer_name, designation, police_station }) {
-  return apiRequest("/api/v1/io-master/", {
+export function createIOMaster({ officer_name, designation, police_station }, userId = null) {
+  const url = userId ? `/api/v1/io-master/?user_id=${userId}` : "/api/v1/io-master/";
+  return apiRequest(url, {
     method: "POST",
     body: JSON.stringify({
       officer_name: officer_name.trim(),

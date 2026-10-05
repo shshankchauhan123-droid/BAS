@@ -11,7 +11,7 @@ def get_user_by_username(
 ) -> User | None:
     cleaned = username.strip()
 
-    exact = (
+    return (
         db.execute(
             select(User).where(User.username == cleaned)
         )
@@ -19,18 +19,39 @@ def get_user_by_username(
         .first()
     )
 
-    if exact:
-        return exact
 
-    return (
-        db.execute(
-            select(User).where(
-                func.lower(User.username) == cleaned.lower()
-            )
+def get_user_by_username_and_client(
+    db: Session,
+    username: str,
+    client_id: int | None,
+) -> User | None:
+    cleaned = username.strip()
+
+    if client_id is None:
+        statement = select(User).where(
+            User.username == cleaned,
+            User.client_id.is_(None),
         )
-        .scalars()
-        .first()
+    else:
+        statement = select(User).where(
+            User.username == cleaned,
+            User.client_id == client_id,
+        )
+
+    return db.execute(statement).scalars().first()
+
+
+def get_users_by_username(
+    db: Session,
+    username: str,
+) -> list[User]:
+    cleaned = username.strip()
+
+    statement = select(User).where(
+        User.username == cleaned
     )
+
+    return list(db.execute(statement).scalars().all())
 
 
 def get_user_by_email(
@@ -143,11 +164,13 @@ def create_or_update_user_permissions(
     user_id: int,
     can_view_cases: bool = True,
     can_create_case: bool = True,
-    can_update_case: bool = True,
     can_upload_files: bool = True,
-    can_process_files: bool = True,
-    can_update_files: bool = True,
     can_delete_files: bool = True,
+    can_view_reports: bool = True,
+    can_view_io: bool = True,
+    can_create_io: bool = True,
+    can_update_io: bool = True,
+    can_delete_io: bool = True,
 ) -> UserPermission:
     permissions = get_user_permissions(
         db=db,
@@ -159,11 +182,13 @@ def create_or_update_user_permissions(
             user_id=user_id,
             can_view_cases=can_view_cases,
             can_create_case=can_create_case,
-            can_update_case=can_update_case,
             can_upload_files=can_upload_files,
-            can_process_files=can_process_files,
-            can_update_files=can_update_files,
             can_delete_files=can_delete_files,
+            can_view_reports=can_view_reports,
+            can_view_io=can_view_io,
+            can_create_io=can_create_io,
+            can_update_io=can_update_io,
+            can_delete_io=can_delete_io,
         )
 
         db.add(permissions)
@@ -171,11 +196,13 @@ def create_or_update_user_permissions(
     else:
         permissions.can_view_cases = can_view_cases
         permissions.can_create_case = can_create_case
-        permissions.can_update_case = can_update_case
         permissions.can_upload_files = can_upload_files
-        permissions.can_process_files = can_process_files
-        permissions.can_update_files = can_update_files
         permissions.can_delete_files = can_delete_files
+        permissions.can_view_reports = can_view_reports
+        permissions.can_view_io = can_view_io
+        permissions.can_create_io = can_create_io
+        permissions.can_update_io = can_update_io
+        permissions.can_delete_io = can_delete_io
 
     db.flush()
 

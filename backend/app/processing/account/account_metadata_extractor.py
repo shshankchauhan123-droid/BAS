@@ -351,7 +351,7 @@ def is_bad_name(value: str) -> bool:
     return False
 
 
-def extract_account_name(lines: List[str]) -> Optional[str]:
+def extract_account_name(lines: List[str], disable_fallback: bool = False) -> Optional[str]:
     """
     Generic customer/account-holder name extraction.
 
@@ -415,6 +415,9 @@ def extract_account_name(lines: List[str]) -> Optional[str]:
     #
     # We only use this as a fallback after all labels fail.
     # --------------------------------------------------------
+    
+    if disable_fallback:
+        return None
 
     for line in lines[:40]:
 
@@ -752,4 +755,136 @@ def extract_account_metadata(pdf_path: str) -> AccountMetadata:
         meta.statement_end_date,
     ) = extract_statement_period(lines)
 
+    return meta
+
+
+# ============================================================
+# EXCEL / CSV ACCOUNT METADATA EXTRACTION
+# ============================================================
+
+def extract_excel_account_metadata(df) -> AccountMetadata:
+    """
+    Bank-independent account metadata extraction for Excel/CSV dataframes.
+    Converts the top rows into text lines and reuses the robust PDF extraction logic.
+    """
+    import pandas as pd
+    lines = []
+    
+    # Add columns as the first line, as headers might contain metadata
+    header_line = " ".join([str(c) for c in df.columns if "Unnamed" not in str(c)])
+    if header_line.strip():
+        lines.append(header_line.strip())
+        
+    for _, row in df.head(50).iterrows():
+        row_strs = []
+        for val in row:
+            if pd.isna(val):
+                continue
+            val_str = str(val).strip()
+            if not val_str or val_str.lower() == "nan":
+                continue
+            
+            # Excel floats (e.g. 1234567890.0)
+            if val_str.endswith(".0") and val_str[:-2].isdigit():
+                val_str = val_str[:-2]
+                
+            row_strs.append(val_str)
+            
+        if row_strs:
+            lines.append(" ".join(row_strs))
+            
+    meta = AccountMetadata()
+    
+    def normalize_for_match(val):
+        if pd.isna(val):
+            return ""
+        import re
+        s = str(val).lower()
+        return re.sub(r'[\s\.\-\_\:\/\\#]', '', s)
+        
+    def clean_excel_val(val):
+        if pd.isna(val):
+            return None
+        val_str = str(val).strip()
+        if not val_str or val_str.lower() in ["nan", "none", "null", "na"]:
+            return None
+        if val_str.endswith(".0") and val_str[:-2].isdigit():
+            val_str = val_str[:-2]
+        return val_str
+
+    acct_num_aliases = ["accountnumber", "accountno", "accountnum", "acnumber", "acno", "accountid"]
+    acct_name_aliases = ["accountname", "accountholdername", "accountholder", "customername", "acname", "nameoftheaccountholder", "nameofaccountholder", "nameofcustomer", "holdername"]
+    
+    def is_match(cell_val, aliases):
+        norm = normalize_for_match(cell_val)
+        return norm in aliases
+
+    # PHASE 1: Check Columns (Format A)
+    for col_idx, col_name in enumerate(df.columns):
+        if "unnamed" in str(col_name).lower():
+            continue
+            
+        if not meta.account_number and is_match(col_name, acct_num_aliases):
+            for val in df.iloc[:, col_idx]:
+                c_val = clean_excel_val(val)
+                if c_val and c_val.upper() != "COUNTERPARTY" and len(c_val) > 4:
+                    meta.account_number = c_val
+                    break
+                    
+        if not meta.account_name and is_match(col_name, acct_name_aliases):
+            for val in df.iloc[:, col_idx]:
+                c_val = clean_excel_val(val)
+                if c_val and not is_bad_name(c_val) and c_val.upper() != "COUNTERPARTY":
+                    meta.account_name = c_val
+                    break
+
+    # PHASE 2: Check Cells (Format B)
+    if not meta.account_number or not meta.account_name:
+        search_df = df.head(50)
+        for r_idx in range(len(search_df)):
+            for c_idx in range(len(search_df.columns)):
+                cell_val = search_df.iat[r_idx, c_idx]
+                if pd.isna(cell_val):
+                    continue
+                
+                if not meta.account_number and is_match(cell_val, acct_num_aliases):
+                    if c_idx + 1 < len(search_df.columns):
+                        right_val = clean_excel_val(search_df.iat[r_idx, c_idx + 1])
+                        if right_val and right_val.upper() != "COUNTERPARTY" and len(right_val) > 4:
+                            meta.account_number = right_val
+                            continue
+                    if r_idx + 1 < len(search_df):
+                        bottom_val = clean_excel_val(search_df.iat[r_idx + 1, c_idx])
+                        if bottom_val and bottom_val.upper() != "COUNTERPARTY" and len(bottom_val) > 4:
+                            meta.account_number = bottom_val
+                            continue
+
+                if not meta.account_name and is_match(cell_val, acct_name_aliases):
+                    if c_idx + 1 < len(search_df.columns):
+                        right_val = clean_excel_val(search_df.iat[r_idx, c_idx + 1])
+                        if right_val and not is_bad_name(right_val) and right_val.upper() != "COUNTERPARTY":
+                            meta.account_name = right_val
+                            continue
+                    if r_idx + 1 < len(search_df):
+                        bottom_val = clean_excel_val(search_df.iat[r_idx + 1, c_idx])
+                        if bottom_val and not is_bad_name(bottom_val) and bottom_val.upper() != "COUNTERPARTY":
+                            meta.account_name = bottom_val
+                            continue
+
+    # PHASE 3: Fallback to existing text-grid extraction for anything missing
+    if not meta.account_number:
+        meta.account_number = extract_account_number(lines)
+    if not meta.account_name:
+        meta.account_name = extract_account_name(lines, disable_fallback=True)
+        
+    meta.ifsc = extract_ifsc(lines)
+    meta.micr = extract_micr(lines)
+    meta.bank_name = extract_bank_name(lines)
+    meta.branch_name = extract_branch_name(lines)
+    meta.account_type = extract_account_type(lines)
+    
+    st, en = extract_statement_period(lines)
+    meta.statement_start_date = st
+    meta.statement_end_date = en
+    
     return meta

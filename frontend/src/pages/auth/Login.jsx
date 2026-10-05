@@ -1,6 +1,6 @@
 import Swal from "sweetalert2";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { loginUser } from "../../services/api/auth";
@@ -10,6 +10,7 @@ function Login() {
   const { login, logout } = useAuth();
 
   const [formData, setFormData] = useState({
+    company_code: "",
     username: "",
     password: "",
   });
@@ -101,9 +102,13 @@ function Login() {
        * normal strings and never an HTMLInputElement.
        */
 
+      const company_code = formData.company_code
+        ? String(formData.company_code).trim().toUpperCase()
+        : undefined;
       const username = String(formData.username).trim();
       const password = String(formData.password);
 
+      console.log("LOGIN COMPANY CODE:", company_code);
       console.log("LOGIN USERNAME:", username);
       console.log("LOGIN USERNAME TYPE:", typeof username);
       console.log("LOGIN PASSWORD TYPE:", typeof password);
@@ -125,6 +130,7 @@ function Login() {
        */
 
       const authData = await loginUser({
+        company_code,
         username,
         password,
       });
@@ -830,6 +836,73 @@ function Login() {
                 >
 
                   {/* =================================================
+                      COMPANY CODE
+                  ================================================== */}
+
+                  <div>
+
+                    <div className="mb-2 flex items-center justify-between">
+
+                      {/* <label
+                        htmlFor="company_code"
+                        className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                      >
+                        Company Code
+                      </label>
+
+                      <span className="text-[9px] uppercase tracking-wider text-slate-600">
+                        Optional for SuperAdmin / Email
+                      </span> */}
+
+                    </div>
+
+                    <div className="relative">
+
+                      <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-600">
+
+                        {/* <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                        >
+                          <path d="M3 21h18" />
+                          <path d="M5 21V7l8-4v18" />
+                          <path d="M19 21V11l-6-3" />
+                          <path d="M9 9h1" />
+                          <path d="M9 13h1" />
+                          <path d="M9 17h1" />
+                        </svg> */}
+
+                      </div>
+
+                      {/* <input
+                        id="company_code"
+                        name="company_code"
+                        type="text"
+                        value={formData.company_code}
+                        onChange={handleChange}
+                        autoComplete="organization"
+                        placeholder="e.g. ABC (for company users)"
+                        disabled={isSubmitting}
+                        className={`${inputBase} pl-11 uppercase placeholder:normal-case ${
+                          errors.company_code ? inputError : inputNormal
+                        }`}
+                      /> */}
+
+                    </div>
+
+                    {/* {errors.company_code && (
+                      <p className="mt-1.5 text-xs text-red-400">
+                        {errors.company_code}
+                      </p>
+                    )} */}
+
+                  </div>
+
+                  {/* =================================================
                       USERNAME
                   ================================================== */}
 
@@ -1056,25 +1129,12 @@ function Login() {
                 </form>
 
                 {/* =================================================
-                    SIGNUP
+                    SECURITY FOOTER
                 ================================================== */}
 
                 <div className="mt-6 border-t border-white/[0.06] pt-5">
 
-                  <p className="text-center text-xs text-slate-500">
-
-                    New to BAS?
-
-                    <Link
-                      to="/signup"
-                      className="ml-1.5 font-medium text-emerald-300 transition hover:text-emerald-200 hover:underline"
-                    >
-                      Create an account
-                    </Link>
-
-                  </p>
-
-                  <div className="mt-4 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.15em] text-slate-600">
+                  <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.15em] text-slate-600">
 
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
 

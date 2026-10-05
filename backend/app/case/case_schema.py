@@ -23,6 +23,11 @@ class CaseCreateRequest(BaseModel):
         description="ID of the Investigating Officer assigned to this case",
     )
 
+    assigned_to: Optional[int] = Field(
+        default=None,
+        description="ID of the user to whom this case is assigned",
+    )
+
 
 class CaseUpdateRequest(BaseModel):
     case_name: Optional[str] = Field(
@@ -40,6 +45,8 @@ class CaseUpdateRequest(BaseModel):
 
     io_id: Optional[int] = None
 
+    assigned_to: Optional[int] = None
+
 
 class CaseData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -49,6 +56,8 @@ class CaseData(BaseModel):
     case_name: str
     description: Optional[str]
     status: str
+    created_by: Optional[int] = None
+    assigned_to: Optional[int] = None
     io_id: Optional[int] = None
     io: Optional[IOMasterData] = None
     created_at: datetime

@@ -6,10 +6,22 @@ import { useAuth } from "../../context/AuthContext";
 import AuditLogTable from "../../components/audit/AuditLogTable";
 
 const DEFAULT_PERMISSIONS = {
+  // CASE
+  can_view_cases: true,
   can_create_case: true,
+
+  // FILES
   can_upload_files: true,
-  can_update_files: true,
   can_delete_files: true,
+
+  // REPORTS
+  can_view_reports: true,
+
+  // IO
+  can_view_io: true,
+  can_create_io: true,
+  can_update_io: true,
+  can_delete_io: true,
 };
 
 export default function ClientAdminDashboard() {
@@ -164,11 +176,20 @@ export default function ClientAdminDashboard() {
       u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const activeSeats = quota?.active_users ?? quota?.used_seats ?? users.length;
-  const maxSeats = quota?.max_users ?? quota?.max_seats ?? 0;
-  const isLimitReached = quota?.is_limit_reached ?? (activeSeats >= maxSeats && maxSeats > 0);
-  const remainingSeats = quota?.remaining_seats ?? Math.max(0, maxSeats - activeSeats);
-  const percentUsed = maxSeats > 0 ? Math.min(100, Math.round((activeSeats / maxSeats) * 100)) : 0;
+  // 5 Specific KPIs
+  const totalLicenseIssued = quota?.total_licenses ?? quota?.max_seats ?? quota?.max_users ?? 0;
+  const activeUsersCount = quota?.active_users ?? users.filter((u) => u.is_active !== false).length;
+  const inactiveUsersCount = quota?.inactive_users ?? users.filter((u) => u.is_active === false).length;
+  const availableLicenses = quota?.available_licenses ?? quota?.remaining_seats ?? Math.max(0, totalLicenseIssued - users.length);
+  const todayUserLogins = quota?.today_login_count ?? 0;
+  const totalUsersCount = quota?.total_users ?? users.length;
+
+  const occupiedSeats = quota?.used_seats ?? users.length;
+  const activeSeats = occupiedSeats;
+  const maxSeats = totalLicenseIssued;
+  const isLimitReached = quota?.is_limit_reached ?? (occupiedSeats >= maxSeats && maxSeats > 0);
+  const remainingSeats = availableLicenses;
+  const percentUsed = maxSeats > 0 ? Math.min(100, Math.round((occupiedSeats / maxSeats) * 100)) : 0;
 
   return (
     <div className="min-h-screen bg-[#06100e] text-white">
@@ -265,51 +286,6 @@ export default function ClientAdminDashboard() {
             <AuditLogTable isSuperAdmin={false} />
           ) : (
             <>
-          {/* Prominent Seats Left Banner */}
-          <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 via-[#071a15] to-teal-500/10 p-5 shadow-lg shadow-emerald-950/30">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-500/20 text-emerald-400">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
-                  Seat Allocation Quota
-                </div>
-                <div className="text-xl font-bold text-white sm:text-2xl">
-                  <span className="text-emerald-300 font-extrabold">{remainingSeats}</span> User Limit{remainingSeats === 1 ? "" : "s"} Left Now
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  You have used <strong className="text-white">{activeSeats}</strong> out of <strong className="text-white">{maxSeats}</strong> total allocated seats for your company.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="text-xs font-semibold text-slate-300">{percentUsed}% Allocated</div>
-                <div className="text-[10px] text-slate-500">
-                  {remainingSeats > 0 ? `${remainingSeats} available slots` : "Quota full"}
-                </div>
-              </div>
-              <div className="h-10 w-28 rounded-xl bg-white/5 p-1.5 border border-white/10 flex items-center">
-                <div className="h-full w-full rounded-lg bg-black/40 overflow-hidden">
-                  <div
-                    className={`h-full rounded-lg transition-all duration-500 ${
-                      percentUsed >= 100
-                        ? "bg-rose-500"
-                        : percentUsed >= 80
-                        ? "bg-amber-400"
-                        : "bg-gradient-to-r from-emerald-500 to-teal-400"
-                    }`}
-                    style={{ width: `${percentUsed}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Seat Limit Warning Banner */}
           {isLimitReached && (
             <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300">
@@ -330,58 +306,126 @@ export default function ClientAdminDashboard() {
             </div>
           )}
 
-          {success && (
-            <div className="mb-6 flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-300">
-              <span>{success}</span>
-              <button type="button" onClick={() => setSuccess("")} className="text-emerald-400 hover:text-white">✕</button>
-            </div>
-          )}
-
-          {/* Seat Quota Metric Cards */}
-          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-emerald-500/20 bg-[#071a15] p-5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Seats Occupied</span>
-              <div className="mt-2 text-2xl font-bold text-emerald-300">{activeSeats} / {maxSeats}</div>
-              <div className="mt-2 h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    percentUsed >= 100
-                      ? "bg-rose-500"
-                      : percentUsed >= 80
-                      ? "bg-amber-400"
-                      : "bg-emerald-400"
-                  }`}
-                  style={{ width: `${percentUsed}%` }}
-                />
+          {/* Admin Dashboard 6 KPI Section */}
+          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+            {/* 1. Total License Issued */}
+            <div className="rounded-2xl border border-violet-500/20 bg-[#0c101a] p-5 shadow-lg shadow-violet-950/20">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-400">
+                  Total License Issued
+                </span>
+                <span className="rounded-lg bg-violet-500/10 p-1.5 text-violet-400">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </span>
               </div>
-              <div className="mt-2 text-[11px] text-emerald-400/80">{percentUsed}% of total capacity used</div>
+              <div className="mt-3 text-2xl font-bold text-white sm:text-3xl">
+                {totalLicenseIssued}
+              </div>
+              <div className="mt-2 text-[11px] text-slate-400">
+                Company allocated seat quota
+              </div>
             </div>
 
-            <div className="rounded-2xl border border-cyan-500/20 bg-[#071618] p-5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400">Limits Left Now</span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-cyan-300">{remainingSeats}</span>
-                <span className="text-xs text-cyan-400/80">seats available</span>
+            {/* 2. Total Users */}
+            <div className="rounded-2xl border border-sky-500/20 bg-[#091520] p-5 shadow-lg shadow-sky-950/20">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">
+                  Total Users
+                </span>
+                <span className="rounded-lg bg-sky-500/10 p-1.5 text-sky-400">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </span>
+              </div>
+              <div className="mt-3 text-2xl font-bold text-sky-300 sm:text-3xl">
+                {totalUsersCount}
+              </div>
+              <div className="mt-2 text-[11px] text-sky-400/80">
+                Onboarded company users
+              </div>
+            </div>
+
+            {/* 3. Active Users */}
+            <div className="rounded-2xl border border-emerald-500/20 bg-[#071a15] p-5 shadow-lg shadow-emerald-950/20">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+                  Active Users
+                </span>
+                <span className="rounded-lg bg-emerald-500/10 p-1.5 text-emerald-400">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </span>
+              </div>
+              <div className="mt-3 text-2xl font-bold text-emerald-300 sm:text-3xl">
+                {activeUsersCount}
+              </div>
+              <div className="mt-2 text-[11px] text-emerald-400/80">
+                Active status accounts
+              </div>
+            </div>
+
+            {/* 4. Inactive Users */}
+            <div className="rounded-2xl border border-amber-500/20 bg-[#161208] p-5 shadow-lg shadow-amber-950/20">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+                  Inactive Users
+                </span>
+                <span className="rounded-lg bg-amber-500/10 p-1.5 text-amber-400">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                </span>
+              </div>
+              <div className="mt-3 text-2xl font-bold text-amber-300 sm:text-3xl">
+                {inactiveUsersCount}
+              </div>
+              <div className="mt-2 text-[11px] text-amber-400/80">
+                Barred / access declined
+              </div>
+            </div>
+
+            {/* 5. Available Licenses */}
+            <div className="rounded-2xl border border-cyan-500/20 bg-[#071618] p-5 shadow-lg shadow-cyan-950/20">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
+                  Available Licenses
+                </span>
+                <span className="rounded-lg bg-cyan-500/10 p-1.5 text-cyan-400">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </span>
+              </div>
+              <div className="mt-3 text-2xl font-bold text-cyan-300 sm:text-3xl">
+                {availableLicenses}
               </div>
               <div className="mt-2 text-[11px] text-cyan-400/80">
-                {remainingSeats > 0 ? "Ready to onboard new users" : "All allocated seats in use"}
+                Ready for user onboarding
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/[0.06] bg-[#071512] p-5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Your Company</span>
-              <div className="mt-2 text-xl font-bold text-white">{quota?.client_name || user?.client_name || "Enterprise Client"}</div>
-              <div className="mt-1 text-[11px] text-slate-500">Tenant ID #{quota?.client_id || user?.client_id || "—"}</div>
-            </div>
-          </div>
-
-          {/* Privacy & Confidentiality Notice */}
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.04] p-4 text-xs text-slate-300">
-            <svg className="h-5 w-5 shrink-0 text-cyan-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <span className="font-semibold text-cyan-300 uppercase tracking-wider">Privacy & Case Isolation Policy:</span> As a company administrator, you manage team seats and user onboarding. All investigation cases and financial analytics created by investigators remain strictly private to the creating investigator to maintain strict regulatory and legal isolation.
+            {/* 6. Today's User Login */}
+            <div className="rounded-2xl border border-teal-500/20 bg-[#081714] p-5 shadow-lg shadow-teal-950/20">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-teal-400">
+                  Today's User Login
+                </span>
+                <span className="rounded-lg bg-teal-500/10 p-1.5 text-teal-400">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                  </svg>
+                </span>
+              </div>
+              <div className="mt-3 text-2xl font-bold text-teal-300 sm:text-3xl">
+                {todayUserLogins}
+              </div>
+              <div className="mt-2 text-[11px] text-teal-400/80">
+                Distinct user logins today
+              </div>
             </div>
           </div>
 
@@ -526,13 +570,23 @@ export default function ClientAdminDashboard() {
                                 <div className="flex flex-wrap items-center gap-1">
                                   <span
                                     className={`rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide ${
+                                      u.permissions?.can_view_cases !== false
+                                        ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                                        : "border border-rose-500/20 bg-rose-500/10 text-rose-400 line-through"
+                                    }`}
+                                    title={u.permissions?.can_view_cases !== false ? "View Cases Allowed" : "View Cases Denied"}
+                                  >
+                                    {u.permissions?.can_view_cases !== false ? "Cases" : "No Case View"}
+                                  </span>
+                                  <span
+                                    className={`rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide ${
                                       u.permissions?.can_create_case
                                         ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
                                         : "border border-rose-500/20 bg-rose-500/10 text-rose-400 line-through"
                                     }`}
                                     title={u.permissions?.can_create_case ? "Case Creation Allowed" : "Case Creation Denied"}
                                   >
-                                    {u.permissions?.can_create_case ? "+ Case" : "No Case"}
+                                    {u.permissions?.can_create_case ? "+ Case" : "No Create"}
                                   </span>
                                   <span
                                     className={`rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide ${
@@ -546,23 +600,33 @@ export default function ClientAdminDashboard() {
                                   </span>
                                   <span
                                     className={`rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide ${
-                                      u.permissions?.can_update_files
-                                        ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
-                                        : "border border-rose-500/20 bg-rose-500/10 text-rose-400 line-through"
-                                    }`}
-                                    title={u.permissions?.can_update_files ? "Update Files Allowed" : "Update Denied"}
-                                  >
-                                    {u.permissions?.can_update_files ? "✎ Edit File" : "No Edit"}
-                                  </span>
-                                  <span
-                                    className={`rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide ${
                                       u.permissions?.can_delete_files
                                         ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
                                         : "border border-rose-500/20 bg-rose-500/10 text-rose-400 line-through"
                                     }`}
                                     title={u.permissions?.can_delete_files ? "Delete Files Allowed" : "Delete Denied"}
                                   >
-                                    {u.permissions?.can_delete_files ? "🗑 Del File" : "No Del"}
+                                    {u.permissions?.can_delete_files ? "Del File" : "No Del"}
+                                  </span>
+                                  <span
+                                    className={`rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide ${
+                                      u.permissions?.can_view_reports !== false
+                                        ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                                        : "border border-rose-500/20 bg-rose-500/10 text-rose-400 line-through"
+                                    }`}
+                                    title={u.permissions?.can_view_reports !== false ? "Reports Allowed" : "Reports Denied"}
+                                  >
+                                    {u.permissions?.can_view_reports !== false ? "Reports" : "No Reports"}
+                                  </span>
+                                  <span
+                                    className={`rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide ${
+                                      u.permissions?.can_view_io !== false
+                                        ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                                        : "border border-rose-500/20 bg-rose-500/10 text-rose-400 line-through"
+                                    }`}
+                                    title={u.permissions?.can_view_io !== false ? "IO Allowed" : "IO Denied"}
+                                  >
+                                    {u.permissions?.can_view_io !== false ? "IO" : "No IO"}
                                   </span>
                                 </div>
                                 <button
@@ -570,10 +634,15 @@ export default function ClientAdminDashboard() {
                                   onClick={() => {
                                     setEditRightsUser(u);
                                     setEditPermissions({
+                                      can_view_cases: u.permissions?.can_view_cases ?? true,
                                       can_create_case: u.permissions?.can_create_case ?? true,
                                       can_upload_files: u.permissions?.can_upload_files ?? true,
-                                      can_update_files: u.permissions?.can_update_files ?? true,
                                       can_delete_files: u.permissions?.can_delete_files ?? true,
+                                      can_view_reports: u.permissions?.can_view_reports ?? true,
+                                      can_view_io: u.permissions?.can_view_io ?? true,
+                                      can_create_io: u.permissions?.can_create_io ?? true,
+                                      can_update_io: u.permissions?.can_update_io ?? true,
+                                      can_delete_io: u.permissions?.can_delete_io ?? true,
                                     });
                                     setEditRightsError("");
                                   }}
@@ -803,31 +872,81 @@ export default function ClientAdminDashboard() {
                     <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Presets:</span>
                     <button
                       type="button"
-                      onClick={() => setFormPermissions({ can_create_case: true, can_upload_files: true, can_update_files: true, can_delete_files: true })}
+                      onClick={() => setFormPermissions({
+                        can_view_cases: true,
+                        can_create_case: true,
+                        can_upload_files: true,
+                        can_delete_files: true,
+                        can_view_reports: true,
+                        can_view_io: true,
+                        can_create_io: true,
+                        can_update_io: true,
+                        can_delete_io: true,
+                      })}
                       className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
                     >
                       Full Investigator
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormPermissions({ can_create_case: true, can_upload_files: true, can_update_files: true, can_delete_files: false })}
+                      onClick={() => setFormPermissions({
+                        can_view_cases: true,
+                        can_create_case: true,
+                        can_upload_files: true,
+                        can_delete_files: false,
+                        can_view_reports: true,
+                        can_view_io: true,
+                        can_create_io: true,
+                        can_update_io: true,
+                        can_delete_io: false,
+                      })}
                       className="rounded-lg border border-teal-500/30 bg-teal-500/10 px-2.5 py-1 text-[10px] font-semibold text-teal-300 hover:bg-teal-500/20"
                     >
                       Upload & Work (No Delete)
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormPermissions({ can_create_case: false, can_upload_files: false, can_update_files: false, can_delete_files: false })}
+                      onClick={() => setFormPermissions({
+                        can_view_cases: true,
+                        can_create_case: false,
+                        can_upload_files: false,
+                        can_delete_files: false,
+                        can_view_reports: true,
+                        can_view_io: true,
+                        can_create_io: false,
+                        can_update_io: false,
+                        can_delete_io: false,
+                      })}
                       className="rounded-lg border border-slate-600 bg-slate-800/60 px-2.5 py-1 text-[10px] font-semibold text-slate-300 hover:bg-slate-700"
                     >
                       Read-Only Analyst
                     </button>
                   </div>
 
-                  {/* Case Rights */}
+                  {/* 1. Case Rights */}
                   <div className="rounded-xl border border-white/[0.08] bg-black/30 p-3.5 space-y-2.5">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
                       📁 Case Rights
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                      <div>
+                        <div className="text-xs font-semibold text-white">View Cases</div>
+                        <div className="text-[10px] text-slate-400">Allow user to view and search assigned cases</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormPermissions({ ...formPermissions, can_view_cases: !formPermissions.can_view_cases })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                          formPermissions.can_view_cases !== false ? "bg-emerald-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            formPermissions.can_view_cases !== false ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
                     </div>
 
                     <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
@@ -870,13 +989,12 @@ export default function ClientAdminDashboard() {
                     </div>
                   </div>
 
-                  {/* File Rights (Under Case) */}
+                  {/* 2. File Rights (Under Case) */}
                   <div className="rounded-xl border border-white/[0.08] bg-black/30 p-3.5 space-y-2.5">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-teal-400">
                       📄 File Rights (Under Case)
                     </div>
 
-                    {/* Can Upload Files */}
                     <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
                       <div>
                         <div className="text-xs font-semibold text-white">Upload Files</div>
@@ -897,28 +1015,6 @@ export default function ClientAdminDashboard() {
                       </button>
                     </div>
 
-                    {/* Can Update Files */}
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
-                      <div>
-                        <div className="text-xs font-semibold text-white">Update Files</div>
-                        <div className="text-[10px] text-slate-400">Allow modifying file details, passwords or re-triggering analysis</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormPermissions({ ...formPermissions, can_update_files: !formPermissions.can_update_files })}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                          formPermissions.can_update_files ? "bg-emerald-500" : "bg-slate-700"
-                        }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            formPermissions.can_update_files ? "translate-x-4" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* Can Delete Files */}
                     <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
                       <div>
                         <div className="text-xs font-semibold text-white">Delete Files</div>
@@ -934,6 +1030,120 @@ export default function ClientAdminDashboard() {
                         <span
                           className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                             formPermissions.can_delete_files ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3. Report Rights */}
+                  <div className="rounded-xl border border-white/[0.08] bg-black/30 p-3.5 space-y-2.5">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+                      📊 Reports Rights
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                      <div>
+                        <div className="text-xs font-semibold text-white">View Reports</div>
+                        <div className="text-[10px] text-slate-400">Allow viewing analytical reports, transaction summaries & charts</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormPermissions({ ...formPermissions, can_view_reports: !formPermissions.can_view_reports })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                          formPermissions.can_view_reports !== false ? "bg-emerald-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            formPermissions.can_view_reports !== false ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 4. IO Rights */}
+                  <div className="rounded-xl border border-white/[0.08] bg-black/30 p-3.5 space-y-2.5">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                      👮 Investigating Officer (IO) Rights
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                      <div>
+                        <div className="text-xs font-semibold text-white">View IOs</div>
+                        <div className="text-[10px] text-slate-400">Allow viewing assigned Investigating Officers</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormPermissions({ ...formPermissions, can_view_io: !formPermissions.can_view_io })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                          formPermissions.can_view_io !== false ? "bg-emerald-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            formPermissions.can_view_io !== false ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                      <div>
+                        <div className="text-xs font-semibold text-white">Create IO</div>
+                        <div className="text-[10px] text-slate-400">Allow creating and registering new Investigating Officers</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormPermissions({ ...formPermissions, can_create_io: !formPermissions.can_create_io })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                          formPermissions.can_create_io ? "bg-emerald-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            formPermissions.can_create_io ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                      <div>
+                        <div className="text-xs font-semibold text-white">Update IO</div>
+                        <div className="text-[10px] text-slate-400">Allow updating officer name, rank, or police station</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormPermissions({ ...formPermissions, can_update_io: !formPermissions.can_update_io })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                          formPermissions.can_update_io ? "bg-emerald-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            formPermissions.can_update_io ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                      <div>
+                        <div className="text-xs font-semibold text-white">Delete IO</div>
+                        <div className="text-[10px] text-slate-400">Allow removing assigned Investigating Officers</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormPermissions({ ...formPermissions, can_delete_io: !formPermissions.can_delete_io })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                          formPermissions.can_delete_io ? "bg-emerald-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            formPermissions.can_delete_io ? "translate-x-4" : "translate-x-0"
                           }`}
                         />
                       </button>
@@ -1022,31 +1232,81 @@ export default function ClientAdminDashboard() {
                 <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Presets:</span>
                 <button
                   type="button"
-                  onClick={() => setEditPermissions({ can_create_case: true, can_upload_files: true, can_update_files: true, can_delete_files: true })}
+                  onClick={() => setEditPermissions({
+                    can_view_cases: true,
+                    can_create_case: true,
+                    can_upload_files: true,
+                    can_delete_files: true,
+                    can_view_reports: true,
+                    can_view_io: true,
+                    can_create_io: true,
+                    can_update_io: true,
+                    can_delete_io: true,
+                  })}
                   className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
                 >
                   Full Investigator
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditPermissions({ can_create_case: true, can_upload_files: true, can_update_files: true, can_delete_files: false })}
+                  onClick={() => setEditPermissions({
+                    can_view_cases: true,
+                    can_create_case: true,
+                    can_upload_files: true,
+                    can_delete_files: false,
+                    can_view_reports: true,
+                    can_view_io: true,
+                    can_create_io: true,
+                    can_update_io: true,
+                    can_delete_io: false,
+                  })}
                   className="rounded-lg border border-teal-500/30 bg-teal-500/10 px-2.5 py-1 text-[10px] font-semibold text-teal-300 hover:bg-teal-500/20"
                 >
                   Upload & Work (No Delete)
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditPermissions({ can_create_case: false, can_upload_files: false, can_update_files: false, can_delete_files: false })}
+                  onClick={() => setEditPermissions({
+                    can_view_cases: true,
+                    can_create_case: false,
+                    can_upload_files: false,
+                    can_delete_files: false,
+                    can_view_reports: true,
+                    can_view_io: true,
+                    can_create_io: false,
+                    can_update_io: false,
+                    can_delete_io: false,
+                  })}
                   className="rounded-lg border border-slate-600 bg-slate-800/60 px-2.5 py-1 text-[10px] font-semibold text-slate-300 hover:bg-slate-700"
                 >
                   Read-Only Analyst
                 </button>
               </div>
 
-              {/* Case Rights */}
+              {/* 1. Case Rights */}
               <div className="rounded-xl border border-white/[0.08] bg-black/30 p-3.5 space-y-2.5">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
                   📁 Case Rights
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                  <div>
+                    <div className="text-xs font-semibold text-white">View Cases</div>
+                    <div className="text-[10px] text-slate-400">Allow user to view and search assigned cases</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditPermissions({ ...editPermissions, can_view_cases: !editPermissions.can_view_cases })}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      editPermissions.can_view_cases !== false ? "bg-emerald-500" : "bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        editPermissions.can_view_cases !== false ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
                 </div>
 
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
@@ -1089,13 +1349,12 @@ export default function ClientAdminDashboard() {
                 </div>
               </div>
 
-              {/* File Rights (Under Case) */}
+              {/* 2. File Rights (Under Case) */}
               <div className="rounded-xl border border-white/[0.08] bg-black/30 p-3.5 space-y-2.5">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-teal-400">
                   📄 File Rights (Under Case)
                 </div>
 
-                {/* Can Upload Files */}
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
                   <div>
                     <div className="text-xs font-semibold text-white">Upload Files</div>
@@ -1116,28 +1375,6 @@ export default function ClientAdminDashboard() {
                   </button>
                 </div>
 
-                {/* Can Update Files */}
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
-                  <div>
-                    <div className="text-xs font-semibold text-white">Update Files</div>
-                    <div className="text-[10px] text-slate-400">Allow modifying file details, passwords or re-triggering analysis</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditPermissions({ ...editPermissions, can_update_files: !editPermissions.can_update_files })}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                      editPermissions.can_update_files ? "bg-emerald-500" : "bg-slate-700"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        editPermissions.can_update_files ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Can Delete Files */}
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
                   <div>
                     <div className="text-xs font-semibold text-white">Delete Files</div>
@@ -1153,6 +1390,120 @@ export default function ClientAdminDashboard() {
                     <span
                       className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                         editPermissions.can_delete_files ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Report Rights */}
+              <div className="rounded-xl border border-white/[0.08] bg-black/30 p-3.5 space-y-2.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+                  📊 Reports Rights
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                  <div>
+                    <div className="text-xs font-semibold text-white">View Reports</div>
+                    <div className="text-[10px] text-slate-400">Allow viewing analytical reports, transaction summaries & charts</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditPermissions({ ...editPermissions, can_view_reports: !editPermissions.can_view_reports })}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      editPermissions.can_view_reports !== false ? "bg-emerald-500" : "bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        editPermissions.can_view_reports !== false ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. IO Rights */}
+              <div className="rounded-xl border border-white/[0.08] bg-black/30 p-3.5 space-y-2.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                  👮 Investigating Officer (IO) Rights
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                  <div>
+                    <div className="text-xs font-semibold text-white">View IOs</div>
+                    <div className="text-[10px] text-slate-400">Allow viewing assigned Investigating Officers</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditPermissions({ ...editPermissions, can_view_io: !editPermissions.can_view_io })}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      editPermissions.can_view_io !== false ? "bg-emerald-500" : "bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        editPermissions.can_view_io !== false ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                  <div>
+                    <div className="text-xs font-semibold text-white">Create IO</div>
+                    <div className="text-[10px] text-slate-400">Allow creating and registering new Investigating Officers</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditPermissions({ ...editPermissions, can_create_io: !editPermissions.can_create_io })}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      editPermissions.can_create_io ? "bg-emerald-500" : "bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        editPermissions.can_create_io ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                  <div>
+                    <div className="text-xs font-semibold text-white">Update IO</div>
+                    <div className="text-[10px] text-slate-400">Allow updating officer name, rank, or police station</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditPermissions({ ...editPermissions, can_update_io: !editPermissions.can_update_io })}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      editPermissions.can_update_io ? "bg-emerald-500" : "bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        editPermissions.can_update_io ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02]">
+                  <div>
+                    <div className="text-xs font-semibold text-white">Delete IO</div>
+                    <div className="text-[10px] text-slate-400">Allow removing assigned Investigating Officers</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditPermissions({ ...editPermissions, can_delete_io: !editPermissions.can_delete_io })}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      editPermissions.can_delete_io ? "bg-emerald-500" : "bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        editPermissions.can_delete_io ? "translate-x-4" : "translate-x-0"
                       }`}
                     />
                   </button>

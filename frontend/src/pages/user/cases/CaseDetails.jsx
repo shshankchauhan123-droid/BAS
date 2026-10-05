@@ -14,6 +14,7 @@ import {
   uploadFile,
   getFileView,
   deleteFile,
+  updateFileDetails,
 } from "../../../services/api/file";
 
 import {
@@ -39,6 +40,11 @@ function CaseDetails() {
     user?.role === "superadmin" ||
     user?.role === "client_admin" ||
     user?.permissions?.can_delete_files !== false;
+
+  const canViewReports =
+    user?.role === "superadmin" ||
+    user?.role === "client_admin" ||
+    user?.permissions?.can_view_reports !== false;
 
   /*
    * ============================================================
@@ -116,6 +122,11 @@ function CaseDetails() {
 
   const [uploadedFiles, setUploadedFiles] =
     useState([]);
+  const [expandedFileId, setExpandedFileId] = useState(null);
+  const [editingFileId, setEditingFileId] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [isSavingFile, setIsSavingFile] = useState(false);
+
 
   const [isFilesLoading, setIsFilesLoading] =
     useState(true);
@@ -232,7 +243,6 @@ const [transactions, setTransactions] = useState([]);
           if (typeof item === "string") {
             return item;
           }
-
           return (
             item?.msg ||
             item?.message ||
@@ -592,6 +602,80 @@ function clearTransactionFilters() {
   // ============================================================
   // INITIAL LOAD
   // ============================================================
+
+  const handleFileClick = (fileId) => {
+    if (expandedFileId === fileId) {
+      setExpandedFileId(null);
+      setEditingFileId(null);
+    } else {
+      setExpandedFileId(fileId);
+      setEditingFileId(null);
+    }
+  };
+
+  const handleEditClick = (e, file) => {
+    e.stopPropagation();
+    setEditingFileId(file.id);
+    setEditFormData({
+      account_name: file.account_name || "",
+      account_number: file.account_number || "",
+      bank_name: file.bank_name || "",
+      branch_name: file.branch_name || "",
+      ifsc: file.ifsc || "",
+      micr: file.micr || "",
+      account_type: file.account_type || "",
+      statement_start_date: file.statement_start_date || "",
+      statement_end_date: file.statement_end_date || "",
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingFileId(null);
+    setEditFormData({});
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSaveFileDetails = async (fileId) => {
+    setIsSavingFile(true);
+    try {
+      const payload = { ...editFormData };
+      // Convert empty strings to null to avoid Pydantic date validation errors
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === "") {
+          payload[key] = null;
+        }
+      });
+      const response = await updateFileDetails(fileId, payload);
+      if (response && response.success) {
+        // Update local state
+        setUploadedFiles(prevFiles => prevFiles.map(f => {
+          if (f.id === fileId) {
+            return response.data || {
+              ...f,
+              ...payload
+            };
+          }
+          return f;
+        }));
+        setEditingFileId(null);
+        // show success (if toast is available, but for now just console or alert is fine if toast isn't in scope)
+      } else {
+        alert(response?.message || "Failed to update file details");
+      }
+    } catch (err) {
+      alert(err.message || "An error occurred while saving");
+    } finally {
+      setIsSavingFile(false);
+    }
+  };
+
 
   useEffect(() => {
     loadCase();
@@ -1878,30 +1962,32 @@ function goToNextTransactionPage() {
 
               <div className="flex flex-wrap items-center gap-3 shrink-0">
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      `/dashboard/cases/${caseId}/reports`
-                    )
-                  }
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-400/[0.08] px-4 py-2.5 text-xs font-semibold text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.12)] transition-all duration-200 hover:border-emerald-400/50 hover:bg-emerald-400/[0.18] hover:text-white"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
+                {canViewReports && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/dashboard/cases/${caseId}/reports`
+                      )
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-400/[0.08] px-4 py-2.5 text-xs font-semibold text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.12)] transition-all duration-200 hover:border-emerald-400/50 hover:bg-emerald-400/[0.18] hover:text-white"
                   >
-                    <path
-                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  View Case Report
-                </button>
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                    >
+                      <path
+                        d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    View Case Report
+                  </button>
+                )}
 
                 <span
                   className={`
@@ -2658,14 +2744,20 @@ function goToNextTransactionPage() {
                                   <div className="min-w-0">
 
                                     <p
-                                      className="truncate text-sm font-semibold text-slate-200"
-                                      title={
-                                        file.original_filename
-                                      }
+                                      className="truncate text-sm font-semibold text-slate-200 cursor-pointer hover:text-emerald-300 transition-colors flex items-center gap-2 select-none"
+                                      title={file.original_filename}
+                                      onClick={() => handleFileClick(file.id)}
                                     >
-                                      {
-                                        file.original_filename
-                                      }
+                                      {file.original_filename}
+                                      {expandedFileId === file.id ? (
+                                        <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                                        </svg>
+                                      ) : (
+                                        <svg className="h-4 w-4 shrink-0 text-slate-500 group-hover:text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                        </svg>
+                                      )}
                                     </p>
 
                                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] uppercase tracking-[0.10em] text-slate-600">
@@ -2864,6 +2956,150 @@ function goToNextTransactionPage() {
 
                               </div>
 
+                              {/* File Details Expanded Section */}
+                              {expandedFileId === file.id && (
+                                <div className="mt-4 border-t border-white/[0.06] pt-4 animate-in slide-in-from-top-2 duration-200">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h4 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400">File Details</h4>
+                                    {editingFileId !== file.id && (
+                                      <button 
+                                        type="button" 
+                                        onClick={(e) => handleEditClick(e, file)}
+                                        className="text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan-300 hover:text-cyan-400 border border-cyan-400/20 hover:border-cyan-400/40 bg-cyan-400/[0.05] hover:bg-cyan-400/[0.1] px-3 py-1 rounded-full transition-all"
+                                      >
+                                        Edit
+                                      </button>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {/* Account Information */}
+                                    <div className="space-y-3">
+                                      <div>
+                                        <div className="text-[10px] uppercase text-slate-500 mb-1">Account Name</div>
+                                        {editingFileId === file.id ? (
+                                          <input type="text" name="account_name" value={editFormData.account_name} onChange={handleEditChange} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50" />
+                                        ) : (
+                                          <div className="text-sm font-medium text-slate-200">{file.account_name || 'Not Available'}</div>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div className="text-[10px] uppercase text-slate-500 mb-1">Account Number</div>
+                                        {editingFileId === file.id ? (
+                                          <input type="text" name="account_number" value={editFormData.account_number} onChange={handleEditChange} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50" />
+                                        ) : (
+                                          <div className="text-sm font-medium text-slate-200">{file.account_number || 'Not Available'}</div>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div className="text-[10px] uppercase text-slate-500 mb-1">Account Type</div>
+                                        {editingFileId === file.id ? (
+                                          <input type="text" name="account_type" value={editFormData.account_type} onChange={handleEditChange} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50" />
+                                        ) : (
+                                          <div className="text-sm font-medium text-slate-200">{file.account_type || 'Not Available'}</div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Bank Information */}
+                                    <div className="space-y-3">
+                                      <div>
+                                        <div className="text-[10px] uppercase text-slate-500 mb-1">Bank Name</div>
+                                        {editingFileId === file.id ? (
+                                          <input type="text" name="bank_name" value={editFormData.bank_name} onChange={handleEditChange} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50" />
+                                        ) : (
+                                          <div className="text-sm font-medium text-slate-200">{file.bank_name || 'Not Available'}</div>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div className="text-[10px] uppercase text-slate-500 mb-1">Branch Name</div>
+                                        {editingFileId === file.id ? (
+                                          <input type="text" name="branch_name" value={editFormData.branch_name} onChange={handleEditChange} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50" />
+                                        ) : (
+                                          <div className="text-sm font-medium text-slate-200">{file.branch_name || 'Not Available'}</div>
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <div className="text-[10px] uppercase text-slate-500 mb-1">IFSC</div>
+                                          {editingFileId === file.id ? (
+                                            <input type="text" name="ifsc" value={editFormData.ifsc} onChange={handleEditChange} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50" />
+                                          ) : (
+                                            <div className="text-sm font-medium text-slate-200">{file.ifsc || 'Not Available'}</div>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <div className="text-[10px] uppercase text-slate-500 mb-1">MICR</div>
+                                          {editingFileId === file.id ? (
+                                            <input type="text" name="micr" value={editFormData.micr} onChange={handleEditChange} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50" />
+                                          ) : (
+                                            <div className="text-sm font-medium text-slate-200">{file.micr || 'Not Available'}</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Statement & Processing Information */}
+                                    <div className="space-y-3">
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <div className="text-[10px] uppercase text-slate-500 mb-1">Statement From</div>
+                                          {editingFileId === file.id ? (
+                                            <input type="date" name="statement_start_date" value={editFormData.statement_start_date} onChange={handleEditChange} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50" />
+                                          ) : (
+                                            <div className="text-sm font-medium text-slate-200">{file.statement_start_date ? formatDate(file.statement_start_date) : 'Not Available'}</div>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <div className="text-[10px] uppercase text-slate-500 mb-1">Statement To</div>
+                                          {editingFileId === file.id ? (
+                                            <input type="date" name="statement_end_date" value={editFormData.statement_end_date} onChange={handleEditChange} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50" />
+                                          ) : (
+                                            <div className="text-sm font-medium text-slate-200">{file.statement_end_date ? formatDate(file.statement_end_date) : 'Not Available'}</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="text-[10px] uppercase text-slate-500 mb-1">Status</div>
+                                        <div className="text-sm font-medium text-slate-200">{file.status || 'Not Available'}</div>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <div className="text-[10px] uppercase text-slate-500 mb-1">Processing Stage</div>
+                                          <div className="text-sm font-medium text-slate-200">{file.processing_stage || 'Not Available'}</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-[10px] uppercase text-slate-500 mb-1">Processing</div>
+                                          <div className="text-sm font-medium text-slate-200">
+                                            {file.processing_progress ? `${file.processing_progress}%` : 'Not Available'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {editingFileId === file.id && (
+                                    <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-white/[0.06]">
+                                      <button
+                                        type="button"
+                                        onClick={handleCancelEdit}
+                                        disabled={isSavingFile}
+                                        className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors disabled:opacity-50"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveFileDetails(file.id)}
+                                        disabled={isSavingFile}
+                                        className="px-4 py-2 text-xs font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors disabled:opacity-50"
+                                      >
+                                        {isSavingFile ? 'Saving...' : 'Save Changes'}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )
                         )}

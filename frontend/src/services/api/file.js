@@ -65,3 +65,21 @@ export function deleteFile(fileId) {
     }
   );
 }
+
+
+// ============================================================
+// Update file metadata
+// ============================================================
+
+export function updateFileDetails(fileId, payload) {
+  return apiRequest(
+    `/api/v1/files/${fileId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+      }
+    }
+  );
+}

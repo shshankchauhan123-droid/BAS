@@ -43,15 +43,24 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
         try:
             metadata = extract_account_metadata(file_record.file_path)
             
-            file_record.account_name = metadata.account_name
-            file_record.account_number = metadata.account_number
-            file_record.bank_name = metadata.bank_name
-            file_record.branch_name = metadata.branch_name
-            file_record.ifsc = metadata.ifsc
-            file_record.micr = metadata.micr
-            file_record.account_type = metadata.account_type
-            file_record.statement_start_date = metadata.statement_start_date
-            file_record.statement_end_date = metadata.statement_end_date
+            if metadata.account_name and not file_record.account_name:
+                file_record.account_name = metadata.account_name
+            if metadata.account_number and not file_record.account_number:
+                file_record.account_number = metadata.account_number
+            if metadata.bank_name and not file_record.bank_name:
+                file_record.bank_name = metadata.bank_name
+            if metadata.branch_name and not file_record.branch_name:
+                file_record.branch_name = metadata.branch_name
+            if metadata.ifsc and not file_record.ifsc:
+                file_record.ifsc = metadata.ifsc
+            if metadata.micr and not file_record.micr:
+                file_record.micr = metadata.micr
+            if metadata.account_type and not file_record.account_type:
+                file_record.account_type = metadata.account_type
+            if metadata.statement_start_date and not file_record.statement_start_date:
+                file_record.statement_start_date = metadata.statement_start_date
+            if metadata.statement_end_date and not file_record.statement_end_date:
+                file_record.statement_end_date = metadata.statement_end_date
             
             update_file(db, file_record)
 
@@ -101,12 +110,62 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
         print("============================================================")
         print("\nStarting PDF table extraction...\n")
 
-        # This function will print its own logs (PDF TABLE EXTRACTION...)
-        raw_df = extract_tables_from_pdf(file_record.file_path)
-
-        print(f"\nTables detected: 1")  # Camelot might not expose table count directly without modifying its return, defaulting for display as asked
-        print(f"Rows extracted: {len(raw_df)}")
-        print(f"Columns extracted: {len(raw_df.columns)}")
+        try:
+            # This function will print its own logs (PDF TABLE EXTRACTION...)
+            raw_df = extract_tables_from_pdf(file_record.file_path)
+            
+            if raw_df is None or len(raw_df) == 0:
+                raise ValueError("Standard PDF table extraction produced no usable transaction table (empty dataframe)")
+                
+            # Robust heuristic for unusable table (e.g. image text recognized as one big column)
+            is_usable = False
+            if len(raw_df.columns) >= 3:
+                expected_keywords = ["date", "chq", "cheque", "particulars", "narration", "description", "debit", "withdrawal", "credit", "deposit", "balance"]
+                match_count = 0
+                
+                # Check columns first
+                for col in raw_df.columns:
+                    val_str = str(col).lower().replace('\n', ' ').strip()
+                    if any(kw in val_str for kw in expected_keywords):
+                        match_count += 1
+                        
+                # Check rows
+                import pandas as pd
+                for i in range(min(50, len(raw_df))):
+                    row_match = 0
+                    for val in raw_df.iloc[i].values:
+                        if pd.isna(val): continue
+                        val_str = str(val).lower().replace('\n', ' ').strip()
+                        if any(kw in val_str for kw in expected_keywords):
+                            row_match += 1
+                    if row_match > match_count:
+                        match_count = row_match
+                        
+                if match_count >= 3:
+                    is_usable = True
+                    
+            if not is_usable:
+                raise ValueError("Standard PDF table extraction produced no usable transaction table (no valid header concepts detected)")
+                
+            print("\nStandard PDF table extraction successful")
+            print(f"Rows extracted: {len(raw_df)}")
+            print(f"Columns extracted: {len(raw_df.columns)}")
+            
+        except Exception as e:
+            print("\nProcessing PDF:", file_record.file_path)
+            print("Attempting standard PDF extraction")
+            print(f"Standard PDF extraction produced no usable transaction table: {e}")
+            print("Falling back to OCR")
+            print("OCR processing started\n")
+            
+            from app.processing.ocr.ocr_table_extractor import extract_tables_from_scanned_pdf_ocr
+            raw_df = extract_tables_from_scanned_pdf_ocr(file_record.file_path)
+            
+            print("\nOCR extraction completed")
+            print(f"Rows extracted: {len(raw_df)}")
+            print("Continuing with existing header mapping")
+            print("Continuing with existing validation")
+            print("Continuing with existing persistence")
 
         print("\nSTAGE 1 SUCCESS\n")
         print("Raw DataFrame created successfully.\n")
@@ -140,6 +199,57 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
             raw_df = pd.read_csv(file_record.file_path)
         else:
             raw_df = pd.read_excel(file_record.file_path)
+            
+        # ------------------------------------------------------------
+        # EXCEL/CSV ACCOUNT METADATA EXTRACTION
+        # ------------------------------------------------------------
+        from app.processing.account.account_metadata_extractor import extract_excel_account_metadata
+        try:
+            excel_meta = extract_excel_account_metadata(raw_df)
+            
+            if excel_meta.account_number and not file_record.account_number:
+                file_record.account_number = excel_meta.account_number
+                masked_acc = excel_meta.account_number
+                if len(masked_acc) > 4:
+                    masked_acc = "X" * (len(masked_acc) - 4) + masked_acc[-4:]
+                print(f"Account number extracted: {masked_acc}")
+            else:
+                print("Account number not updated.")
+                
+            if excel_meta.account_name and not file_record.account_name:
+                file_record.account_name = excel_meta.account_name
+                print(f"Account name extracted: {excel_meta.account_name}")
+            else:
+                print("Account name not updated.")
+                
+            if excel_meta.bank_name and not file_record.bank_name:
+                file_record.bank_name = excel_meta.bank_name
+            if excel_meta.branch_name and not file_record.branch_name:
+                file_record.branch_name = excel_meta.branch_name
+            if excel_meta.ifsc and not file_record.ifsc:
+                file_record.ifsc = excel_meta.ifsc
+            if excel_meta.micr and not file_record.micr:
+                file_record.micr = excel_meta.micr
+            if excel_meta.account_type and not file_record.account_type:
+                file_record.account_type = excel_meta.account_type
+            if excel_meta.statement_start_date and not file_record.statement_start_date:
+                file_record.statement_start_date = excel_meta.statement_start_date
+            if excel_meta.statement_end_date and not file_record.statement_end_date:
+                file_record.statement_end_date = excel_meta.statement_end_date
+                
+            # If ANY field was extracted, we should update
+            if any([
+                excel_meta.account_number, excel_meta.account_name, excel_meta.bank_name,
+                excel_meta.branch_name, excel_meta.ifsc, excel_meta.micr, excel_meta.account_type,
+                excel_meta.statement_start_date, excel_meta.statement_end_date
+            ]):
+                update_file(db, file_record)
+                print("Account metadata stored successfully")
+        except Exception as e:
+            print(f"Account metadata extraction for Excel/CSV failed: {e}")
+            
+        print("Transaction rows continuing through existing pipeline")
+
             
         file_path = Path(file_record.file_path)
         excel_filename = f"{file_path.stem}_raw.xlsx"

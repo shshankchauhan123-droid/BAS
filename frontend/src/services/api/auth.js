@@ -18,12 +18,14 @@ export function signupUser({
 export function loginUser({
   username,
   password,
+  company_code,
 }) {
   return apiRequest("/api/v1/auth/login", {
     method: "POST",
     body: JSON.stringify({
       username,
       password,
+      company_code: company_code ? String(company_code).trim() : null,
     }),
   });
 }

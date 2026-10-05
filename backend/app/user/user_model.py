@@ -1,6 +1,5 @@
 from datetime import datetime
-
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -8,6 +7,21 @@ from app.core.database import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index(
+            "uq_users_client_id_username",
+            "client_id",
+            text("user_name"),
+            unique=True,
+            postgresql_where=text("client_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_users_global_username",
+            text("user_name"),
+            unique=True,
+            postgresql_where=text("client_id IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         primary_key=True,

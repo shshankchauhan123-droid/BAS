@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.client.client_repository import get_client_by_id
 from app.core.roles import CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, USER_ROLE
 from app.core.security import hash_password
-from app.audit.audit_service import record_audit_log
+from app.audit.audit_service import get_today_login_count_for_client, record_audit_log
 from app.user.user_model import User
 from app.user.user_repository import (
     count_users_in_client,
@@ -13,6 +13,7 @@ from app.user.user_repository import (
     get_user_by_email,
     get_user_by_id,
     get_user_by_username,
+    get_user_by_username_and_client,
     get_users_by_client_id,
     update_user_status,
 )
@@ -83,8 +84,8 @@ def create_user_by_admin(
     cleaned_username = data.username.strip()
     cleaned_email = data.email.strip().lower()
 
-    if get_user_by_username(db, cleaned_username):
-        raise ValueError(f"Username '{cleaned_username}' is already taken.")
+    if get_user_by_username_and_client(db, cleaned_username, client_id):
+        raise ValueError(f"Username '{cleaned_username}' is already taken in this company.")
 
     if get_user_by_email(db, cleaned_email):
         raise ValueError(f"Email '{cleaned_email}' is already in use.")
@@ -101,33 +102,40 @@ def create_user_by_admin(
         first_login=True,  # Will prompt to change password on first login
     )
 
-    # Initialize user permissions
+    # Initialize user permissions (all 9 default to True)
     can_view_cases = True
     can_create_case = True
-    can_update_case = True
     can_upload_files = True
-    can_process_files = True
-    can_update_files = True
     can_delete_files = True
+    can_view_reports = True
+    can_view_io = True
+    can_create_io = True
+    can_update_io = True
+    can_delete_io = True
+
     if data.permissions:
         can_view_cases = getattr(data.permissions, "can_view_cases", True)
         can_create_case = getattr(data.permissions, "can_create_case", True)
-        can_update_case = getattr(data.permissions, "can_update_case", True)
         can_upload_files = getattr(data.permissions, "can_upload_files", True)
-        can_process_files = getattr(data.permissions, "can_process_files", True)
-        can_update_files = getattr(data.permissions, "can_update_files", True)
         can_delete_files = getattr(data.permissions, "can_delete_files", True)
+        can_view_reports = getattr(data.permissions, "can_view_reports", True)
+        can_view_io = getattr(data.permissions, "can_view_io", True)
+        can_create_io = getattr(data.permissions, "can_create_io", True)
+        can_update_io = getattr(data.permissions, "can_update_io", True)
+        can_delete_io = getattr(data.permissions, "can_delete_io", True)
 
     create_or_update_user_permissions(
         db=db,
         user_id=user.id,
         can_view_cases=can_view_cases,
         can_create_case=can_create_case,
-        can_update_case=can_update_case,
         can_upload_files=can_upload_files,
-        can_process_files=can_process_files,
-        can_update_files=can_update_files,
         can_delete_files=can_delete_files,
+        can_view_reports=can_view_reports,
+        can_view_io=can_view_io,
+        can_create_io=can_create_io,
+        can_update_io=can_update_io,
+        can_delete_io=can_delete_io,
     )
     db.refresh(user)
 
@@ -147,11 +155,13 @@ def create_user_by_admin(
             "permissions": {
                 "can_view_cases": can_view_cases,
                 "can_create_case": can_create_case,
-                "can_update_case": can_update_case,
                 "can_upload_files": can_upload_files,
-                "can_process_files": can_process_files,
-                "can_update_files": can_update_files,
                 "can_delete_files": can_delete_files,
+                "can_view_reports": can_view_reports,
+                "can_view_io": can_view_io,
+                "can_create_io": can_create_io,
+                "can_update_io": can_update_io,
+                "can_delete_io": can_delete_io,
             },
         },
         client_id=client_id or actor.client_id,
@@ -175,15 +185,24 @@ def list_users_for_actor(
             quota = None
             if client:
                 used = len(users)
+                active_count = sum(1 for u in users if u.is_active)
+                inactive_count = sum(1 for u in users if not u.is_active)
+                today_logins = get_today_login_count_for_client(db, client.id)
+                available_licenses = max(0, client.max_users - used)
                 quota = {
                     "client_id": client.id,
                     "client_name": client.name,
                     "used_seats": used,
-                    "active_users": used,
+                    "active_users": active_count,
                     "max_seats": client.max_users,
                     "max_users": client.max_users,
-                    "remaining_seats": max(0, client.max_users - used),
+                    "remaining_seats": available_licenses,
                     "is_limit_reached": used >= client.max_users,
+                    "total_licenses": client.max_users,
+                    "inactive_users": inactive_count,
+                    "available_licenses": available_licenses,
+                    "today_login_count": today_logins,
+                    "total_users": used,
                 }
             return users, quota
         else:
@@ -197,15 +216,24 @@ def list_users_for_actor(
         client = get_client_by_id(db, actor.client_id)
         max_seats = client.max_users if client else 0
         used = len(users)
+        active_count = sum(1 for u in users if u.is_active)
+        inactive_count = sum(1 for u in users if not u.is_active)
+        today_logins = get_today_login_count_for_client(db, actor.client_id)
+        available_licenses = max(0, max_seats - used)
         quota = {
             "client_id": actor.client_id,
             "client_name": client.name if client else "Enterprise Client",
             "used_seats": used,
-            "active_users": used,
+            "active_users": active_count,
             "max_seats": max_seats,
             "max_users": max_seats,
-            "remaining_seats": max(0, max_seats - used),
+            "remaining_seats": available_licenses,
             "is_limit_reached": used >= max_seats if max_seats > 0 else False,
+            "total_licenses": max_seats,
+            "inactive_users": inactive_count,
+            "available_licenses": available_licenses,
+            "today_login_count": today_logins,
+            "total_users": used,
         }
         return users, quota
 
@@ -279,13 +307,15 @@ def update_user_permissions_by_actor(
         raise ValueError("You do not have permission to manage user permissions.")
 
     old_perms = {
-        "can_view_cases": target_user.permissions.can_view_cases if target_user.permissions else True,
-        "can_create_case": target_user.permissions.can_create_case if target_user.permissions else True,
-        "can_update_case": target_user.permissions.can_update_case if target_user.permissions else True,
-        "can_upload_files": target_user.permissions.can_upload_files if target_user.permissions else True,
-        "can_process_files": target_user.permissions.can_process_files if target_user.permissions else True,
-        "can_update_files": target_user.permissions.can_update_files if target_user.permissions else True,
-        "can_delete_files": target_user.permissions.can_delete_files if target_user.permissions else True,
+        "can_view_cases": getattr(target_user.permissions, "can_view_cases", True) if target_user.permissions else True,
+        "can_create_case": getattr(target_user.permissions, "can_create_case", True) if target_user.permissions else True,
+        "can_upload_files": getattr(target_user.permissions, "can_upload_files", True) if target_user.permissions else True,
+        "can_delete_files": getattr(target_user.permissions, "can_delete_files", True) if target_user.permissions else True,
+        "can_view_reports": getattr(target_user.permissions, "can_view_reports", True) if target_user.permissions else True,
+        "can_view_io": getattr(target_user.permissions, "can_view_io", True) if target_user.permissions else True,
+        "can_create_io": getattr(target_user.permissions, "can_create_io", True) if target_user.permissions else True,
+        "can_update_io": getattr(target_user.permissions, "can_update_io", True) if target_user.permissions else True,
+        "can_delete_io": getattr(target_user.permissions, "can_delete_io", True) if target_user.permissions else True,
     }
 
     create_or_update_user_permissions(
@@ -293,11 +323,13 @@ def update_user_permissions_by_actor(
         user_id=target_user.id,
         can_view_cases=getattr(data, "can_view_cases", True),
         can_create_case=getattr(data, "can_create_case", True),
-        can_update_case=getattr(data, "can_update_case", True),
         can_upload_files=getattr(data, "can_upload_files", True),
-        can_process_files=getattr(data, "can_process_files", True),
-        can_update_files=getattr(data, "can_update_files", True),
         can_delete_files=getattr(data, "can_delete_files", True),
+        can_view_reports=getattr(data, "can_view_reports", True),
+        can_view_io=getattr(data, "can_view_io", True),
+        can_create_io=getattr(data, "can_create_io", True),
+        can_update_io=getattr(data, "can_update_io", True),
+        can_delete_io=getattr(data, "can_delete_io", True),
     )
     db.refresh(target_user)
 
@@ -316,11 +348,13 @@ def update_user_permissions_by_actor(
             "new_permissions": {
                 "can_view_cases": getattr(data, "can_view_cases", True),
                 "can_create_case": getattr(data, "can_create_case", True),
-                "can_update_case": getattr(data, "can_update_case", True),
                 "can_upload_files": getattr(data, "can_upload_files", True),
-                "can_process_files": getattr(data, "can_process_files", True),
-                "can_update_files": getattr(data, "can_update_files", True),
                 "can_delete_files": getattr(data, "can_delete_files", True),
+                "can_view_reports": getattr(data, "can_view_reports", True),
+                "can_view_io": getattr(data, "can_view_io", True),
+                "can_create_io": getattr(data, "can_create_io", True),
+                "can_update_io": getattr(data, "can_update_io", True),
+                "can_delete_io": getattr(data, "can_delete_io", True),
             },
         },
         client_id=target_user.client_id or actor.client_id,

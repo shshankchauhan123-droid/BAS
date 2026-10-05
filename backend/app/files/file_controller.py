@@ -98,7 +98,7 @@ def update_file_controller(
         db=db,
         file_id=file_id,
         user=user,
-        original_filename=data.original_filename,
+        data=data,
     )
 
     return FileSingleResponse(

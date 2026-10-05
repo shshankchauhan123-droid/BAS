@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.audit.audit_model import AuditLog
 from app.audit.audit_repository import (
+    count_distinct_logins_today_for_client,
     create_audit_log,
     get_audit_logs,
     get_audit_stats,
@@ -195,3 +196,7 @@ def get_audit_stats_for_actor(
         raise PermissionError("Access denied.")
 
     return get_audit_stats(db=db, client_id=scoped_client_id)
+
+
+def get_today_login_count_for_client(db: Session, client_id: int) -> int:
+    return count_distinct_logins_today_for_client(db=db, client_id=client_id)

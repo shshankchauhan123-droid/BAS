@@ -70,6 +70,11 @@ def get_cases_route(
             user_id=current_user.id,
         )
 
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -88,12 +93,23 @@ def get_case_route(
     current_user=Depends(get_current_user),
 ):
     try:
-        return get_case(
+        case = get_case(
             db=db,
             case_id=case_id,
             user_id=current_user.id,
         )
+        if not case:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Case not found",
+            )
+        return case
 
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

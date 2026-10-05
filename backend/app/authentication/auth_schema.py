@@ -34,6 +34,8 @@ class LoginRequest(BaseModel):
         max_length=128,
     )
 
+    company_code: str | None = None
+
 
 class UserResponse(BaseModel):
     id: int
@@ -43,6 +45,7 @@ class UserResponse(BaseModel):
     is_active: bool
     client_id: int | None = None
     permissions: UserPermissionsSchema | None = None
+    first_login: bool = False
 
 
 class LoginResponse(BaseModel):
@@ -60,3 +63,15 @@ class RefreshTokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
+
+
+class FirstLoginPasswordRequest(BaseModel):
+    new_password: str = Field(
+        min_length=6,
+        max_length=128,
+    )
+
+
+class FirstLoginResponse(BaseModel):
+    message: str
+    user: UserResponse

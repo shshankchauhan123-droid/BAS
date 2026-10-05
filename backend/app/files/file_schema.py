@@ -12,6 +12,15 @@ class FileUploadResponse(BaseModel):
 
 class FileUpdateRequest(BaseModel):
     original_filename: Optional[str] = None
+    account_name: Optional[str] = None
+    account_number: Optional[str] = None
+    bank_name: Optional[str] = None
+    branch_name: Optional[str] = None
+    ifsc: Optional[str] = None
+    micr: Optional[str] = None
+    account_type: Optional[str] = None
+    statement_start_date: Optional[date] = None
+    statement_end_date: Optional[date] = None
 
 
 class FileSingleResponse(BaseModel):
@@ -41,6 +50,8 @@ class FileData(BaseModel):
     ifsc: Optional[str] = None
     micr: Optional[str] = None
     account_type: Optional[str] = None
+    processing_stage: Optional[str] = None
+    processing_progress: Optional[str] = None
     statement_start_date: Optional[date] = None
     statement_end_date: Optional[date] = None
     created_at: datetime

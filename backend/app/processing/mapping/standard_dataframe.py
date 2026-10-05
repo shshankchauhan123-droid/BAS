@@ -25,8 +25,6 @@ def create_standard_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     required_columns = [
         "transaction_date",
         "description",
-        "debit",
-        "credit",
         "balance"
     ]
     
@@ -35,10 +33,13 @@ def create_standard_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     print(json.dumps(standard_columns, indent=4))
     print()
     
-    # Check for missing required columns
+    # Check for missing strictly required columns
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Missing required standard columns: {missing_cols}")
+        
+    if "debit" not in df.columns and "credit" not in df.columns:
+        raise ValueError("Missing required standard columns: Must have at least 'debit' or 'credit' column.")
         
     # Do not modify in-place
     new_df = df.copy()
@@ -76,6 +77,12 @@ def create_standard_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         
     if "account_name" not in new_df.columns:
         new_df["account_name"] = None
+        
+    if "debit" not in new_df.columns:
+        new_df["debit"] = None
+        
+    if "credit" not in new_df.columns:
+        new_df["credit"] = None
         
     # Identify removed columns
     removed_cols = [col for col in new_df.columns if col not in standard_columns]

@@ -58,6 +58,11 @@ def persist_transactions(
     file_record = get_file_by_id(db, file_id)
     account_name = file_record.account_name if file_record else None
     account_number = file_record.account_number if file_record else None
+    
+    print("\n[ACCOUNT METADATA] Propagating metadata to transactions")
+    masked_acc = "********" + account_number[-4:] if account_number and len(account_number) > 4 else (account_number or "None")
+    print(f"[ACCOUNT METADATA] Account name: {account_name}")
+    print(f"[ACCOUNT METADATA] Account number: {masked_acc}")
     # Fetch available transaction modes
     available_modes = get_all_modes(db)
     
@@ -78,8 +83,8 @@ def persist_transactions(
         transaction = BankTransaction(
             file_id=file_id,
             case_id=case_id,
-            account_name=clean_val(row.get("account_name")) or account_name,
-            account_number=clean_val(row.get("account_number")) or account_number,
+            account_name=account_name,
+            account_number=account_number,
             transaction_date=clean_val(row.get("transaction_date")),
             description=description_val,
             cheque_number=clean_val(row.get("cheque_number")),

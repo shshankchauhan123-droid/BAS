@@ -24,9 +24,17 @@ import { useAuth } from "../../../context/AuthContext";
 function CaseList() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isClientAdmin =
+    String(user?.role || "").toLowerCase() === "client_admin";
+
+  const canViewCases =
+    user?.role === "superadmin" ||
+    isClientAdmin ||
+    user?.permissions?.can_view_cases !== false;
+
   const canCreateCase =
     user?.role === "superadmin" ||
-    user?.role === "client_admin" ||
+    isClientAdmin ||
     user?.permissions?.can_create_case !== false;
 
 
@@ -43,6 +51,10 @@ function CaseList() {
   // ============================================================
 
   const loadCases = useCallback(async () => {
+    if (!canViewCases) {
+      setIsLoading(false);
+      return;
+    }
     try {
       setIsLoading(true);
       setError("");
@@ -290,17 +302,36 @@ function CaseList() {
         ===================================================== */}
 
         <main className="flex-1">
-
-          <div
-            className="
-              mx-auto
-              max-w-[1700px]
-              px-5
-              py-12
-              sm:px-8
-              lg:px-10
-            "
-          >
+          {!canViewCases ? (
+            <div className="mx-auto max-w-xl px-5 py-24 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-400">
+                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h2 className="mt-5 text-xl font-bold text-white">Access Denied</h2>
+              <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+                You do not have permission to view investigation cases. Please contact your company administrator.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard")}
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-xs font-bold text-black hover:bg-emerald-400 transition"
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          ) : (
+            <div
+              className="
+                mx-auto
+                max-w-[1700px]
+                px-5
+                py-12
+                sm:px-8
+                lg:px-10
+              "
+            >
 
             {/* ==================================================
                 HEADER
@@ -376,65 +407,114 @@ function CaseList() {
 
               </div>
 
-              {/* CREATE BUTTON */}
+              {/* ACTIONS: VIEW CASE REPORT & CREATE CASE */}
+              <div className="flex flex-wrap items-center gap-3">
 
-              <button
-                type="button"
-                onClick={() =>
-                  setIsModalOpen(true)
-                }
-                className="
-                  inline-flex
-                  w-fit
-                  items-center
-                  justify-center
-                  gap-3
-                  rounded-xl
-                  bg-emerald-400
-                  px-6
-                  py-3.5
-                  text-sm
-                  font-semibold
-                  text-[#03100d]
-                  shadow-[0_10px_30px_rgba(52,211,153,0.08)]
-                  transition-all
-                  duration-200
-                  hover:bg-emerald-300
-                  hover:shadow-[0_12px_35px_rgba(52,211,153,0.14)]
-                  active:scale-[0.98]
-                  lg:px-7
-                "
-              >
-
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
+                {/* VIEW CASE REPORT BUTTON */}
+                <button
+                  type="button"
+                  onClick={() => navigate("/reports")}
+                  className="
+                    inline-flex
+                    w-fit
+                    items-center
+                    justify-center
+                    gap-2.5
+                    rounded-xl
+                    border
+                    border-emerald-400/40
+                    bg-[#051c16]
+                    px-5
+                    py-3.5
+                    text-xs
+                    font-bold
+                    uppercase
+                    tracking-[0.12em]
+                    text-emerald-300
+                    shadow-[0_4px_20px_rgba(0,0,0,0.25)]
+                    transition-all
+                    duration-200
+                    hover:border-emerald-400
+                    hover:bg-emerald-400/10
+                    hover:text-emerald-200
+                    active:scale-[0.98]
+                    cursor-pointer
+                  "
                 >
-                  <path
-                    d="M12 5v14"
-                    strokeLinecap="round"
-                  />
+                  <svg
+                    className="h-4 w-4 text-emerald-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  VIEW CASE REPORT
+                </button>
 
-                  <path
-                    d="M5 12h14"
-                    strokeLinecap="round"
-                  />
-                </svg>
-
-                CREATE NEW CASE
-
-              </button>
+                {/* CREATE BUTTON */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsModalOpen(true)
+                  }
+                  className="
+                    inline-flex
+                    w-fit
+                    items-center
+                    justify-center
+                    gap-3
+                    rounded-xl
+                    bg-emerald-400
+                    px-6
+                    py-3.5
+                    text-xs
+                    font-bold
+                    uppercase
+                    tracking-[0.12em]
+                    text-[#03100d]
+                    shadow-[0_10px_30px_rgba(52,211,153,0.08)]
+                    transition-all
+                    duration-200
+                    hover:bg-emerald-300
+                    hover:shadow-[0_12px_35px_rgba(52,211,153,0.14)]
+                    active:scale-[0.98]
+                    lg:px-7
+                  "
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      d="M12 5v14"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M5 12h14"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  CREATE NEW CASE
+                </button>
+              </div>
 
             </div>
 
             {/* ==================================================
-                CASE OVERVIEW
+                CASE OVERVIEW (Hidden for Client Admin to avoid duplicate KPIs)
             =================================================== */}
 
-            <section className="mt-10">
+            {!isClientAdmin && (
+              <section className="mt-10">
 
               {/* Section title */}
 
@@ -671,6 +751,7 @@ function CaseList() {
               </div>
 
             </section>
+            )}
 
             {/* ==================================================
                 CASE MANAGEMENT
@@ -1148,8 +1229,8 @@ function CaseList() {
             </section>
 
           </div>
-
-        </main>
+        )}
+      </main>
 
         {/* ====================================================
             FOOTER
@@ -1172,7 +1253,9 @@ function CaseList() {
         }}
         onSubmit={handleCreateCase}
         isSubmitting={isCreating}
+        isClientAdmin={isClientAdmin}
       />
+
 
     </div>
   );

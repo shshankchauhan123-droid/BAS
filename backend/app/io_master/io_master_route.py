@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -30,6 +30,7 @@ router = APIRouter(
 )
 def create_io_route(
     data: IOMasterCreateRequest,
+    user_id: int | None = Query(default=None, description="Target user ID (Client Admin / Superadmin only)"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -37,7 +38,13 @@ def create_io_route(
         return create_io_controller(
             db=db,
             data=data,
-            user_id=current_user.id,
+            actor=current_user,
+            target_user_id=user_id,
+        )
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
         )
     except ValueError as error:
         raise HTTPException(
@@ -52,13 +59,20 @@ def create_io_route(
     status_code=status.HTTP_200_OK,
 )
 def get_ios_route(
+    user_id: int | None = Query(default=None, description="Target user ID (Client Admin / Superadmin only)"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     try:
         return get_ios_controller(
             db=db,
-            user_id=current_user.id,
+            actor=current_user,
+            target_user_id=user_id,
+        )
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
         )
     except ValueError as error:
         raise HTTPException(
@@ -81,7 +95,12 @@ def get_io_route(
         return get_io_controller(
             db=db,
             io_id=io_id,
-            user_id=current_user.id,
+            actor=current_user,
+        )
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
         )
     except ValueError as error:
         raise HTTPException(
@@ -108,6 +127,11 @@ def update_io_route(
             data=data,
             user_id=current_user.id,
         )
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -129,6 +153,11 @@ def delete_io_route(
             db=db,
             io_id=io_id,
             user_id=current_user.id,
+        )
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
         )
     except ValueError as error:
         raise HTTPException(

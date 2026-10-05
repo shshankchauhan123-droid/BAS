@@ -23,46 +23,62 @@ class UserPermission(Base):
         nullable=False,
     )
 
+    # CASE
     can_view_cases: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        default=False,
+        default=True,
     )
 
     can_create_case: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        default=False,
+        default=True,
     )
 
-    can_update_case: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False,
-    )
-
+    # FILES
     can_upload_files: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        default=False,
-    )
-
-    can_process_files: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False,
-    )
-
-    can_update_files: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False,
+        default=True,
     )
 
     can_delete_files: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        default=False,
+        default=True,
+    )
+
+    # REPORTS
+    can_view_reports: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    # IO
+    can_view_io: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    can_create_io: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    can_update_io: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    can_delete_io: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(

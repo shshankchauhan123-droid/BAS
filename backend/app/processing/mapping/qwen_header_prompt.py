@@ -13,6 +13,13 @@ Rules:
 - source_header MUST exactly match the supplied header.
 - Do not change source_header spelling.
 - target_field MUST be one allowed field or null.
+- 'debit' should be used for withdrawals, debit amounts, or money out.
+- 'credit' should be used for deposits, credit amounts, or money in.
+- 'transaction_date' should be used for date, txn date, value date.
+- 'balance' should be used for account balance, available balance.
+- 'description' should be used for particulars, narration, transaction details, remarks.
+- 'mode' should be used for transaction mode, type.
+- 'cheque_number' should be used for cheque, chq, ref no, instrument no.
 - confidence MUST be a number between 0 and 1.
 - Return the COMPLETE JSON object.
 - Return JSON only.

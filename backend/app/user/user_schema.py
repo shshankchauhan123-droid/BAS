@@ -6,21 +6,25 @@ class UserPermissionsSchema(BaseModel):
 
     can_view_cases: bool = True
     can_create_case: bool = True
-    can_update_case: bool = True
     can_upload_files: bool = True
-    can_process_files: bool = True
-    can_update_files: bool = True
     can_delete_files: bool = True
+    can_view_reports: bool = True
+    can_view_io: bool = True
+    can_create_io: bool = True
+    can_update_io: bool = True
+    can_delete_io: bool = True
 
 
 class UserPermissionsUpdateRequest(BaseModel):
     can_view_cases: bool = True
     can_create_case: bool = True
-    can_update_case: bool = True
     can_upload_files: bool = True
-    can_process_files: bool = True
-    can_update_files: bool = True
     can_delete_files: bool = True
+    can_view_reports: bool = True
+    can_view_io: bool = True
+    can_create_io: bool = True
+    can_update_io: bool = True
+    can_delete_io: bool = True
 
 
 class UserCreateRequest(BaseModel):
@@ -69,6 +73,11 @@ class UserQuotaInfo(BaseModel):
     client_id: int | None = None
     client_name: str | None = None
     is_limit_reached: bool = False
+    total_licenses: int | None = None
+    inactive_users: int | None = 0
+    available_licenses: int | None = None
+    today_login_count: int | None = 0
+    total_users: int | None = 0
 
 
 class UserListResponse(BaseModel):

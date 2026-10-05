@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import math
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select
 
 from app.audit.audit_model import AuditLog
 
@@ -105,3 +105,21 @@ def get_audit_stats(
         "file_processing_failures": file_processing_failures,
         "user_management_activities": user_management_activities,
     }
+
+
+def count_distinct_logins_today_for_client(
+    db: Session,
+    client_id: int,
+) -> int:
+    """
+    Count the number of distinct users who successfully logged in today for a specific client.
+    """
+    statement = (
+        select(func.count(func.distinct(AuditLog.user_id)))
+        .where(
+            AuditLog.client_id == client_id,
+            AuditLog.action == "USER_LOGIN",
+            func.date(AuditLog.created_at) == func.current_date(),
+        )
+    )
+    return db.scalar(statement) or 0

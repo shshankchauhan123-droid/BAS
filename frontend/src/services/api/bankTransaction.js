@@ -46,6 +46,8 @@ export function searchCaseTransactions(
     hasChequeOnly = false,
     hasReferenceOnly = false,
     sourcePage = null,
+    sortBy = "",
+    sortOrder = "asc",
     page = 1,
     pageSize = 50,
   } = {}
@@ -81,7 +83,7 @@ export function searchCaseTransactions(
   }
 
   if (channel) {
-    params.append("channel", channel);
+    params.append("mode", channel);
   }
 
   if (dayType) {
@@ -112,6 +114,16 @@ export function searchCaseTransactions(
     params.append("has_cheque_only", "true");
   }
 
+  if (excludeKeyword && excludeKeyword.trim()) {
+    params.append("exclude_keyword", excludeKeyword.trim());
+  }
+ if (sortBy) {
+    params.append("sort_by", sortBy);
+  }
+
+  if (sortOrder) {
+    params.append("sort_order", sortOrder);
+  }
   if (hasReferenceOnly) {
     params.append("has_reference_only", "true");
   }
@@ -151,4 +163,80 @@ export function getCaseTransactionSummary(caseId, file_ids = null) {
       method: "GET",
     }
   );
+}
+
+export function getCaseModeWise(caseId, fileIds = []) {
+  const params = new URLSearchParams();
+  if (fileIds && fileIds.length > 0) {
+    params.append("file_ids", fileIds.join(","));
+  }
+  const url = params.toString() 
+    ? `/api/v1/bank-transactions/case/${caseId}/mode-wise?${params.toString()}`
+    : `/api/v1/bank-transactions/case/${caseId}/mode-wise`;
+    
+  return apiRequest(url, { method: "GET" });
+}
+
+export function getTransactionModes() {
+  return apiRequest(
+    `/api/v1/bank-transactions/transaction-modes`,
+    {
+      method: "GET",
+    }
+  );
+}
+export function getTransactionRelationships(caseId, filters = {}) {
+  const params = new URLSearchParams();
+  
+  if (filters.fileIds && filters.fileIds.length > 0) {
+    params.append('file_ids', filters.fileIds.join(','));
+  }
+  
+  if (filters.transactionMode && filters.transactionMode !== 'All') {
+    params.append('transaction_mode', filters.transactionMode);
+  }
+  
+  if (filters.minAmount) {
+    params.append('min_amount', filters.minAmount);
+  }
+  
+  if (filters.maxAmount) {
+    params.append('max_amount', filters.maxAmount);
+  }
+  
+  if (filters.transactionType && filters.transactionType !== 'All') {
+    params.append('transaction_type', filters.transactionType);
+  }
+  
+  const url = params.toString()
+    ? `/api/v1/bank-transactions/case/${caseId}/transaction-relationships?${params.toString()}`
+    : `/api/v1/bank-transactions/case/${caseId}/transaction-relationships`;
+    
+  return apiRequest(url, { method: "GET" });
+}
+
+export async function exportCaseTransactions(caseId, filterParams = {}) {
+  const params = new URLSearchParams();
+  
+  if (filterParams.file_ids) params.append("file_ids", filterParams.file_ids);
+  if (filterParams.search?.trim()) params.append("search", filterParams.search.trim());
+  if (filterParams.dateFrom) params.append("date_from", filterParams.dateFrom);
+  if (filterParams.dateTo) params.append("date_to", filterParams.dateTo);
+  if (filterParams.transactionType) params.append("transaction_type", filterParams.transactionType);
+  if (filterParams.minAmount !== "" && filterParams.minAmount !== null) params.append("min_amount", filterParams.minAmount);
+  if (filterParams.maxAmount !== "" && filterParams.maxAmount !== null) params.append("max_amount", filterParams.maxAmount);
+  if (filterParams.channel) params.append("mode", filterParams.channel);
+  if (filterParams.minBalance !== "" && filterParams.minBalance !== null) params.append("min_balance", filterParams.minBalance);
+  if (filterParams.maxBalance !== "" && filterParams.maxBalance !== null) params.append("max_balance", filterParams.maxBalance);
+  if (filterParams.hasChequeOnly) params.append("has_cheque_only", filterParams.hasChequeOnly);
+  if (filterParams.excludeKeyword?.trim()) params.append("exclude_keyword", filterParams.excludeKeyword.trim());
+  if (filterParams.sortBy) params.append("sort_by", filterParams.sortBy);
+  if (filterParams.sortOrder) params.append("sort_order", filterParams.sortOrder);
+
+  const blob = await apiRequest(`/api/v1/bank-transactions/case/${caseId}/export?${params.toString()}`, {
+    method: "GET",
+    responseType: 'blob'
+  });
+  
+  return blob;
 }

@@ -26,8 +26,7 @@ export default function FirstLoginModal() {
       updateUser({ first_login: false });
     } catch (err) {
       console.error("Failed to dismiss first login:", err);
-      // Even if API fails, allow them to proceed or show warning
-      updateUser({ first_login: false });
+      setError(err?.message || "Failed to dismiss first login prompt. Please try again.");
     } finally {
       setIsLoading(false);
     }

@@ -13,15 +13,20 @@ from app.io_master.io_master_service import (
 )
 
 
+from app.user.user_model import User
+
+
 def create_io_controller(
     db: Session,
     data: IOMasterCreateRequest,
-    user_id: int,
+    actor: User,
+    target_user_id: int | None = None,
 ):
     io = create_io_service(
         db=db,
         data=data,
-        user_id=user_id,
+        actor=actor,
+        target_user_id=target_user_id,
     )
 
     return {
@@ -33,11 +38,13 @@ def create_io_controller(
 
 def get_ios_controller(
     db: Session,
-    user_id: int,
+    actor: User,
+    target_user_id: int | None = None,
 ):
     ios = get_ios_service(
         db=db,
-        user_id=user_id,
+        actor=actor,
+        target_user_id=target_user_id,
     )
 
     return {
@@ -51,12 +58,12 @@ def get_ios_controller(
 def get_io_controller(
     db: Session,
     io_id: int,
-    user_id: int,
+    actor: User,
 ):
     io = get_io_service(
         db=db,
         io_id=io_id,
-        user_id=user_id,
+        actor=actor,
     )
 
     return {
