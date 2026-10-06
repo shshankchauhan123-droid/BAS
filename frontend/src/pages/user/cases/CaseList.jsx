@@ -1197,6 +1197,7 @@ function CaseList() {
                   <CaseTable
                     cases={filteredCases}
                     onOpen={handleOpenCase}
+                    isClientAdmin={isClientAdmin}
                   />
 
                 ) : (
@@ -1216,6 +1217,7 @@ function CaseList() {
                           key={caseData.id}
                           caseData={caseData}
                           onOpen={handleOpenCase}
+                          isClientAdmin={isClientAdmin}
                         />
                       )
                     )}

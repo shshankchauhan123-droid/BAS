@@ -454,6 +454,14 @@ def get_transaction_relationships_route(
         default=None,
         description="Debit or Credit filter"
     ),
+    start_date: str | None = Query(
+        default=None,
+        description="Start date filter (YYYY-MM-DD)"
+    ),
+    end_date: str | None = Query(
+        default=None,
+        description="End date filter (YYYY-MM-DD)"
+    ),
     user = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -493,7 +501,9 @@ def get_transaction_relationships_route(
         transaction_mode=transaction_mode,
         min_amount=min_amount,
         max_amount=max_amount,
-        transaction_type=transaction_type
+        transaction_type=transaction_type,
+        start_date=start_date,
+        end_date=end_date
     )
 
     return TransactionRelationshipResponse(

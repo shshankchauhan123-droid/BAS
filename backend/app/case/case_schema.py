@@ -48,6 +48,13 @@ class CaseUpdateRequest(BaseModel):
     assigned_to: Optional[int] = None
 
 
+class CaseCreatorData(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    username: str
+    email: str
+    role: str
+
 class CaseData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -60,6 +67,7 @@ class CaseData(BaseModel):
     assigned_to: Optional[int] = None
     io_id: Optional[int] = None
     io: Optional[IOMasterData] = None
+    creator: Optional[CaseCreatorData] = None
     created_at: datetime
     updated_at: datetime
 

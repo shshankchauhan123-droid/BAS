@@ -688,29 +688,7 @@ function CreateCaseModal({
                       ))}
                     </select>
 
-                    {/* Selected IO Summary & Designation Badge */}
-                    {selectedIO ? (
-                      <div className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/[0.06] p-3.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                            Officer Assigned to Case
-                          </span>
-                          <span className="rounded-lg border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
-                            {selectedIO.designation}
-                          </span>
-                        </div>
-                        <p className="mt-1.5 text-sm font-semibold text-white">
-                          {selectedIO.officer_name}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-400">
-                          Station / Branch: <span className="text-slate-200">{selectedIO.police_station}</span>
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-[10px] text-slate-500">
-                        Select an IO from the list above, or click "+ Add New IO" to register a different officer.
-                      </p>
-                    )}
+
                   </>
                 )}
               </div>

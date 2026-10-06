@@ -283,7 +283,10 @@ def detect_header_row(df: pd.DataFrame) -> dict:
         "withdrawal", 
         "credit", 
         "deposit", 
-        "balance"
+        "balance",
+        "dr",
+        "cr",
+        "bal"
     ]
     
     # We only check up to the first 50 rows to find the header
@@ -302,11 +305,18 @@ def detect_header_row(df: pd.DataFrame) -> dict:
     col_matched_columns = []
     for col in df.columns:
         val_str = str(col).lower().replace('\n', ' ').strip()
+        val_words = val_str.split()
         for keyword in expected_keywords:
-            if keyword in val_str:
-                col_match_count += 1
-                col_matched_columns.append(str(col).strip())
-                break
+            if keyword in ["dr", "cr", "bal"]:
+                if keyword in val_words:
+                    col_match_count += 1
+                    col_matched_columns.append(str(col).strip())
+                    break
+            else:
+                if keyword in val_str:
+                    col_match_count += 1
+                    col_matched_columns.append(str(col).strip())
+                    break
                 
     if col_match_count >= 3:
         best_match_count = col_match_count
@@ -325,13 +335,20 @@ def detect_header_row(df: pd.DataFrame) -> dict:
                 continue
                 
             val_str = str(val).lower().replace('\n', ' ').strip()
+            val_words = val_str.split()
             
             # Check if this cell matches any of our expected concepts
             for keyword in expected_keywords:
-                if keyword in val_str:
-                    match_count += 1
-                    matched_columns.append(str(val).strip())
-                    break
+                if keyword in ["dr", "cr", "bal"]:
+                    if keyword in val_words:
+                        match_count += 1
+                        matched_columns.append(str(val).strip())
+                        break
+                else:
+                    if keyword in val_str:
+                        match_count += 1
+                        matched_columns.append(str(val).strip())
+                        break
         
         if match_count > best_match_count:
             best_match_count = match_count

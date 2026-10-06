@@ -196,7 +196,8 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
         
         import pandas as pd
         if file_extension == ".csv":
-            raw_df = pd.read_csv(file_record.file_path)
+            from app.processing.csv.csv_reader import load_csv_dataframe
+            raw_df = load_csv_dataframe(file_record.file_path)
         else:
             raw_df = pd.read_excel(file_record.file_path)
             

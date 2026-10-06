@@ -1,4 +1,4 @@
-function CaseCard({ caseData, onOpen }) {
+function CaseCard({ caseData, onOpen, isClientAdmin }) {
   // ------------------------------------------------------------
   // Status
   // ------------------------------------------------------------
@@ -225,6 +225,17 @@ function CaseCard({ caseData, onOpen }) {
             #{caseData?.id ?? "-"}
           </p>
         </div>
+
+        {isClientAdmin && caseData?.creator && (
+          <div className="col-span-2 pt-2 border-t border-white/[0.04]">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-indigo-400/80">
+              Created By
+            </p>
+            <p className="mt-1 text-xs font-medium text-slate-200 truncate">
+              {caseData.creator.username} <span className="text-slate-400 uppercase text-[10px]">({caseData.creator.role})</span>
+            </p>
+          </div>
+        )}
 
         {caseData?.io && (
           <div className="col-span-2 pt-2 border-t border-white/[0.04]">

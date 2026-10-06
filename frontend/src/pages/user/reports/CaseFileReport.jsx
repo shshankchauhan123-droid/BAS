@@ -1755,6 +1755,7 @@ function CaseFileReport() {
 
                 {/* Advanced Filters Drawer Toggle */}
                 <div className="lg:col-span-2 flex items-center justify-end">
+                  {/*
                   <button
                     type="button"
                     onClick={() => setShowAdvancedFilters((prev) => !prev)}
@@ -1780,6 +1781,7 @@ function CaseFileReport() {
                       </span>
                     )}
                   </button>
+                  */}
                 </div>
               </div>
 

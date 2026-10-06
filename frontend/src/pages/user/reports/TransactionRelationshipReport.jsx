@@ -40,6 +40,8 @@ export default function TransactionRelationshipReport() {
     minAmount: "",
     maxAmount: "",
     transactionType: "All",
+    startDate: "",
+    endDate: "",
   });
 
   const [graphData, setGraphData] = useState({
@@ -306,7 +308,7 @@ export default function TransactionRelationshipReport() {
 
         <div className="bg-[#061411] border border-white/[0.08] rounded-2xl p-6 mb-8 shadow-2xl">
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
 
             {/* CASE SELECTION */}
 
@@ -436,6 +438,37 @@ export default function TransactionRelationshipReport() {
                 </option>
               </select>
             </div>
+
+            {/* START DATE */}
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, startDate: e.target.value }))
+                }
+                className="w-full bg-[#020b09] border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-400 outline-none"
+              />
+            </div>
+
+            {/* END DATE */}
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, endDate: e.target.value }))
+                }
+                className="w-full bg-[#020b09] border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-400 outline-none"
+              />
+            </div>
+
           </div>
 
           {/* FILE SELECTION */}
@@ -443,9 +476,27 @@ export default function TransactionRelationshipReport() {
           {activeCaseId && (
             <div className="mt-6 pt-6 border-t border-white/[0.06]">
 
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                Select Statements for Relationship Analysis (Min. 1)
-              </label>
+              <div className="mb-3 flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Select Statements for Relationship Analysis (Min. 1)
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFileIds(files.map(f => f.id))}
+                    className="rounded bg-[#020b09] border border-white/[0.1] px-3 py-1.5 text-[10px] font-semibold text-emerald-400 transition hover:bg-emerald-400/10 hover:border-emerald-400/30"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFileIds([])}
+                    className="rounded bg-[#020b09] border border-white/[0.1] px-3 py-1.5 text-[10px] font-semibold text-rose-400 transition hover:bg-rose-400/10 hover:border-rose-400/30"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
 
               <div className="flex flex-wrap gap-3">
 

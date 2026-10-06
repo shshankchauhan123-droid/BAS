@@ -207,6 +207,14 @@ export function getTransactionRelationships(caseId, filters = {}) {
   if (filters.transactionType && filters.transactionType !== 'All') {
     params.append('transaction_type', filters.transactionType);
   }
+
+  if (filters.startDate) {
+    params.append('start_date', filters.startDate);
+  }
+
+  if (filters.endDate) {
+    params.append('end_date', filters.endDate);
+  }
   
   const url = params.toString()
     ? `/api/v1/bank-transactions/case/${caseId}/transaction-relationships?${params.toString()}`

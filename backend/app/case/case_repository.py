@@ -21,7 +21,7 @@ def get_all_cases(
 ) -> list[Case]:
     return (
         db.query(Case)
-        .options(joinedload(Case.io))
+        .options(joinedload(Case.io), joinedload(Case.creator))
         .order_by(Case.created_at.desc())
         .all()
     )
@@ -33,7 +33,7 @@ def get_cases_by_user(
 ) -> list[Case]:
     return (
         db.query(Case)
-        .options(joinedload(Case.io))
+        .options(joinedload(Case.io), joinedload(Case.creator))
         .filter(
             or_(
                 Case.created_by == user_id,
@@ -51,7 +51,7 @@ def get_case_by_id(
 ) -> Optional[Case]:
     return (
         db.query(Case)
-        .options(joinedload(Case.io))
+        .options(joinedload(Case.io), joinedload(Case.creator))
         .filter(Case.id == case_id)
         .first()
     )
@@ -64,7 +64,7 @@ def get_case_by_id_and_user(
 ) -> Optional[Case]:
     return (
         db.query(Case)
-        .options(joinedload(Case.io))
+        .options(joinedload(Case.io), joinedload(Case.creator))
         .filter(
             Case.id == case_id,
             or_(

@@ -1,6 +1,6 @@
 import React from "react";
 
-function CaseTable({ cases = [], onOpen }) {
+function CaseTable({ cases = [], onOpen, isClientAdmin }) {
   // ------------------------------------------------------------
   // Safe cases
   // ------------------------------------------------------------
@@ -208,6 +208,25 @@ function CaseTable({ cases = [], onOpen }) {
                 Case Name
               </th>
 
+              {/* Created By (Client Admin Only) */}
+              {isClientAdmin && (
+                <th
+                  className="
+                    whitespace-nowrap
+                    px-6
+                    py-5
+                    text-left
+                    text-[10px]
+                    font-semibold
+                    uppercase
+                    tracking-[0.18em]
+                    text-slate-500
+                  "
+                >
+                  Created By
+                </th>
+              )}
+
               {/* Investigating Officer */}
 
               <th
@@ -392,6 +411,34 @@ function CaseTable({ cases = [], onOpen }) {
                     )}
 
                   </td>
+
+                  {/* ==================================================
+                      CREATED BY (Client Admin Only)
+                  =================================================== */}
+
+                  {isClientAdmin && (
+                    <td className="whitespace-nowrap px-6 py-6">
+                      {caseData.creator ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-400/10 text-[10px] font-bold text-indigo-400">
+                            {caseData.creator.username?.charAt(0)?.toUpperCase() || "U"}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-200">
+                              {caseData.creator.username}
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-slate-500 uppercase tracking-wider">
+                              {caseData.creator.role || "User"}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-600 italic">
+                          Unknown User
+                        </span>
+                      )}
+                    </td>
+                  )}
 
                   {/* ==================================================
                       INVESTIGATING OFFICER

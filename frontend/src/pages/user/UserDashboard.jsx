@@ -746,7 +746,7 @@ function UserDashboard() {
                 )}
 
                 {/* Analysis */}
-                <QuickAction
+                {/* <QuickAction
                   title="Transaction Analysis"
                   description="Analyze transactions and financial movements"
                   color="violet"
@@ -789,7 +789,7 @@ function UserDashboard() {
                       />
                     </svg>
                   }
-                />
+                /> */}
 
                 {/* Reports */}
                 {canViewReports && (

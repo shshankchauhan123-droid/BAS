@@ -664,6 +664,8 @@ def get_transaction_relationships(
     min_amount: Decimal | None = None,
     max_amount: Decimal | None = None,
     transaction_type: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ):
     from app.files.file_model import File
     
@@ -707,7 +709,13 @@ def get_transaction_relationships(
             query = query.filter(BankTransaction.debit.isnot(None), BankTransaction.debit > 0)
         elif ttype == "credit":
             query = query.filter(BankTransaction.credit.isnot(None), BankTransaction.credit > 0)
-            
+
+    if start_date:
+        query = query.filter(BankTransaction.transaction_date >= start_date)
+
+    if end_date:
+        query = query.filter(BankTransaction.transaction_date <= end_date)
+
     transactions = query.all()
     
     edges_map = {}
