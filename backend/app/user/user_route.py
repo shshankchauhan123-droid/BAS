@@ -168,3 +168,57 @@ def update_user_permissions_route(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         )
+from app.user.user_schema import UserUpdateRequest
+from app.user.user_controller import update_user_controller, delete_user_controller
+
+@router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update user details (username, email, password)",
+)
+def update_user_route(
+    user_id: int,
+    data: UserUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles([SUPERADMIN_ROLE, CLIENT_ADMIN_ROLE])
+    ),
+):
+    try:
+        return update_user_controller(
+            db=db,
+            actor=current_user,
+            user_id=user_id,
+            data=data,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        )
+
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a user",
+)
+def delete_user_route(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles([SUPERADMIN_ROLE, CLIENT_ADMIN_ROLE])
+    ),
+):
+    try:
+        delete_user_controller(
+            db=db,
+            actor=current_user,
+            user_id=user_id,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        )
+

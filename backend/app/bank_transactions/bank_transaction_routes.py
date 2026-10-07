@@ -454,17 +454,20 @@ def get_transaction_relationships_route(
         default=None,
         description="Debit or Credit filter"
     ),
-    start_date: str | None = Query(
+    start_date: date | None = Query(
         default=None,
         description="Start date filter (YYYY-MM-DD)"
     ),
-    end_date: str | None = Query(
+    end_date: date | None = Query(
         default=None,
         description="End date filter (YYYY-MM-DD)"
     ),
     user = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(status_code=400, detail="start_date cannot be greater than end_date")
+
     try:
         parsed_file_ids = [int(f.strip()) for f in file_ids.split(",") if f.strip()]
     except ValueError:

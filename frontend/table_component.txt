@@ -1,0 +1,73 @@
+﻿          {selectedMode && (
+            <div id="transactions-grid" className="mt-8 bg-[#020b09] border border-emerald-500/20 rounded-xl p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-emerald-400">
+                  Transactions for Mode: {selectedMode}
+                </h2>
+                <span className="text-sm text-slate-400 bg-white/5 px-3 py-1 rounded-full">
+                  Total: {transactionTotal}
+                </span>
+              </div>
+              
+              {isTransactionsLoading ? (
+                <div className="p-8 text-center text-emerald-400/70 animate-pulse">
+                  Loading transactions...
+                </div>
+              ) : transactions.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  No transactions found for this mode.
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left text-sm text-slate-300">
+                      <thead className="text-xs text-slate-400 bg-[#03120f] uppercase">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">Date</th>
+                          <th className="px-4 py-3 font-medium">Description</th>
+                          <th className="px-4 py-3 font-medium">Chq No.</th>
+                          <th className="px-4 py-3 font-medium text-right">Debit</th>
+                          <th className="px-4 py-3 font-medium text-right">Credit</th>
+                          <th className="px-4 py-3 font-medium text-right">Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-emerald-500/10">
+                        {transactions.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="px-4 py-3 whitespace-nowrap">{tx.transaction_date}</td>
+                            <td className="px-4 py-3 max-w-[300px] truncate" title={tx.description}>{tx.description}</td>
+                            <td className="px-4 py-3">{tx.cheque_number || '-'}</td>
+                            <td className="px-4 py-3 text-right text-rose-400">{tx.debit ? Number(tx.debit).toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
+                            <td className="px-4 py-3 text-right text-emerald-400">{tx.credit ? Number(tx.credit).toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
+                            <td className="px-4 py-3 text-right font-medium">{tx.balance ? Number(tx.balance).toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {transactionTotalPages > 1 && (
+                    <div className="mt-4 flex justify-between items-center border-t border-emerald-500/10 pt-4">
+                      <button
+                        disabled={transactionPage === 1}
+                        onClick={() => setTransactionPage(p => Math.max(1, p - 1))}
+                        className="px-3 py-1.5 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-xs text-slate-400">
+                        Page {transactionPage} of {transactionTotalPages}
+                      </span>
+                      <button
+                        disabled={transactionPage === transactionTotalPages}
+                        onClick={() => setTransactionPage(p => Math.min(transactionTotalPages, p + 1))}
+                        className="px-3 py-1.5 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}

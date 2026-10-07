@@ -1564,16 +1564,22 @@ useEffect(() => {
   if (transactionPage <= 1) {
     return;
   }
-
-  loadFilteredTransactions(transactionPage - 1);
+  if (selectedTransactionFileId) {
+    loadTransactions(selectedTransactionFileId, transactionPage - 1);
+  } else {
+    loadFilteredTransactions(transactionPage - 1);
+  }
 }
 
 function goToNextTransactionPage() {
   if (transactionPage >= transactionTotalPages) {
     return;
   }
-
-  loadFilteredTransactions(transactionPage + 1);
+  if (selectedTransactionFileId) {
+    loadTransactions(selectedTransactionFileId, transactionPage + 1);
+  } else {
+    loadFilteredTransactions(transactionPage + 1);
+  }
 }
   // ============================================================
   // CASE STATUS

@@ -219,3 +219,16 @@ def update_user_status(
     db.flush()
 
     return user
+def update_user_details(db: Session, user: User, username: str | None = None, email: str | None = None, password_hash: str | None = None) -> User:
+    if username is not None:
+        user.username = username
+    if email is not None:
+        user.email = email
+    if password_hash is not None:
+        user.hashed_password = password_hash
+    db.flush()
+    return user
+
+def delete_user(db: Session, user: User) -> None:
+    db.delete(user)
+    db.flush()

@@ -4,7 +4,7 @@ import BASNavbar from "../../../components/layout/UserNavbar";
 import DynamicModeWiseChart from "../../../components/dynamicReport/DynamicModeWiseChart";
 import { getCases } from "../../../services/api/case";
 import { getCaseFiles } from "../../../services/api/file";
-import { getCaseModeWise } from "../../../services/api/bankTransaction";
+import { getCaseModeWise, searchCaseTransactions } from "../../../services/api/bankTransaction";
 
 export default function DynamicReportDashboard() {
   const navigate = useNavigate();
@@ -27,6 +27,14 @@ export default function DynamicReportDashboard() {
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [isLoadingModeWise, setIsLoadingModeWise] = useState(false);
   const [error, setError] = useState("");
+
+  const [selectedMode, setSelectedMode] = useState("");
+  const [transactions, setTransactions] = useState([]);
+  const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
+  const [transactionPage, setTransactionPage] = useState(1);
+  const [transactionTotalPages, setTransactionTotalPages] = useState(0);
+  const [transactionTotal, setTransactionTotal] = useState(0);
+
 
   // 1. Fetch Cases on mount
   useEffect(() => {
@@ -122,6 +130,48 @@ export default function DynamicReportDashboard() {
     fetchModeWise();
     
   }, [selectedCaseId, selectedFileIds]);
+
+  
+  useEffect(() => {
+    if (!selectedMode || selectedFileIds.size === 0) {
+      setTransactions([]);
+      return;
+    }
+    
+    async function loadTransactions() {
+      setIsTransactionsLoading(true);
+      try {
+        const fileIdsArray = Array.from(selectedFileIds);
+        const res = await searchCaseTransactions(selectedCaseId, {
+           file_ids: fileIdsArray.join(","),
+           channel: selectedMode,
+           page: transactionPage,
+           pageSize: 20
+        });
+        if (res?.data) {
+           setTransactions(res.data);
+           setTransactionTotalPages(Number(res.total_pages) || 0);
+           setTransactionTotal(Number(res.total) || 0);
+        } else {
+           setTransactions([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch mode transactions:", err);
+      } finally {
+        setIsTransactionsLoading(false);
+      }
+    }
+    loadTransactions();
+  }, [selectedMode, selectedFileIds, selectedCaseId, transactionPage]);
+
+  const handleBarClick = (mode) => {
+    setSelectedMode(mode);
+    setTransactionPage(1);
+    // Scroll down to table
+    setTimeout(() => {
+      document.getElementById('transactions-grid')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
 
   const handleFileToggle = (fileId) => {
     setSelectedFileIds(prev => {
@@ -238,15 +288,7 @@ export default function DynamicReportDashboard() {
           </div>
         </div>
 
-        {/* KPI Cards */}
-        {modeData.length > 0 && !isLoadingModeWise && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-[#020b09]/80 border border-emerald-500/20 rounded-xl p-4 flex flex-col items-center justify-center">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Total Transactions</div>
-              <div className="text-2xl font-mono text-white">{totalTransactions.toLocaleString()}</div>
-            </div>
-          </div>
-        )}
+        
 
         {/* Chart Section */}
         <div className="mt-4">
@@ -268,7 +310,85 @@ export default function DynamicReportDashboard() {
             <DynamicModeWiseChart 
               data={modeData}
               isLoading={isLoadingModeWise}
+              totalTransactions={totalTransactions}
+              onBarClick={handleBarClick}
             />
+          )}
+
+          {selectedMode && (
+            <div id="transactions-grid" className="mt-8 bg-[#020b09] border border-emerald-500/20 rounded-xl p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-emerald-400">
+                  Transactions for Mode: {selectedMode}
+                </h2>
+                <span className="text-sm text-slate-400 bg-white/5 px-3 py-1 rounded-full">
+                  Total: {transactionTotal}
+                </span>
+              </div>
+              
+              {isTransactionsLoading ? (
+                <div className="p-8 text-center text-emerald-400/70 animate-pulse">
+                  Loading transactions...
+                </div>
+              ) : transactions.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  No transactions found for this mode.
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left text-sm text-slate-300">
+                      <thead className="text-xs text-slate-400 bg-[#03120f] uppercase">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">Date</th>
+                          <th className="px-4 py-3 font-medium">Account Name</th>
+                          <th className="px-4 py-3 font-medium">Account Number</th>
+                          <th className="px-4 py-3 font-medium">Description</th>
+                          <th className="px-4 py-3 font-medium text-right">Debit</th>
+                          <th className="px-4 py-3 font-medium text-right">Credit</th>
+                          <th className="px-4 py-3 font-medium text-right">Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-emerald-500/10">
+                        {transactions.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="px-4 py-3 whitespace-nowrap">{tx.transaction_date}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{tx.account_name || '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{tx.account_number || '-'}</td>
+                            <td className="px-4 py-3 max-w-[300px] truncate" title={tx.description}>{tx.description}</td>
+                            <td className="px-4 py-3 text-right text-rose-400">{tx.debit ? Number(tx.debit).toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
+                            <td className="px-4 py-3 text-right text-emerald-400">{tx.credit ? Number(tx.credit).toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
+                            <td className="px-4 py-3 text-right font-medium">{tx.balance ? Number(tx.balance).toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {transactionTotalPages > 1 && (
+                    <div className="mt-4 flex justify-between items-center border-t border-emerald-500/10 pt-4">
+                      <button
+                        disabled={transactionPage === 1}
+                        onClick={() => setTransactionPage(p => Math.max(1, p - 1))}
+                        className="px-3 py-1.5 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-xs text-slate-400">
+                        Page {transactionPage} of {transactionTotalPages}
+                      </span>
+                      <button
+                        disabled={transactionPage === transactionTotalPages}
+                        onClick={() => setTransactionPage(p => Math.min(transactionTotalPages, p + 1))}
+                        className="px-3 py-1.5 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
           
           {error && (

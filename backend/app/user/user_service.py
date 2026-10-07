@@ -361,3 +361,63 @@ def update_user_permissions_by_actor(
     )
 
     return target_user
+from app.user.user_repository import update_user_details, delete_user
+from app.user.user_schema import UserUpdateRequest
+
+def update_user_by_actor(db: Session, actor: User, user_id: int, data: UserUpdateRequest) -> User:
+    user = get_user_by_id(db, user_id)
+    if not user:
+        raise ValueError("User not found")
+        
+    actor_role = str(actor.role).lower()
+    if actor_role == CLIENT_ADMIN_ROLE and user.client_id != actor.client_id:
+        raise ValueError("Unauthorized to update this user")
+        
+    pwd_hash = hash_password(data.password) if data.password else None
+    
+    user = update_user_details(
+        db=db,
+        user=user,
+        username=data.username,
+        email=data.email,
+        password_hash=pwd_hash
+    )
+    db.commit()
+    
+    # Audit log
+    record_audit_log(
+        db=db,
+        actor_id=actor.id,
+        action="UPDATE_USER",
+        target_resource_type="USER",
+        target_resource_id=user.id,
+        details={"username": user.username}
+    )
+    
+    return user
+
+def delete_user_by_actor(db: Session, actor: User, user_id: int) -> None:
+    user = get_user_by_id(db, user_id)
+    if not user:
+        raise ValueError("User not found")
+        
+    actor_role = str(actor.role).lower()
+    if actor_role == CLIENT_ADMIN_ROLE and user.client_id != actor.client_id:
+        raise ValueError("Unauthorized to delete this user")
+        
+    if actor.id == user.id:
+        raise ValueError("Cannot delete yourself")
+        
+    delete_user(db, user)
+    db.commit()
+    
+    # Audit log
+    record_audit_log(
+        db=db,
+        actor_id=actor.id,
+        action="DELETE_USER",
+        target_resource_type="USER",
+        target_resource_id=user.id,
+        details={"username": user.username}
+    )
+

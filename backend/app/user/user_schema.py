@@ -45,6 +45,10 @@ class UserCreateRequest(BaseModel):
     permissions: UserPermissionsSchema | None = None
 
 
+class UserUpdateRequest(BaseModel):
+    username: str | None = Field(default=None, min_length=3, max_length=100)
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=6, max_length=128)
 class UserUpdateStatusRequest(BaseModel):
     is_active: bool
 

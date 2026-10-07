@@ -664,8 +664,8 @@ def get_transaction_relationships(
     min_amount: Decimal | None = None,
     max_amount: Decimal | None = None,
     transaction_type: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ):
     from app.files.file_model import File
     

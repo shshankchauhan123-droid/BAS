@@ -1,0 +1,37 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div id="main" style="width: 600px;height:400px;"></div>
+    <div id="output" style="font-size: 24px; color: red;"></div>
+    <script>
+        var chart = echarts.init(document.getElementById('main'));
+        var option = {
+            xAxis: {
+                type: 'category',
+                data: ['UPI', 'CHEQUE', 'POS']
+            },
+            yAxis: {
+                type: 'value'
+            },
+            series: [{
+                data: [5000, 1, 3000],
+                type: 'bar',
+                barWidth: '40%'
+            }]
+        };
+        chart.setOption(option);
+
+        chart.getZr().on('click', function(params) {
+            const pointInPixel = [params.offsetX, params.offsetY];
+            if (chart.containPixel('grid', pointInPixel)) {
+                const xIndex = chart.convertFromPixel({ seriesIndex: 0 }, pointInPixel)[0];
+                const mode = option.xAxis.data[xIndex];
+                document.getElementById('output').innerText = 'Clicked: ' + mode;
+            }
+        });
+    </script>
+</body>
+</html>

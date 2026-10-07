@@ -1,0 +1,48 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div id="main" style="width: 600px;height:400px;"></div>
+    <div id="output" style="font-size: 24px; color: red;"></div>
+    <script>
+        var chart = echarts.init(document.getElementById('main'));
+        var dataCounts = [5000, 1, 3000];
+        var maxTx = Math.max(...dataCounts);
+        var option = {
+            tooltip: { trigger: 'axis' },
+            xAxis: {
+                type: 'category',
+                data: ['UPI', 'CHEQUE', 'POS']
+            },
+            yAxis: {
+                type: 'value'
+            },
+            series: [
+                {
+                    name: 'Transactions',
+                    data: dataCounts,
+                    type: 'bar',
+                    barWidth: '40%'
+                },
+                {
+                    name: 'HitArea',
+                    data: dataCounts.map(() => maxTx),
+                    type: 'bar',
+                    barWidth: '80%',
+                    barGap: '-100%',
+                    itemStyle: { color: 'rgba(255, 0, 0, 0.5)' }, // visible for testing
+                    tooltip: { show: false },
+                    z: 10
+                }
+            ]
+        };
+        chart.setOption(option);
+
+        chart.on('click', function(params) {
+            document.getElementById('output').innerText = 'Clicked: ' + params.name;
+        });
+    </script>
+</body>
+</html>

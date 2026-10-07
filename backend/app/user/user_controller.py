@@ -123,3 +123,31 @@ def update_user_permissions_controller(
         data=data,
     )
     return _format_user_response(user)
+from app.user.user_schema import UserUpdateRequest
+from app.user.user_service import update_user_by_actor, delete_user_by_actor
+
+def update_user_controller(
+    db: Session,
+    actor: User,
+    user_id: int,
+    data: UserUpdateRequest,
+) -> UserResponse:
+    user = update_user_by_actor(
+        db=db,
+        actor=actor,
+        user_id=user_id,
+        data=data,
+    )
+    return _format_user_response(user)
+    
+def delete_user_controller(
+    db: Session,
+    actor: User,
+    user_id: int,
+) -> None:
+    delete_user_by_actor(
+        db=db,
+        actor=actor,
+        user_id=user_id,
+    )
+

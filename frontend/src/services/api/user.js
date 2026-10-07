@@ -56,3 +56,21 @@ export function updateUserPermissions(userId, permissions) {
     body: JSON.stringify(permissions),
   });
 }
+/**
+ * Delete a user.
+ */
+export function deleteUser(userId) {
+  return apiRequest("/api/v1/users/" + userId, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Update user basic details (username, email, password).
+ */
+export function updateUserDetails(userId, data) {
+  return apiRequest("/api/v1/users/" + userId, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}

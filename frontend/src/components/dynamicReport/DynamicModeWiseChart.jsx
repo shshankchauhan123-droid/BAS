@@ -10,7 +10,7 @@ function formatCurrency(amount) {
   }).format(amount);
 }
 
-export default function DynamicModeWiseChart({ data, isLoading }) {
+export default function DynamicModeWiseChart({ data, isLoading, totalTransactions, onBarClick }) {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
@@ -19,6 +19,7 @@ export default function DynamicModeWiseChart({ data, isLoading }) {
 
     const modes = data.map((d) => d.mode);
     const txCounts = data.map((d) => d.transaction_count);
+    const maxTx = Math.max(...txCounts, 1);
 
     return {
       backgroundColor: "transparent",
@@ -110,7 +111,22 @@ export default function DynamicModeWiseChart({ data, isLoading }) {
               color: "#34d399",
             },
           },
+          z: 2
         },
+        {
+          name: "HitArea",
+          type: "bar",
+          data: txCounts.map(() => maxTx),
+          barWidth: "80%",
+          barGap: "-125%",
+          itemStyle: {
+            color: "transparent",
+          },
+          tooltip: {
+            show: false,
+          },
+          z: 10
+        }
       ],
     };
   }, [data]);
@@ -127,6 +143,14 @@ export default function DynamicModeWiseChart({ data, isLoading }) {
     } else {
       chartInstance.current.clear();
     }
+    
+    // Add click event listener
+    chartInstance.current.off('click');
+    chartInstance.current.on('click', function (params) {
+      if (params.componentType === 'series' && params.seriesType === 'bar' && onBarClick) {
+        onBarClick(params.name); // params.name is the mode name
+      }
+    });
 
     const handleResize = () => {
       chartInstance.current?.resize();
@@ -168,11 +192,19 @@ export default function DynamicModeWiseChart({ data, isLoading }) {
         </div>
       )}
 
-      {/* Chart Container */}
+            {/* Chart Container */}
       <div
         ref={chartRef}
         style={{ width: "100%", height: "450px", opacity: isLoading ? 0.3 : 1 }}
       />
+      
+      {/* Total Transactions Top Right overlay */}
+      {!isLoading && totalTransactions > 0 && (
+        <div className="absolute top-4 right-6 pointer-events-none text-right">
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Total Transactions</div>
+          <div className="text-3xl font-mono text-emerald-400">{totalTransactions.toLocaleString()}</div>
+        </div>
+      )}
     </div>
   );
 }
