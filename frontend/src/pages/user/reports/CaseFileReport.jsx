@@ -2893,6 +2893,7 @@ function CaseFileReport() {
                           >
                             Narration / Description {filters.sortBy === "description" ? (filters.sortOrder === "desc" ? "▼" : "▲") : "↕"}
                           </th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Counter Party</th>
                           <th
                             onClick={() => handleSortColumn("debit")}
                             className="py-3.5 px-4 text-right whitespace-nowrap text-rose-400 cursor-pointer hover:text-rose-300 transition"
@@ -3026,6 +3027,34 @@ function CaseFileReport() {
                                 >
                                   {tx.description || tx.raw_narration || "-"}
                                 </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-xs leading-5">
+                                {tx.counterparty_name ? (
+                                  <div className="flex flex-col gap-1">
+                                    <span className="font-semibold text-emerald-300">
+                                      {tx.counterparty_name}
+                                    </span>
+                                    {tx.counterparty_identifier && (
+                                      <span className="text-[10px] text-slate-500">
+                                        ID: {tx.counterparty_identifier}
+                                      </span>
+                                    )}
+                                    <div className="flex flex-wrap gap-1 mt-0.5">
+                                      {tx.counterparty_type && (
+                                        <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-emerald-400">
+                                          {tx.counterparty_type}
+                                        </span>
+                                      )}
+                                      {tx.counterparty_source && (
+                                        <span className="rounded bg-indigo-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-indigo-400">
+                                          {tx.counterparty_source}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-600">-</span>
+                                )}
                               </td>
                               <td className="py-3.5 px-4 text-right font-mono font-semibold text-rose-400 whitespace-nowrap">
                                 {tx.debit !== null && tx.debit !== undefined ? formatCurrency(tx.debit) : "-"}

@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 from sqlalchemy.orm import Session
+import requests
+import traceback
+import logging
 
 from app.files.file_repository import get_file_by_id, update_file
 from app.processing.pdf.pdf_table_extractor import extract_tables_from_pdf
@@ -435,7 +438,167 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
         print("Status: FAILED\n")
         print("============================================================")
         raise e
-        
+
+        # ------------------------------------------------------------
+    # STAGE 7.5: GLINER TRANSACTION INTELLIGENCE
+    # ------------------------------------------------------------
+
+    file_record.processing_stage = "nlp_entity_extraction"
+    file_record.processing_progress = "75%"
+    update_file(db, file_record)
+
+    try:
+        from app.services.counterparty_service import extract_counterparties_batch
+        from app.services.gliner_entity_service import get_gliner_config
+
+        import logging
+        import traceback
+
+        logger = logging.getLogger(__name__)
+
+        config = get_gliner_config()
+
+        print("\n")
+        print("=" * 80)
+        print("STAGE 7.5 - GLINER TRANSACTION INTELLIGENCE")
+        print("=" * 80)
+
+        print(f"File ID: {file_record.id}")
+        print(f"Transactions received: {len(validated_df)}")
+        print(f"GLiNER enabled: {config['enabled']}")
+        print(f"GLiNER model: {config['model_name']}")
+        print(f"GLiNER threshold: {config['threshold']}")
+        print(f"GLiNER batch size: {config['batch_size']}")
+
+        logger.warning(
+            "GLINER_RUNTIME_CONFIG enabled=%s model=%s threshold=%s batch_size=%s",
+            config["enabled"],
+            config["model_name"],
+            config["threshold"],
+            config["batch_size"]
+        )
+
+        if not config["enabled"]:
+            logger.warning("GLiNER is disabled. Skipping counterparty extraction.")
+            print("GLiNER skipped (disabled).")
+            # Fill with defaults
+            validated_df['counterparty_name'] = None
+            validated_df['counterparty_type'] = None
+            validated_df['counterparty_identifier'] = None
+            validated_df['counterparty_confidence'] = None
+            validated_df['counterparty_source'] = None
+            validated_df['counterparty_status'] = "NOT_FOUND"
+        else:
+            print("\nCalling GLiNER counterparty service...")
+            print("-" * 80)
+
+            logger.warning(
+                "COUNTERPARTY_CALLING_GLINER_SERVICE transactions=%s",
+                len(validated_df)
+            )
+
+            print(
+                f"COUNTERPARTY_CALLING_GLINER_SERVICE "
+                f"transactions={len(validated_df)}"
+            )
+
+            final_mapping = extract_counterparties_batch(validated_df)
+
+            logger.warning("COUNTERPARTY_GLINER_SERVICE_RETURNED results=%s", len(final_mapping))
+            print(f"COUNTERPARTY_GLINER_SERVICE_RETURNED results={len(final_mapping)}")
+            
+            c_names, c_types, c_confs, c_sources, c_statuses = [], [], [], [], []
+            c_ids = []
+            
+            for idx, row in validated_df.iterrows():
+                mapping = final_mapping.get(idx, {})
+                c_names.append(mapping.get("counterparty_name"))
+                c_types.append(mapping.get("counterparty_type"))
+                c_ids.append(mapping.get("counterparty_identifier"))
+                c_confs.append(mapping.get("counterparty_confidence"))
+                c_sources.append(mapping.get("counterparty_source"))
+                c_statuses.append(mapping.get("counterparty_status", "NOT_FOUND"))
+                
+            validated_df['counterparty_name'] = c_names
+            validated_df['counterparty_type'] = c_types
+            validated_df['counterparty_identifier'] = c_ids
+            validated_df['counterparty_confidence'] = c_confs
+            validated_df['counterparty_source'] = c_sources
+            validated_df['counterparty_status'] = c_statuses
+
+        # --------------------------------------------------------
+        # SUCCESS
+        # --------------------------------------------------------
+
+        print("\n")
+        print("=" * 80)
+        print("STAGE 7.5 SUCCESS")
+        print("=" * 80)
+
+        found_count = sum(
+            1
+            for status in validated_df.get("counterparty_status", [])
+            if status == "FOUND"
+        )
+
+        not_found_count = sum(
+            1
+            for status in validated_df.get("counterparty_status", [])
+            if status == "NOT_FOUND"
+        )
+
+        print(f"Total transactions : {len(validated_df)}")
+        print(f"Counterparties found: {found_count}")
+        print(f"Not found           : {not_found_count}")
+        print("=" * 80)
+        print()
+
+    except Exception as e:
+        # ========================================================
+        # FATAL GLINER ERROR
+        # ========================================================
+        import traceback
+        import logging
+        logger = logging.getLogger(__name__)
+
+        print("\n")
+        print("=" * 100)
+        print("                    STAGE 7.5 FAILED")
+        print("=" * 100)
+
+        print(f"File ID    : {file_record.id}")
+        print(f"Stage      : nlp_entity_extraction")
+        print(f"Error Type : {type(e).__name__}")
+        print(f"Error      : {str(e)}")
+
+        print("\nFULL TRACEBACK:")
+        print("-" * 100)
+
+        traceback.print_exc()
+
+        print("-" * 100)
+        print("GLINER COUNTERPARTY EXTRACTION FAILED")
+        print("PIPELINE WILL NOT CONTINUE TO STAGE 8")
+        print("=" * 100)
+
+        logger.error(
+            "STAGE_7_5_FATAL_ERROR file_id=%s error_type=%s error=%s",
+            file_record.id,
+            type(e).__name__,
+            str(e),
+            exc_info=True
+        )
+
+        try:
+            file_record.status = "FAILED"
+            file_record.processing_stage = "nlp_entity_extraction_failed"
+            file_record.processing_progress = "75%"
+            update_file(db, file_record)
+        except Exception as db_error:
+            pass
+
+        raise
+
     # ------------------------------------------------------------
     # STAGE 8: DATABASE PERSISTENCE
     # ------------------------------------------------------------
@@ -446,8 +609,10 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
     try:
         from app.processing.persistence.transaction_persistence_service import persist_transactions
         
+        print("COUNTERPARTY_PERSISTENCE_STARTED")
         # Persist transactions
         persist_transactions(db, validated_df, file_record.id, file_record.case_id)
+        print("COUNTERPARTY_PERSISTENCE_COMPLETED")
         
         print("DATABASE COMMIT SUCCESSFUL\n")
         print("STAGE 8 SUCCESS\n")
@@ -469,3 +634,4 @@ def process_bank_statement_first_stage(db: Session, file_id: int):
         raise e
         
     return True
+

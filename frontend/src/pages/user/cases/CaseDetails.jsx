@@ -3322,6 +3322,7 @@ function goToNextTransactionPage() {
                               <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Date</th>
                               <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Mode</th>
                               <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Description</th>
+                              <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Counter Party</th>
                               <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Debit</th>
                               <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Credit</th>
                               <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Balance</th>
@@ -3343,10 +3344,38 @@ function goToNextTransactionPage() {
                                 <td className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                                   {transaction.mode || "-"}
                                 </td>
-                                <td className="max-w-[420px] px-4 py-3 text-xs leading-5 text-slate-400" title={transaction.description || ""}>
+                                <td className="max-w-[320px] px-4 py-3 text-xs leading-5 text-slate-400" title={transaction.description || ""}>
                                   <div className="line-clamp-2">
                                     {transaction.description || "-"}
                                   </div>
+                                </td>
+                                <td className="px-4 py-3 text-xs leading-5">
+                                  {transaction.counterparty_name ? (
+                                    <div className="flex flex-col gap-1">
+                                      <span className="font-semibold text-emerald-300">
+                                        {transaction.counterparty_name}
+                                      </span>
+                                      {transaction.counterparty_identifier && (
+                                        <span className="text-[10px] text-slate-500">
+                                          ID: {transaction.counterparty_identifier}
+                                        </span>
+                                      )}
+                                      <div className="flex flex-wrap gap-1 mt-0.5">
+                                        {transaction.counterparty_type && (
+                                          <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-emerald-400">
+                                            {transaction.counterparty_type}
+                                          </span>
+                                        )}
+                                        {transaction.counterparty_source && (
+                                          <span className="rounded bg-indigo-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-indigo-400">
+                                            {transaction.counterparty_source}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-600">-</span>
+                                  )}
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-3 text-right text-xs font-medium text-red-300">
                                   {transaction.debit ?? "-"}

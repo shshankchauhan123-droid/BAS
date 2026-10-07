@@ -92,6 +92,12 @@ def persist_transactions(
             credit=clean_val(row.get("credit")),
             balance=clean_val(row.get("balance")),
             mode=final_mode,
+            counterparty_name=clean_val(row.get("counterparty_name")),
+            counterparty_type=clean_val(row.get("counterparty_type")),
+            counterparty_identifier=clean_val(row.get("counterparty_identifier")),
+            counterparty_confidence=clean_val(row.get("counterparty_confidence")),
+            counterparty_source=clean_val(row.get("counterparty_source")),
+            counterparty_status=clean_val(row.get("counterparty_status")),
         )
         transactions.append(transaction)
         

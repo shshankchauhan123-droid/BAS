@@ -84,6 +84,37 @@ class BankTransaction(Base):
         nullable=True,
     )
 
+    # GLiNER NLP Counterparty Extraction Fields
+    counterparty_name = Column(
+        String(255),
+        nullable=True,
+    )
+
+    counterparty_type = Column(
+        String(50),
+        nullable=True,
+    )
+
+    counterparty_identifier = Column(
+        String(255),
+        nullable=True,
+    )
+
+    counterparty_confidence = Column(
+        Numeric(5, 4),
+        nullable=True,
+    )
+
+    counterparty_source = Column(
+        String(50),
+        nullable=True,
+    )
+
+    counterparty_status = Column(
+        String(50),
+        nullable=True,
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

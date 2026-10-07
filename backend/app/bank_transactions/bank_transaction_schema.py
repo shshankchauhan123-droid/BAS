@@ -23,6 +23,13 @@ class BankTransactionData(BaseModel):
     balance: Optional[Decimal] = None
 
     mode: Optional[str] = None
+    
+    counterparty_name: Optional[str] = None
+    counterparty_type: Optional[str] = None
+    counterparty_identifier: Optional[str] = None
+    counterparty_confidence: Optional[Decimal] = None
+    counterparty_source: Optional[str] = None
+    counterparty_status: Optional[str] = None
 
     created_at: datetime
 
