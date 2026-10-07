@@ -11,7 +11,7 @@ _GLINER_INITIALIZED = False
 def get_gliner_config():
     return {
         "enabled": os.getenv("GLINER_ENABLED", "true").lower() == "true",
-        "model_name": os.getenv("GLINER_MODEL_NAME", "urchade/gliner_multi_pii-v1"),
+        "model_name": os.getenv("GLINER_MODEL_NAME", "urchade/gliner_multi-v2.1"),
         "threshold": float(os.getenv("GLINER_THRESHOLD", "0.50")),
         "batch_size": int(os.getenv("GLINER_BATCH_SIZE", "32"))
     }

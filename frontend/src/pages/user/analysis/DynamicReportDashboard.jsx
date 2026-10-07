@@ -4,7 +4,7 @@ import BASNavbar from "../../../components/layout/UserNavbar";
 import DynamicModeWiseChart from "../../../components/dynamicReport/DynamicModeWiseChart";
 import { getCases } from "../../../services/api/case";
 import { getCaseFiles } from "../../../services/api/file";
-import { getCaseModeWise, searchCaseTransactions } from "../../../services/api/bankTransaction";
+import { getCaseModeWise, searchCaseTransactions, getCaseTransactionSummary } from "../../../services/api/bankTransaction";
 
 export default function DynamicReportDashboard() {
   const navigate = useNavigate();
@@ -20,6 +20,8 @@ export default function DynamicReportDashboard() {
   
   const [modeData, setModeData] = useState([]);
   const [totalTransactions, setTotalTransactions] = useState(0);
+  const [summaryData, setSummaryData] = useState(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   
   
   
@@ -34,7 +36,7 @@ export default function DynamicReportDashboard() {
   const [transactionPage, setTransactionPage] = useState(1);
   const [transactionTotalPages, setTransactionTotalPages] = useState(0);
   const [transactionTotal, setTransactionTotal] = useState(0);
-
+    
 
   // 1. Fetch Cases on mount
   useEffect(() => {
@@ -104,6 +106,7 @@ export default function DynamicReportDashboard() {
     if (!selectedCaseId || selectedFileIds.size === 0) {
       setModeData([]);
       setTotalTransactions(0);
+      setSummaryData(null);
       return;
     }
 
@@ -127,7 +130,26 @@ export default function DynamicReportDashboard() {
       }
     }
 
+    async function fetchSummary() {
+      setIsLoadingSummary(true);
+      try {
+        const fileIdsArray = Array.from(selectedFileIds);
+        const res = await getCaseTransactionSummary(selectedCaseId, fileIdsArray.join(","));
+        if (res?.success) {
+          setSummaryData(res.data);
+        } else {
+          setSummaryData(null);
+        }
+      } catch (err) {
+        console.error("Summary error:", err);
+        setSummaryData(null);
+      } finally {
+        setIsLoadingSummary(false);
+      }
+    }
+
     fetchModeWise();
+    fetchSummary();
     
   }, [selectedCaseId, selectedFileIds]);
 
@@ -138,7 +160,7 @@ export default function DynamicReportDashboard() {
       return;
     }
     
-    async function loadTransactions() {
+        async function loadTransactions() {
       setIsTransactionsLoading(true);
       try {
         const fileIdsArray = Array.from(selectedFileIds);
@@ -161,8 +183,81 @@ export default function DynamicReportDashboard() {
         setIsTransactionsLoading(false);
       }
     }
+    
+    
     loadTransactions();
+    
   }, [selectedMode, selectedFileIds, selectedCaseId, transactionPage]);
+
+  
+  const modeKPIs = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return {
+        highestDebit: 0,
+        highestCredit: 0,
+        mostActiveDate: null,
+        mostActiveDateCount: 0,
+        averageValue: 0
+      };
+    }
+
+    let highestDebit = 0;
+    let highestCredit = 0;
+    let totalValue = 0;
+    let validTxCount = 0;
+    
+    const dateCounts = {};
+
+    transactions.forEach(tx => {
+      const debit = parseFloat(tx.debit);
+      const credit = parseFloat(tx.credit);
+
+      let hasValidAmount = false;
+
+      if (!isNaN(debit) && debit > 0) {
+        if (debit > highestDebit) highestDebit = debit;
+        totalValue += debit;
+        hasValidAmount = true;
+      } else if (!isNaN(credit) && credit > 0) {
+        if (credit > highestCredit) highestCredit = credit;
+        totalValue += credit;
+        hasValidAmount = true;
+      }
+
+      if (hasValidAmount) {
+        validTxCount++;
+      }
+
+      if (tx.transaction_date) {
+        dateCounts[tx.transaction_date] = (dateCounts[tx.transaction_date] || 0) + 1;
+      }
+    });
+
+    let mostActiveDate = null;
+    let mostActiveDateCount = 0;
+
+    for (const [date, count] of Object.entries(dateCounts)) {
+      if (count > mostActiveDateCount) {
+        mostActiveDateCount = count;
+        mostActiveDate = date;
+      } else if (count === mostActiveDateCount) {
+        // choose the most recent date if tie
+        if (new Date(date) > new Date(mostActiveDate)) {
+           mostActiveDate = date;
+        }
+      }
+    }
+
+    const averageValue = validTxCount > 0 ? totalValue / validTxCount : 0;
+
+    return {
+      highestDebit,
+      highestCredit,
+      mostActiveDate,
+      mostActiveDateCount,
+      averageValue
+    };
+  }, [transactions, selectedMode]);
 
   const handleBarClick = (mode) => {
     setSelectedMode(mode);
@@ -216,9 +311,26 @@ export default function DynamicReportDashboard() {
               </p>
             </div>
           </div>
+          <div className="bg-[#020b09] border border-emerald-500/20 rounded-xl p-4 flex flex-col justify-between">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Most Active Date</h3>
+            {isLoadingSummary ? (
+              <div className="h-12 w-24 bg-white/5 animate-pulse rounded"></div>
+            ) : (
+              <div>
+                <div className="text-xl font-semibold text-emerald-400">
+                  {summaryData?.most_active_date ? new Date(summaryData.most_active_date).toLocaleDateString('en-GB').replace(/\//g, '-') : "No Data"}
+                </div>
+                {summaryData?.most_active_date && (
+                  <div className="text-sm text-slate-400 mt-1">
+                    {summaryData.most_active_date_count} Transactions
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Controls Section */}
+                {/* Controls Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           
           {/* Case Selector */}
@@ -288,7 +400,66 @@ export default function DynamicReportDashboard() {
           </div>
         </div>
 
-        
+        {/* KPI Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
+          <div className="bg-[#020b09] border border-emerald-500/20 rounded-xl p-4 flex flex-col justify-between">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Total Debit Amount</h3>
+            {isLoadingSummary ? (
+              <div className="h-8 w-24 bg-white/5 animate-pulse rounded"></div>
+            ) : (
+              <div className="text-xl font-semibold text-rose-400">
+                ₹ {summaryData?.total_debits ? Number(summaryData.total_debits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+              </div>
+            )}
+          </div>
+          <div className="bg-[#020b09] border border-emerald-500/20 rounded-xl p-4 flex flex-col justify-between">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Total Credit Amount</h3>
+            {isLoadingSummary ? (
+              <div className="h-8 w-24 bg-white/5 animate-pulse rounded"></div>
+            ) : (
+              <div className="text-xl font-semibold text-emerald-400">
+                ₹ {summaryData?.total_credits ? Number(summaryData.total_credits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+              </div>
+            )}
+          </div>
+          <div className="bg-[#020b09] border border-emerald-500/20 rounded-xl p-4 flex flex-col justify-between">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Debit Transactions</h3>
+            {isLoadingSummary ? (
+              <div className="h-8 w-16 bg-white/5 animate-pulse rounded"></div>
+            ) : (
+              <div className="text-xl font-semibold text-slate-200">
+                {summaryData?.debit_transactions ? Number(summaryData.debit_transactions).toLocaleString('en-IN') : "0"}
+              </div>
+            )}
+          </div>
+          <div className="bg-[#020b09] border border-emerald-500/20 rounded-xl p-4 flex flex-col justify-between">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Credit Transactions</h3>
+            {isLoadingSummary ? (
+              <div className="h-8 w-16 bg-white/5 animate-pulse rounded"></div>
+            ) : (
+              <div className="text-xl font-semibold text-slate-200">
+                {summaryData?.credit_transactions ? Number(summaryData.credit_transactions).toLocaleString('en-IN') : "0"}
+              </div>
+            )}
+          </div>
+          <div className="bg-[#020b09] border border-emerald-500/20 rounded-xl p-4 flex flex-col justify-between">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Most Active Date</h3>
+            {isLoadingSummary ? (
+              <div className="h-12 w-24 bg-white/5 animate-pulse rounded"></div>
+            ) : (
+              <div>
+                <div className="text-xl font-semibold text-emerald-400">
+                  {summaryData?.most_active_date ? new Date(summaryData.most_active_date).toLocaleDateString('en-GB').replace(/\//g, '-') : "No Data"}
+                </div>
+                {summaryData?.most_active_date && (
+                  <div className="text-sm text-slate-400 mt-1">
+                    {summaryData.most_active_date_count} Transactions
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Chart Section */}
         <div className="mt-4">
@@ -324,6 +495,41 @@ export default function DynamicReportDashboard() {
                 <span className="text-sm text-slate-400 bg-white/5 px-3 py-1 rounded-full">
                   Total: {transactionTotal}
                 </span>
+              </div>
+              
+              {/* Mode Specific KPIs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="bg-[#03120f] border border-emerald-500/10 rounded-xl p-4 flex flex-col justify-between">
+                  <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Highest Debit Amount</h3>
+                  <div className="text-xl font-semibold text-rose-400">
+                    ₹ {modeKPIs.highestDebit ? Number(modeKPIs.highestDebit).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                  </div>
+                </div>
+                <div className="bg-[#03120f] border border-emerald-500/10 rounded-xl p-4 flex flex-col justify-between">
+                  <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Highest Credit Amount</h3>
+                  <div className="text-xl font-semibold text-emerald-400">
+                    ₹ {modeKPIs.highestCredit ? Number(modeKPIs.highestCredit).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                  </div>
+                </div>
+                <div className="bg-[#03120f] border border-emerald-500/10 rounded-xl p-4 flex flex-col justify-between">
+                  <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Most Active Date</h3>
+                  <div>
+                    <div className="text-xl font-semibold text-slate-200">
+                      {modeKPIs.mostActiveDate ? new Date(modeKPIs.mostActiveDate).toLocaleDateString('en-GB').replace(/\//g, '-') : "No Data"}
+                    </div>
+                    {modeKPIs.mostActiveDate && (
+                      <div className="text-sm text-slate-400 mt-1">
+                        {modeKPIs.mostActiveDateCount} Transactions
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-[#03120f] border border-emerald-500/10 rounded-xl p-4 flex flex-col justify-between">
+                  <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Average Transaction Value</h3>
+                  <div className="text-xl font-semibold text-emerald-400">
+                    ₹ {modeKPIs.averageValue ? Number(modeKPIs.averageValue).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                  </div>
+                </div>
               </div>
               
               {isTransactionsLoading ? (

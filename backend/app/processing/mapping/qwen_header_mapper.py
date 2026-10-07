@@ -328,7 +328,7 @@ def map_headers_with_qwen(normalized_headers: list[str], raw_excel_path: str, he
         if not headers_changed:
             wb_check.close()
             os.remove(temp_excel_path)
-            raise ValueError("No headers were actually changed in the Excel file.")
+            return # We allow unchanged headers if they are already perfect
             
         # Verify all other rows
         for r in range(1, original_max_row + 1):

@@ -1,3 +1,4 @@
+from sqlalchemy import desc
 from datetime import date
 from decimal import Decimal
 
@@ -464,11 +465,13 @@ def get_file_transaction_summary(db: Session, file_id: int):
 # Get transactions summary by case and file_ids
 # ============================================================
 
-def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] | None = None):
+def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] | None = None, mode: str | None = None):
     # Calculate total transactions
     query_count = db.query(func.count(BankTransaction.id)).filter(BankTransaction.case_id == case_id)
     if file_ids:
         query_count = query_count.filter(BankTransaction.file_id.in_(file_ids))
+    if mode:
+        query_count = query_count.filter(BankTransaction.mode == mode)
     total_transactions = query_count.scalar() or 0
 
     # Calculate min and max dates
@@ -478,6 +481,8 @@ def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] 
     ).filter(BankTransaction.case_id == case_id)
     if file_ids:
         query_dates = query_dates.filter(BankTransaction.file_id.in_(file_ids))
+    if mode:
+        query_dates = query_dates.filter(BankTransaction.mode == mode)
     dates = query_dates.first()
     
     start_date = dates[0] if dates else None
@@ -487,20 +492,85 @@ def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] 
     query_debits = db.query(func.sum(BankTransaction.debit)).filter(BankTransaction.case_id == case_id)
     if file_ids:
         query_debits = query_debits.filter(BankTransaction.file_id.in_(file_ids))
+    if mode:
+        query_debits = query_debits.filter(BankTransaction.mode == mode)
     total_debits = query_debits.scalar() or Decimal("0.0")
 
     # Calculate total credits
     query_credits = db.query(func.sum(BankTransaction.credit)).filter(BankTransaction.case_id == case_id)
     if file_ids:
         query_credits = query_credits.filter(BankTransaction.file_id.in_(file_ids))
+    if mode:
+        query_credits = query_credits.filter(BankTransaction.mode == mode)
     total_credits = query_credits.scalar() or Decimal("0.0")
+
+    # Calculate debit transactions count
+    query_debit_count = db.query(func.count(BankTransaction.id)).filter(BankTransaction.case_id == case_id, BankTransaction.debit > 0)
+    if file_ids:
+        query_debit_count = query_debit_count.filter(BankTransaction.file_id.in_(file_ids))
+    if mode:
+        query_debit_count = query_debit_count.filter(BankTransaction.mode == mode)
+    debit_transactions = query_debit_count.scalar() or 0
+
+    # Calculate credit transactions count
+    query_credit_count = db.query(func.count(BankTransaction.id)).filter(BankTransaction.case_id == case_id, BankTransaction.credit > 0)
+    if file_ids:
+        query_credit_count = query_credit_count.filter(BankTransaction.file_id.in_(file_ids))
+    if mode:
+        query_credit_count = query_credit_count.filter(BankTransaction.mode == mode)
+    credit_transactions = query_credit_count.scalar() or 0
+
+    # Calculate most active date
+    query_active_date = db.query(
+        BankTransaction.transaction_date, 
+        func.count(BankTransaction.id).label('tx_count')
+    ).filter(BankTransaction.case_id == case_id)
+    
+    if file_ids:
+        query_active_date = query_active_date.filter(BankTransaction.file_id.in_(file_ids))
+    if mode:
+        query_active_date = query_active_date.filter(BankTransaction.mode == mode)
+        
+    query_active_date = query_active_date.group_by(BankTransaction.transaction_date)\
+        .order_by(desc('tx_count'), desc(BankTransaction.transaction_date))\
+        .limit(1)
+        
+    active_date_result = query_active_date.first()
+    most_active_date = active_date_result[0] if active_date_result else None
+    most_active_date_count = active_date_result[1] if active_date_result else 0
+
+    # Calculate highest debit/credit
+    query_highest = db.query(
+        func.max(BankTransaction.debit),
+        func.max(BankTransaction.credit)
+    ).filter(BankTransaction.case_id == case_id)
+    if file_ids:
+        query_highest = query_highest.filter(BankTransaction.file_id.in_(file_ids))
+    if mode:
+        query_highest = query_highest.filter(BankTransaction.mode == mode)
+        
+    highest_res = query_highest.first()
+    highest_debit = highest_res[0] if highest_res else None
+    highest_credit = highest_res[1] if highest_res else None
+    
+    # Calculate average
+    average_transaction_value = None
+    if total_transactions > 0:
+        average_transaction_value = (total_debits + total_credits) / total_transactions
 
     return {
         "start_date": start_date,
         "end_date": end_date,
         "total_transactions": total_transactions,
         "total_debits": total_debits,
-        "total_credits": total_credits
+        "total_credits": total_credits,
+        "debit_transactions": debit_transactions,
+        "credit_transactions": credit_transactions,
+        "most_active_date": most_active_date,
+        "most_active_date_count": most_active_date_count,
+        "highest_debit": highest_debit,
+        "highest_credit": highest_credit,
+        "average_transaction_value": average_transaction_value
     }
 
 

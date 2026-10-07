@@ -54,6 +54,13 @@ class TransactionSummaryData(BaseModel):
     total_transactions: int = 0
     total_debits: Decimal = Decimal("0.0")
     total_credits: Decimal = Decimal("0.0")
+    debit_transactions: int = 0
+    credit_transactions: int = 0
+    most_active_date: Optional[date] = None
+    most_active_date_count: int = 0
+    highest_debit: Optional[Decimal] = None
+    highest_credit: Optional[Decimal] = None
+    average_transaction_value: Optional[Decimal] = None
     available_modes: list[dict] = []
     all_db_modes: list[str] = []
     min_amount: Optional[Decimal] = None

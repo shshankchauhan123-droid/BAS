@@ -368,6 +368,7 @@ def get_file_summary(
 def get_case_summary(
     case_id: int,
     file_ids: str | None = Query(default=None),
+    mode: str | None = Query(default=None, description="Transaction mode"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -398,7 +399,7 @@ def get_case_summary(
                     detail=f"Files {invalid_ids} do not belong to case {case_id}"
                 )
 
-    summary_data = get_case_transaction_summary(db=db, case_id=case_id, file_ids=parsed_file_ids)
+    summary_data = get_case_transaction_summary(db=db, case_id=case_id, file_ids=parsed_file_ids, mode=mode)
 
     return TransactionSummaryResponse(
         success=True,
