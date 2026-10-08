@@ -1,15 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import * as echarts from 'echarts';
 
+import { formatFinancialValue } from "../../utils/chartFormatter";
+
 function formatCurrency(amount) {
-  if (amount === null || amount === undefined || isNaN(amount)) {
-    return "-";
-  }
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
+  return formatFinancialValue(amount);
 }
 
 export default function RelationshipGraph({ nodes = [], edges = [], transactions = [] }) {

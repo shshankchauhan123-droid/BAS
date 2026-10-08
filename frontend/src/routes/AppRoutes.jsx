@@ -1,3 +1,4 @@
+import FinancialTransactionIntelligenceReport from "../pages/user/reports/FinancialTransactionIntelligenceReport";
 import CounterpartyIntelligenceReport from "../pages/user/reports/CounterpartyIntelligenceReport";
 import {
   BrowserRouter,
@@ -492,6 +493,27 @@ function AppRoutes() {
             <ProtectedRoute>
               <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
                 <CounterpartyIntelligenceReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+      
+        <Route
+          path="/dashboard/cases/:caseId/reports/financial-transaction-intelligence"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+                <FinancialTransactionIntelligenceReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/financial-transaction-intelligence"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+                <FinancialTransactionIntelligenceReport />
               </RoleRoute>
             </ProtectedRoute>
           }

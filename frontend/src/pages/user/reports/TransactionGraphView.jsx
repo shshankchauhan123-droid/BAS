@@ -22,15 +22,11 @@ function formatCurrencyFull(amount) {
   }).format(amount);
 }
 
-function formatCompact(num) {
-  if (num === null || num === undefined || isNaN(num)) return "0";
-  const abs = Math.abs(num);
-  if (abs >= 10000000) return `₹${(num / 10000000).toFixed(1)}Cr`;
-  if (abs >= 100000) return `₹${(num / 100000).toFixed(1)}L`;
-  if (abs >= 1000) return `₹${(num / 1000).toFixed(1)}k`;
-  return `₹${Math.round(num)}`;
-}
+import { formatFinancialValue } from "../../../utils/chartFormatter";
 
+function formatCompact(num) {
+  return formatFinancialValue(num);
+}
 function extractCounterparty(narration) {
   if (!narration) return "General Transfer";
   const str = String(narration).trim();

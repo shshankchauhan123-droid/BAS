@@ -1,5 +1,7 @@
 import React, { useMemo, useEffect, useRef } from "react";
 import * as echarts from "echarts";
+import { formatFinancialValue } from "../../utils/chartFormatter";
+
 function formatCurrency(amount) {
   if (amount === undefined || amount === null) return "-";
   return new Intl.NumberFormat("en-IN", {
