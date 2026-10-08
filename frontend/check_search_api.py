@@ -3,6 +3,6 @@ with open(filepath, 'r', encoding='utf-8') as f:
     text = f.read()
 
 import re
-match = re.search(r'\? /api/v1/bank-transactions/case//counterparty-analysis\?', text)
+match = re.search(r'export function searchCaseTransactions.*?}', text, re.DOTALL)
 if match:
-    print(text[match.start()-100:match.start()+200])
+    print(match.group(0))

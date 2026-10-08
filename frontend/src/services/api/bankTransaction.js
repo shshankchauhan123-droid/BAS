@@ -31,6 +31,7 @@ export function searchCaseTransactions(
   {
     file_ids = null,
     search = "",
+    counterparty_name = null,
     dateFrom = "",
     dateTo = "",
     transactionType = "",
@@ -60,6 +61,10 @@ export function searchCaseTransactions(
 
   if (search.trim()) {
     params.append("search", search.trim());
+  }
+
+  if (counterparty_name) {
+    params.append("counterparty_name", counterparty_name);
   }
 
   if (dateFrom) {
@@ -247,4 +252,16 @@ export async function exportCaseTransactions(caseId, filterParams = {}) {
   });
   
   return blob;
+}
+
+export function getCounterpartyAnalysis(caseId, fileIds = []) {
+  const params = new URLSearchParams();
+  if (fileIds && fileIds.length > 0) {
+    params.append("file_ids", fileIds.join(","));
+  }
+  const url = params.toString() 
+    ? `/api/v1/bank-transactions/case/${caseId}/counterparty-analysis?${params.toString()}`
+    : `/api/v1/bank-transactions/case/${caseId}/counterparty-analysis`;
+    
+  return apiRequest(url, { method: "GET" });
 }

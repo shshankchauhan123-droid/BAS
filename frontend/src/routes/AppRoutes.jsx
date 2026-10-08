@@ -1,3 +1,4 @@
+import CounterpartyIntelligenceReport from "../pages/user/reports/CounterpartyIntelligenceReport";
 import {
   BrowserRouter,
   Navigate,
@@ -472,6 +473,28 @@ function AppRoutes() {
         <Route
           path="*"
           element={<NotFound />}
+        />
+
+        <Route
+          path="/dashboard/cases/:caseId/reports/counterparty-intelligence"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+                <CounterpartyIntelligenceReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/counterparty-intelligence"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+                <CounterpartyIntelligenceReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
         />
       </Routes>
     </BrowserRouter>

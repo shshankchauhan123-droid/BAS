@@ -3,6 +3,8 @@ with open(filepath, 'r', encoding='utf-8') as f:
     text = f.read()
 
 import re
-match = re.search(r'def search_case_transactions_route.*?def ', text, re.DOTALL)
+match = re.search(r'@router\.get\(\s*"/case/{case_id}/transactions".*?def ', text, re.DOTALL)
 if match:
-    print(match.group(0)[:800])
+    # grab the next few lines
+    idx = text.find(match.group(0))
+    print(text[idx:idx+1000])

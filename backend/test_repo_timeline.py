@@ -1,14 +1,13 @@
 ﻿import sys
-import os
 sys.path.append(r'c:\final bas\BAS_YASH_2_ZIP\BAS\backend')
 
 from app.core.database import SessionLocal
-from app.bank_transactions.bank_transaction_repository import get_counterparty_analysis
+from app.bank_transactions.bank_transaction_repository import get_timeline_by_case
 
 db = SessionLocal()
 try:
-    data = get_counterparty_analysis(db, case_id=38, file_ids=[194, 195, 196])
-    print(data)
+    data = get_timeline_by_case(db, case_id=38, file_ids=[195, 194])
+    print("SUCCESS timeline")
 except Exception as e:
     import traceback
     traceback.print_exc()

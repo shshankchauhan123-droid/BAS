@@ -3,6 +3,8 @@ with open(filepath, 'r', encoding='utf-8') as f:
     text = f.read()
 
 import re
-match = re.search(r'def search_case_transactions_route.*?def ', text, re.DOTALL)
+match = re.search(r'get_counterparty_analysis_route', text, re.DOTALL)
 if match:
-    print(match.group(0)[:800])
+    print("YES")
+else:
+    print("NO")

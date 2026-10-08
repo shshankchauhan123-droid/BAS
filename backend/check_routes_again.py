@@ -3,6 +3,6 @@ with open(filepath, 'r', encoding='utf-8') as f:
     text = f.read()
 
 import re
-match = re.search(r'def search_case_transactions_route.*?def ', text, re.DOTALL)
+match = re.search(r'export_case_transactions', text)
 if match:
-    print(match.group(0)[:800])
+    print("Found export_case_transactions")

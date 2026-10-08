@@ -2,7 +2,5 @@
 with open(filepath, 'r', encoding='utf-8') as f:
     text = f.read()
 
-import re
-match = re.search(r'def search_case_transactions_route.*?def ', text, re.DOTALL)
-if match:
-    print(match.group(0)[:800])
+for line in text.splitlines()[:25]:
+    print(line)
