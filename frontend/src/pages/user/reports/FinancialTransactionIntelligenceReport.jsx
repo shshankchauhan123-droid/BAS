@@ -1,4 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
+import html2pdf from "html2pdf.js";
+import Swal from "sweetalert2";
+
 
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -502,10 +505,47 @@ export default function FinancialTransactionIntelligenceReport() {
 
 
 
-  const handlePrint = () => {
+  const [isExporting, setIsExporting] = useState(false);
 
-    window.print();
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    const element = document.getElementById('pdf-report-content');
+    
+    if (!element) {
+      console.error("PDF container not found");
+      setIsExporting(false);
+      return;
+    }
 
+    const opt = {
+      margin: 10,
+      filename: `Financial_Transaction_Intelligence_Report_${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    try {
+      await html2pdf().set(opt).from(element).save();
+      Swal.fire({
+        icon: 'success',
+        title: 'Export Successful',
+        text: 'The PDF has been downloaded successfully.',
+        background: document.documentElement.classList.contains("dark") ? '#1e293b' : '#ffffff',
+        color: document.documentElement.classList.contains("dark") ? '#f8fafc' : '#0f172a',
+      });
+    } catch (error) {
+      console.error('PDF Export Error:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Export Failed',
+        text: 'An error occurred while generating the PDF.',
+        background: document.documentElement.classList.contains("dark") ? '#1e293b' : '#ffffff',
+        color: document.documentElement.classList.contains("dark") ? '#f8fafc' : '#0f172a',
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
 
@@ -522,7 +562,7 @@ export default function FinancialTransactionIntelligenceReport() {
 
 
 
-      <div className="max-w-7xl mx-auto px-4 py-8 mt-16 print:mt-0 print:p-0">
+      <div id="pdf-report-content" className="max-w-7xl mx-auto px-4 py-8 mt-16 print:mt-0 print:p-0">
 
 
 
@@ -548,11 +588,13 @@ export default function FinancialTransactionIntelligenceReport() {
 
 
 
-          <div className="flex gap-2 print:hidden">
+          <div className="flex gap-2 print:hidden" data-html2canvas-ignore="true">
 
             <button
 
-              onClick={handlePrint}
+              type="button"
+                onClick={handleExportPDF}
+                disabled={isExporting}
 
               className="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 px-4 py-2 rounded-lg transition border border-emerald-500/20 flex items-center gap-2"
 
@@ -584,15 +626,15 @@ export default function FinancialTransactionIntelligenceReport() {
 
               </svg>
 
-              Export PDF
-
-            </button>
+              {isExporting ? "Generating PDF..." : "Export PDF"}
+              </button>
 
 
 
             <button
 
-              onClick={() => navigate('/dashboard/reports')}
+              type="button"
+                onClick={() => navigate('/dashboard/reports')}
 
               className="bg-[#03120f] border border-emerald-500/20 text-emerald-500 px-4 py-2 rounded hover:bg-emerald-500/10 transition"
 
@@ -610,7 +652,7 @@ export default function FinancialTransactionIntelligenceReport() {
 
         {/* Filters Panel - Print Hidden */}
 
-        <div className="bg-[#03120f] border border-emerald-500/20 rounded-xl p-4 mb-8 print:hidden">
+        <div className="bg-[#03120f] border border-emerald-500/20 rounded-xl p-4 mb-8 print:hidden" data-html2canvas-ignore="true">
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
 
@@ -876,7 +918,8 @@ export default function FinancialTransactionIntelligenceReport() {
 
               <button
 
-                onClick={applyFilters}
+                type="button"
+                  onClick={applyFilters}
 
                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-lg transition text-sm"
 

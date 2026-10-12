@@ -6,6 +6,7 @@ import UserFooter from "../../components/layout/UserFooter";
 import { useAuth } from "../../context/AuthContext";
 import CreateCaseModal from "../../components/cases/CreateCaseModal";
 import { getCases ,createCase} from "../../services/api/case";
+import { getDashboardStatistics } from "../../services/api/dashboard";
 import { getIOMasters } from "../../services/api/ioMaster";
 import Swal from "sweetalert2";
 
@@ -26,6 +27,8 @@ function UserDashboard() {
   const [cases, setCases] = useState([]);
   const [ioList, setIoList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(null);
+  const [statsError, setStatsError] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -43,9 +46,10 @@ function UserDashboard() {
         } else {
           promises.push(Promise.resolve(null));
         }
-        const [casesRes, ioRes] = await Promise.allSettled([
+        const [casesRes, ioRes, statsRes] = await Promise.allSettled([
           getCases(),
           getIOMasters(),
+          getDashboardStatistics(),
         ]);
 
         if (isMounted) {
@@ -54,6 +58,12 @@ function UserDashboard() {
           }
           if (ioRes.status === "fulfilled" && Array.isArray(ioRes.value?.data)) {
             setIoList(ioRes.value.data);
+          }
+          if (statsRes.status === "fulfilled" && statsRes.value) {
+            setStats(statsRes.value);
+            setStatsError(false);
+          } else {
+            setStatsError(true);
           }
         }
       } catch (err) {
@@ -279,9 +289,9 @@ function UserDashboard() {
                   TOTAL CASES
               ================================================== */}
               <AnalysisStat
-                title="Analysis Cases"
-                value={loading ? "..." : String(cases.length).padStart(2, "0")}
-                description="Total banking cases"
+                  title="Analysis Cases"
+                  value={loading ? "..." : statsError || !stats ? "ERR" : String(stats.analysis_cases).padStart(2, "0")}
+                  description="Total banking cases"
                 color="emerald"
                 onClick={handleViewCases}
                 icon={
@@ -325,9 +335,9 @@ function UserDashboard() {
                   INVESTIGATING OFFICERS (IO)
               ================================================== */}
               <AnalysisStat
-                title="Investigating Officers"
-                value={loading ? "..." : String(ioList.length).padStart(2, "0")}
-                description="Master IO records"
+                  title="Investigating Officers"
+                  value={loading ? "..." : statsError || !stats ? "ERR" : String(stats.investigating_officers).padStart(2, "0")}
+                  description="Master IO records"
                 color="teal"
                 onClick={handleIOMaster}
                 icon={
@@ -353,9 +363,9 @@ function UserDashboard() {
                   STATEMENTS
               ================================================== */}
               <AnalysisStat
-                title="Bank Statements"
-                value="00"
-                description="Statements processed"
+                  title="Bank Statements"
+                  value={loading ? "..." : statsError || !stats ? "ERR" : String(stats.bank_statements).padStart(2, "0")}
+                  description="Statements processed"
                 color="cyan"
                 icon={
                   <svg
@@ -399,9 +409,9 @@ function UserDashboard() {
                   TRANSACTIONS
               ================================================== */}
               <AnalysisStat
-                title="Transactions"
-                value="00"
-                description="Transactions analyzed"
+                  title="Transactions"
+                  value={loading ? "..." : statsError || !stats ? "ERR" : String(stats.transactions).padStart(2, "0")}
+                  description="Transactions analyzed"
                 color="violet"
                 icon={
                   <svg
@@ -447,9 +457,9 @@ function UserDashboard() {
                   REPORTS
               ================================================== */}
               <AnalysisStat
-                title="Analytical Reports"
-                value="00"
-                description="Reports generated"
+                  title="Analytical Reports"
+                  value={loading ? "..." : statsError || !stats ? "ERR" : String(stats.analytical_reports).padStart(2, "0")}
+                  description="Reports generated"
                 color="amber"
                 icon={
                   <svg
