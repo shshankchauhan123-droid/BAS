@@ -77,12 +77,13 @@ export default function DynamicReportDashboard() {
       try {
         const res = await getCaseFiles(selectedCaseId);
         if (res?.data) {
-          setFiles(res.data);
-          if (paramFileId && res.data.some(f => f.id.toString() === paramFileId.toString())) {
+          const activeFiles = (res.data || []).filter(f => !f.is_superseded);
+          setFiles(activeFiles);
+          if (paramFileId && activeFiles.some(f => f.id.toString() === paramFileId.toString())) {
             setSelectedFileIds(new Set([Number(paramFileId)]));
           } else {
-            // By default select all files
-            const allIds = new Set(res.data.map(f => f.id));
+            // By default select all active files
+            const allIds = new Set(activeFiles.map(f => f.id));
             setSelectedFileIds(allIds);
           }
         } else {

@@ -185,7 +185,11 @@ export default function FinancialTransactionIntelligenceReport() {
 
       const res = await getCaseFiles(caseId);
 
-      setFiles(res.data);
+      const activeFiles = (Array.isArray(res?.data) ? res.data : []).filter(
+        (f) => !f.is_superseded
+      );
+
+      setFiles(activeFiles);
 
     } catch (err) {
 
@@ -757,6 +761,12 @@ export default function FinancialTransactionIntelligenceReport() {
                         {f.original_filename}
 
                       </span>
+
+                      {f.is_merged && (
+                        <span className="shrink-0 ml-1 rounded bg-teal-400/20 px-1.5 py-0.5 text-[9px] font-bold text-teal-300 border border-teal-400/30">
+                          MERGED
+                        </span>
+                      )}
 
                     </label>
 

@@ -903,6 +903,11 @@ export default function TransactionGraphView({
                 >
                   <span className={`h-2 w-2 rounded-full ${isChecked ? col.dot : "bg-slate-600"}`} />
                   <span className="truncate max-w-[150px]">{f.account_number?.toString().trim() || f.original_filename}</span>
+                  {f.is_merged && (
+                    <span className="rounded bg-teal-400/20 px-1 py-0.2 text-[8px] font-bold text-teal-300 border border-teal-400/30">
+                      MERGED
+                    </span>
+                  )}
                   <span className="text-[10px] opacity-75">{isChecked ? "✓" : "off"}</span>
                 </button>
               );

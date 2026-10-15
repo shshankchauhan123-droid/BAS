@@ -25,10 +25,12 @@ export function uploadFile(caseId, file) {
 // Get case files
 // ============================================================
 
-export function getCaseFiles(caseId) {
+export function getCaseFiles(caseId, includeSuperseded = false) {
+
+  const query = includeSuperseded ? "?include_superseded=true" : "";
 
   return apiRequest(
-    `/api/v1/files/case/${caseId}`,
+    `/api/v1/files/case/${caseId}${query}`,
     {
       method: "GET",
     }
@@ -80,6 +82,24 @@ export function updateFileDetails(fileId, payload) {
       headers: {
         "Content-Type": "application/json",
       }
+    }
+  );
+}
+
+
+// ============================================================
+// Merge case files
+// ============================================================
+
+export function mergeFiles(caseId, payload) {
+  return apiRequest(
+    `/api/v1/files/case/${caseId}/merge`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+      },
     }
   );
 }

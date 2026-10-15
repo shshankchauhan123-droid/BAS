@@ -1,6 +1,7 @@
 from pathlib import Path
 from fastapi import (
     APIRouter,
+    Query,
     Depends,
     File as FastAPIFile,
     HTTPException,
@@ -17,6 +18,7 @@ from app.files.file_controller import (
     delete_file_controller,
     get_case_files_controller,
     get_file_for_view_controller,
+    merge_case_files_controller,
     update_file_controller,
     upload_file_controller,
 )
@@ -26,6 +28,7 @@ from app.files.file_schema import (
     FileSingleResponse,
     FileUploadResponse,
     FileUpdateRequest,
+    MergeFilesRequest,
 )
 
 
@@ -95,6 +98,10 @@ def upload_file_route(
 )
 def get_case_files_route(
     case_id: int,
+    include_superseded: bool = Query(
+        default=False,
+        description="Include superseded source files that have been merged",
+    ),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -105,6 +112,7 @@ def get_case_files_route(
             db=db,
             case_id=case_id,
             user=current_user,
+            include_superseded=include_superseded,
         )
 
     except ValueError as error:
@@ -112,6 +120,45 @@ def get_case_files_route(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(error),
+        )
+
+
+# ============================================================
+# MERGE CASE FILES
+# ============================================================
+
+@router.post(
+    "/case/{case_id}/merge",
+    response_model=FileSingleResponse,
+    status_code=status.HTTP_200_OK,
+)
+def merge_case_files_route(
+    case_id: int,
+    data: MergeFilesRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    try:
+        return merge_case_files_controller(
+            db=db,
+            case_id=case_id,
+            user=current_user,
+            data=data,
+        )
+    except PermissionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Merge failed: {str(error)}",
         )
 
 
@@ -215,7 +262,7 @@ def delete_file_route(
 
     try:
 
-        delete_file_controller(
+        result = delete_file_controller(
             db=db,
             file_id=file_id,
             user=current_user,
@@ -224,9 +271,7 @@ def delete_file_route(
         return {
             "success": True,
             "message": "File deleted successfully",
-            "data": {
-                "file_id": file_id,
-            },
+            "data": result,
         }
 
     except PermissionError as error:

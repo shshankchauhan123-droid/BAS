@@ -114,11 +114,12 @@ export default function CaseReportsHub() {
     try {
       setLoadingFiles(true);
       const res = await getCaseFiles(newCaseId);
-      const list = Array.isArray(res?.data)
+      const rawList = Array.isArray(res?.data)
         ? res.data
         : Array.isArray(res)
         ? res
         : [];
+      const list = rawList.filter((f) => !f.is_superseded);
       setCaseFiles(list);
     } catch (err) {
       console.error("Failed to load files for case:", err);

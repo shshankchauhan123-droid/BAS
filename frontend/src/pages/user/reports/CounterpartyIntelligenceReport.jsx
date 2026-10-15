@@ -78,11 +78,12 @@ export default function CounterpartyIntelligenceReport() {
       try {
         const res = await getCaseFiles(selectedCaseId);
         if (res?.data) {
-          setFiles(res.data);
-          if (paramFileId && res.data.some(f => f.id.toString() === paramFileId.toString())) {
+          const activeFiles = (res.data || []).filter(f => !f.is_superseded);
+          setFiles(activeFiles);
+          if (paramFileId && activeFiles.some(f => f.id.toString() === paramFileId.toString())) {
             setSelectedFileIds(new Set([Number(paramFileId)]));
           } else {
-            const allIds = new Set(res.data.map(f => f.id));
+            const allIds = new Set(activeFiles.map(f => f.id));
             setSelectedFileIds(allIds);
           }
         } else {
@@ -350,6 +351,11 @@ export default function CounterpartyIntelligenceReport() {
                     <span className="text-sm text-slate-300 group-hover:text-emerald-300 truncate" title={f.original_filename}>
                       {f.original_filename}
                     </span>
+                    {f.is_merged && (
+                      <span className="shrink-0 ml-1.5 rounded bg-teal-400/20 px-1.5 py-0.5 text-[9px] font-bold text-teal-300 border border-teal-400/30">
+                        MERGED
+                      </span>
+                    )}
                   </label>
                 ))
               )}

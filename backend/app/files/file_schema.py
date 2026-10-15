@@ -30,6 +30,11 @@ class FileSingleResponse(BaseModel):
 
 
 
+class MergeFilesRequest(BaseModel):
+    file_ids: list[int]
+    merged_filename: Optional[str] = None
+
+
 class FileData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -54,6 +59,10 @@ class FileData(BaseModel):
     processing_progress: Optional[str] = None
     statement_start_date: Optional[date] = None
     statement_end_date: Optional[date] = None
+    is_merged: bool = False
+    source_file_ids: Optional[list[int]] = None
+    is_superseded: bool = False
+    superseded_by_file_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 

@@ -399,11 +399,12 @@ function CaseFileReport() {
       ]);
 
       const loadedCase = caseRes?.data || caseRes;
-      const loadedFiles = Array.isArray(filesRes?.data)
+      const rawFiles = Array.isArray(filesRes?.data)
         ? filesRes.data
         : Array.isArray(filesRes)
         ? filesRes
         : [];
+      const loadedFiles = rawFiles.filter((f) => !f.is_superseded);
 
       setCaseData(loadedCase);
       setFiles(loadedFiles);
@@ -1488,7 +1489,12 @@ function CaseFileReport() {
                                 </div>
                               </div>
 
-                              <div className="shrink-0 pl-1">
+                              <div className="shrink-0 pl-1 flex items-center gap-1.5">
+                                {file.is_merged && (
+                                  <span className="px-1.5 py-0.5 rounded font-bold uppercase text-[9px] tracking-wider border bg-teal-400/15 text-teal-300 border-teal-400/30">
+                                    MERGED
+                                  </span>
+                                )}
                                 <span
                                   className={`
                                     px-1.5 py-0.5 rounded font-bold uppercase text-[9px] tracking-wider border

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Date,
@@ -8,6 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 
 from app.core.database import Base
@@ -134,6 +136,27 @@ class File(Base):
         nullable=True,
     )
 
+    is_merged = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        index=True,
+    )
+
+    is_superseded = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        index=True,
+    )
+
+    superseded_by_file_id = Column(
+        Integer,
+        ForeignKey("files.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -145,4 +168,39 @@ class File(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class MergedFileSource(Base):
+    __tablename__ = "merged_file_sources"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+        autoincrement=True,
+    )
+
+    merged_file_id = Column(
+        Integer,
+        ForeignKey("files.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    source_file_id = Column(
+        Integer,
+        ForeignKey("files.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("merged_file_id", "source_file_id", name="uq_merged_file_source"),
     )

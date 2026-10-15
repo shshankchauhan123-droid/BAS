@@ -930,11 +930,13 @@ export default function TransactionRelationshipReport() {
         const res =
           await getCaseFiles(activeCaseId);
 
-        const list = Array.isArray(res?.data)
+        const rawList = Array.isArray(res?.data)
           ? res.data
           : Array.isArray(res)
             ? res
             : [];
+
+        const list = rawList.filter((f) => !f.is_superseded);
 
         setFiles(list);
 
@@ -1955,6 +1957,11 @@ export default function TransactionRelationshipReport() {
                         ?.toString()
                         .trim() ||
                         "Account number not available"}
+                      {f.is_merged && (
+                        <span className="ml-1 rounded bg-teal-400/20 px-1.5 py-0.5 text-[9px] font-bold text-teal-300 border border-teal-400/30">
+                          MERGED
+                        </span>
+                      )}
 
                     </button>
                   );

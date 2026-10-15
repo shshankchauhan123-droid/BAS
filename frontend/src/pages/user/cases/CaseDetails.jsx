@@ -24,6 +24,8 @@ import {
 
 import BASNavbar from "../../../components/layout/UserNavbar";
 import BASFooter from "../../../components/layout/UserFooter";
+import MergeFilesModal from "../../../components/cases/MergeFilesModal";
+import Swal from "sweetalert2";
 import { useAuth } from "../../../context/AuthContext";
 
 function CaseDetails() {
@@ -196,6 +198,19 @@ const [transactions, setTransactions] = useState([]);
 
   const [deletingFileId, setDeletingFileId] =
     useState(null);
+
+  const [isMergeModalOpen, setIsMergeModalOpen] =
+    useState(false);
+
+  const handleMergeSuccess = async () => {
+    try {
+      const res = await getCaseFiles(caseId);
+      const filesList = Array.isArray(res?.data) ? res.data : [];
+      setUploadedFiles(filesList);
+    } catch (err) {
+      console.error("Failed to refresh files after merge:", err);
+    }
+  };
 
   // ============================================================
   // PAGINATION
@@ -1382,12 +1397,27 @@ useEffect(() => {
       return;
     }
 
-    const confirmed =
-      window.confirm(
-        `Are you sure you want to delete "${file.original_filename}"?\n\nThis action cannot be undone.`
-      );
+    const isMerged = Boolean(file.is_merged);
+    const confirmResult = await Swal.fire({
+      icon: "warning",
+      title: isMerged ? "Delete Merged Statement?" : "Delete File?",
+      text: isMerged
+        ? `Are you sure you want to delete "${file.original_filename}"? This will permanently delete the merged statement and ALL of its underlying source files and transactions.`
+        : `Are you sure you want to delete "${file.original_filename}"?\n\nThis action cannot be undone.`,
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      cancelButtonText: "Cancel",
+      background: "#07110f",
+      color: "#f8fafc",
+      iconColor: "#f59e0b",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#334155",
+      customClass: {
+        popup: "border border-white/10 rounded-2xl",
+      },
+    });
 
-    if (!confirmed) {
+    if (!confirmResult.isConfirmed) {
       return;
     }
 
@@ -1395,47 +1425,45 @@ useEffect(() => {
       setDeletingFileId(file.id);
       setFilesError("");
 
-      await deleteFile(file.id);
+      const res = await deleteFile(file.id);
+
+      const deletedIds = res?.data?.deleted_file_ids || [file.id];
+
+      // Clear or reset active drawer/selection state if deleted file was active
+      if (deletedIds.includes(selectedTransactionFileId)) {
+        setSelectedTransactionFileId(null);
+        setTransactions([]);
+      }
+      if (deletedIds.includes(selectedFile?.id)) {
+        setSelectedFile(null);
+      }
+      if (deletedIds.includes(expandedFileId)) {
+        setExpandedFileId(null);
+      }
+      if (deletedIds.includes(editingFileId)) {
+        setEditingFileId(null);
+      }
 
       /*
-       * Remove from local state immediately.
+       * Re-fetch files to synchronize active list and refresh counts.
        */
+      await loadFiles();
 
-      setUploadedFiles(
-        (currentFiles) =>
-          currentFiles.filter(
-            (currentFile) =>
-              currentFile.id !==
-              file.id
-          )
-      );
-
-      /*
-       * Calculate pages after deletion.
-       */
-
-      const remainingCount =
-        Math.max(
-          0,
-          uploadedFiles.length - 1
-        );
-
-      const remainingPages =
-        Math.max(
-          1,
-          Math.ceil(
-            remainingCount /
-              FILES_PER_PAGE
-          )
-        );
-
-      setCurrentPage(
-        (previousPage) =>
-          Math.min(
-            previousPage,
-            remainingPages
-          )
-      );
+      await Swal.fire({
+        icon: "success",
+        title: "File Deleted",
+        text: isMerged
+          ? `"${file.original_filename}" and all its source statements were deleted.`
+          : `"${file.original_filename}" was deleted successfully.`,
+        background: "#07110f",
+        color: "#f8fafc",
+        iconColor: "#34d399",
+        confirmButtonColor: "#059669",
+        timer: 2000,
+        customClass: {
+          popup: "border border-emerald-500/20 rounded-2xl",
+        },
+      });
     } catch (requestError) {
       console.error(
         "Failed to delete file:",
@@ -1449,6 +1477,19 @@ useEffect(() => {
         );
 
       setFilesError(message);
+
+      await Swal.fire({
+        icon: "error",
+        title: "Deletion Failed",
+        text: message,
+        background: "#07110f",
+        color: "#f8fafc",
+        iconColor: "#f87171",
+        confirmButtonColor: "#dc2626",
+        customClass: {
+          popup: "border border-red-500/20 rounded-2xl",
+        },
+      });
     } finally {
       setDeletingFileId(null);
     }
@@ -2688,7 +2729,7 @@ function goToNextTransactionPage() {
                   ) : (
                     <>
 
-                      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
                         <div>
 
@@ -2717,14 +2758,31 @@ function goToNextTransactionPage() {
 
                         </div>
 
-                        {totalPages > 1 && (
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                            Page{" "}
-                            {currentPage}{" "}
-                            of{" "}
-                            {totalPages}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-3">
+
+                          {canUploadFiles && uploadedFiles.length >= 2 && (
+                            <button
+                              type="button"
+                              onClick={() => setIsMergeModalOpen(true)}
+                              className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition hover:border-emerald-400/35 hover:bg-emerald-400/15 shadow-sm active:scale-[0.98]"
+                            >
+                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                              </svg>
+                              Merge Files
+                            </button>
+                          )}
+
+                          {totalPages > 1 && (
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                              Page{" "}
+                              {currentPage}{" "}
+                              of{" "}
+                              {totalPages}
+                            </p>
+                          )}
+
+                        </div>
 
                       </div>
 
@@ -2790,6 +2848,15 @@ function goToNextTransactionPage() {
                                         )}
                                       </span>
 
+                                      {file.is_merged && (
+                                        <>
+                                          <span className="h-1 w-1 rounded-full bg-slate-700" />
+                                          <span className="text-teal-400 font-semibold lowercase tracking-normal">
+                                            [merged file]
+                                          </span>
+                                        </>
+                                      )}
+
                                     </div>
 
                                   </div>
@@ -2797,6 +2864,13 @@ function goToNextTransactionPage() {
                                 </div>
 
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+
+                                  {file.is_merged && (
+                                    <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1.5 text-[9px] font-bold tracking-[0.12em] text-teal-300">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-teal-400" />
+                                      MERGED STATEMENT
+                                    </span>
+                                  )}
 
                                   <span
                                     className={`
@@ -2825,35 +2899,37 @@ function goToNextTransactionPage() {
 
                                   </span>
 
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleViewFile(
-                                        file
-                                      )
-                                    }
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] px-4 py-2.5 text-xs font-semibold text-emerald-300 transition hover:border-emerald-400/30 hover:bg-emerald-400/[0.08]"
-                                  >
-
-                                    <svg
-                                      className="h-4 w-4"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="1.7"
+                                  {!Boolean(file.is_merged) && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleViewFile(
+                                          file
+                                        )
+                                      }
+                                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] px-4 py-2.5 text-xs font-semibold text-emerald-300 transition hover:border-emerald-400/30 hover:bg-emerald-400/[0.08]"
                                     >
-                                      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
 
-                                      <circle
-                                        cx="12"
-                                        cy="12"
-                                        r="2.5"
-                                      />
-                                    </svg>
+                                      <svg
+                                        className="h-4 w-4"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.7"
+                                      >
+                                        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
 
-                                    View
+                                        <circle
+                                          cx="12"
+                                          cy="12"
+                                          r="2.5"
+                                        />
+                                      </svg>
 
-                                  </button>
+                                      View
+
+                                    </button>
+                                  )}
 
                                   {String(file.status || "").toUpperCase() === "COMPLETED" && (
                                     <button
@@ -3712,6 +3788,14 @@ function goToNextTransactionPage() {
           </div>
 
         </main>
+
+        <MergeFilesModal
+          isOpen={isMergeModalOpen}
+          onClose={() => setIsMergeModalOpen(false)}
+          files={uploadedFiles}
+          caseId={caseId}
+          onMergeSuccess={handleMergeSuccess}
+        />
 
         <BASFooter />
 
