@@ -3,6 +3,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.case.case_model import Case
+from app.user.user_model import User
 
 
 def create_case(
@@ -21,7 +22,12 @@ def get_all_cases(
 ) -> list[Case]:
     return (
         db.query(Case)
-        .options(joinedload(Case.io), joinedload(Case.creator))
+        .options(
+            joinedload(Case.io),
+            joinedload(Case.client),
+            joinedload(Case.creator).joinedload(User.client),
+            joinedload(Case.assignee),
+        )
         .order_by(Case.created_at.desc())
         .all()
     )
@@ -33,7 +39,12 @@ def get_cases_by_user(
 ) -> list[Case]:
     return (
         db.query(Case)
-        .options(joinedload(Case.io), joinedload(Case.creator))
+        .options(
+            joinedload(Case.io),
+            joinedload(Case.client),
+            joinedload(Case.creator).joinedload(User.client),
+            joinedload(Case.assignee),
+        )
         .filter(
             or_(
                 Case.created_by == user_id,
@@ -51,7 +62,12 @@ def get_case_by_id(
 ) -> Optional[Case]:
     return (
         db.query(Case)
-        .options(joinedload(Case.io), joinedload(Case.creator))
+        .options(
+            joinedload(Case.io),
+            joinedload(Case.client),
+            joinedload(Case.creator).joinedload(User.client),
+            joinedload(Case.assignee),
+        )
         .filter(Case.id == case_id)
         .first()
     )
@@ -64,7 +80,12 @@ def get_case_by_id_and_user(
 ) -> Optional[Case]:
     return (
         db.query(Case)
-        .options(joinedload(Case.io), joinedload(Case.creator))
+        .options(
+            joinedload(Case.io),
+            joinedload(Case.client),
+            joinedload(Case.creator).joinedload(User.client),
+            joinedload(Case.assignee),
+        )
         .filter(
             Case.id == case_id,
             or_(

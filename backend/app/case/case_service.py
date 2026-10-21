@@ -195,13 +195,16 @@ def create_case(
     else:
         # SuperAdmin or Admin
         assigned_to_id = None
+        target = None
         if data.assigned_to:
             target = get_user_by_id(db=db, user_id=data.assigned_to)
             if not target:
                 raise ValueError("Assigned user not found.")
             assigned_to_id = target.id
 
-        user_ios = get_ios_by_user(db=db, user_id=user.id)
+        client_id = data.client_id or (target.client_id if target else None) or user.client_id
+
+        user_ios = get_ios_by_user(db=db, user_id=(target.id if target else user.id))
         assigned_io_id = data.io_id if data.io_id else (user_ios[0].id if user_ios else None)
 
         case_number = generate_case_number(db)
@@ -217,7 +220,7 @@ def create_case(
             created_by=user.id,
             assigned_to=assigned_to_id,
             io_id=assigned_io_id,
-            client_id=user.client_id,
+            client_id=client_id,
         )
 
         created = repository_create_case(db=db, case=new_case)
@@ -263,7 +266,12 @@ def get_cases(
             from sqlalchemy.orm import joinedload
             return (
                 db.query(Case)
-                .options(joinedload(Case.io))
+                .options(
+                    joinedload(Case.io),
+                    joinedload(Case.client),
+                    joinedload(Case.creator).joinedload(User.client),
+                    joinedload(Case.assignee),
+                )
                 .filter(
                     or_(
                         Case.created_by == target_user_id,
@@ -291,10 +299,28 @@ def get_cases(
             return []
         from sqlalchemy.orm import joinedload
         from sqlalchemy import or_
+
+        client_user_ids = (
+            db.query(User.id)
+            .filter(User.client_id == user.client_id)
+            .subquery()
+        )
+
         query = (
             db.query(Case)
-            .options(joinedload(Case.io))
-            .filter(Case.client_id == user.client_id)
+            .options(
+                joinedload(Case.io),
+                joinedload(Case.client),
+                joinedload(Case.creator).joinedload(User.client),
+                joinedload(Case.assignee),
+            )
+            .filter(
+                or_(
+                    Case.client_id == user.client_id,
+                    Case.created_by.in_(client_user_ids.select()),
+                    Case.assigned_to.in_(client_user_ids.select()),
+                )
+            )
         )
         if target_user_id:
             target_user = get_user_by_id(db=db, user_id=target_user_id)
@@ -306,7 +332,18 @@ def get_cases(
                     Case.assigned_to == target_user_id,
                 )
             )
-        return query.order_by(Case.created_at.desc()).all()
+        cases = query.order_by(Case.created_at.desc()).all()
+        healed = False
+        for c in cases:
+            if c.client_id is None:
+                c.client_id = user.client_id
+                healed = True
+        if healed:
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+        return cases
 
     return []
 
@@ -335,7 +372,20 @@ def get_case(
         )
     elif user_role == CLIENT_ADMIN_ROLE:
         case = get_case_by_id(db=db, case_id=case_id)
-        if case and case.client_id == user.client_id:
+        if not case:
+            return None
+        is_client_case = (
+            case.client_id == user.client_id
+            or (case.creator and case.creator.client_id == user.client_id)
+            or (case.assignee and case.assignee.client_id == user.client_id)
+        )
+        if is_client_case:
+            if case.client_id is None and user.client_id is not None:
+                case.client_id = user.client_id
+                try:
+                    db.commit()
+                except Exception:
+                    db.rollback()
             return case
         return None
     return None

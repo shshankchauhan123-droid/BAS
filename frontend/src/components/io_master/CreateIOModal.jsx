@@ -18,7 +18,10 @@ function CreateIOModal({
   onSubmit,
   isSubmitting = false,
   isClientAdmin = false,
+  editingOfficer = null,
 }) {
+  const isEditMode = Boolean(editingOfficer);
+
   const [formData, setFormData] = useState({
     officer_name: "",
     designation: "Sub-Inspector (SI)",
@@ -55,14 +58,28 @@ function CreateIOModal({
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+
+    setError("");
+
+    if (editingOfficer) {
+      const rawDesig = editingOfficer.designation || "";
+      const isStandard = DESIGNATION_OPTIONS.includes(rawDesig) && rawDesig !== "Other";
+
+      setFormData({
+        officer_name: editingOfficer.officer_name || "",
+        designation: isStandard ? rawDesig : "Other",
+        custom_designation: isStandard ? "" : rawDesig,
+        police_station: editingOfficer.police_station || "",
+      });
+      setSelectedUserId(editingOfficer.created_by ? String(editingOfficer.created_by) : "");
+    } else {
       setFormData({
         officer_name: "",
         designation: "Sub-Inspector (SI)",
         custom_designation: "",
         police_station: "",
       });
-      setError("");
       if (isClientAdmin) {
         loadCompanyUsers();
       } else {
@@ -70,7 +87,7 @@ function CreateIOModal({
         setSelectedUserId("");
       }
     }
-  }, [isOpen, isClientAdmin]);
+  }, [isOpen, editingOfficer, isClientAdmin]);
 
   if (!isOpen) {
     return null;
@@ -102,6 +119,10 @@ function CreateIOModal({
       setError("Officer name must be at least 2 characters.");
       return;
     }
+    if (officerName.length > 150) {
+      setError("Officer name must not exceed 150 characters.");
+      return;
+    }
     if (!designation) {
       setError("Designation / Rank is required.");
       return;
@@ -126,8 +147,12 @@ function CreateIOModal({
       setError("Police Station / Branch is required.");
       return;
     }
+    if (policeStation.length > 200) {
+      setError("Police Station / Branch must not exceed 200 characters.");
+      return;
+    }
 
-    if (isClientAdmin && !selectedUserId) {
+    if (!isEditMode && isClientAdmin && !selectedUserId) {
       setError("Please select an investigator for this IO record.");
       return;
     }
@@ -139,14 +164,16 @@ function CreateIOModal({
           designation,
           police_station: policeStation,
         },
-        isClientAdmin ? Number(selectedUserId) : null
+        !isEditMode && isClientAdmin ? Number(selectedUserId) : null
       );
     } catch (err) {
-      console.error("Create IO error:", err);
+      console.error(isEditMode ? "Update IO error:" : "Create IO error:", err);
       const message =
         err?.response?.data?.detail ||
         err?.message ||
-        "You do not have permission to create Investigating Officers.";
+        (isEditMode
+          ? "Failed to update Investigating Officer record."
+          : "You do not have permission to create Investigating Officers.");
       setError(message);
     }
   };
@@ -155,42 +182,60 @@ function CreateIOModal({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity"
+        className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-sm transition-opacity"
         onClick={!isSubmitting ? onClose : undefined}
       />
 
       {/* Modal Dialog */}
       <div
-        className="relative z-10 w-full max-w-lg rounded-3xl border border-emerald-400/25 bg-[#071310] p-7 text-white shadow-2xl shadow-emerald-950/40"
+        className="relative z-10 w-full max-w-lg rounded-2xl border border-[#E2E8F0] bg-white p-6 sm:p-7 text-[#172033] shadow-2xl shadow-slate-900/15"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-emerald-400/10 pb-5">
+        <div className="flex items-start justify-between border-b border-[#E2E8F0] pb-5">
           <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 text-emerald-400">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-[#ECFDF5] text-[#059669]">
+              {isEditMode ? (
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              ) : (
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              )}
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-white">
-                Add Investigating Officer (IO)
+              <h2 className="text-xl font-bold tracking-tight text-[#172554]">
+                {isEditMode ? "Edit Investigating Officer" : "Add Investigating Officer (IO)"}
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Register an IO master record to link with cases
+              <p className="text-xs text-[#64748B] mt-0.5">
+                {isEditMode
+                  ? "Update officer details, rank, and station assignment"
+                  : "Register an IO master record to link with cases"}
               </p>
             </div>
           </div>
@@ -199,9 +244,10 @@ function CreateIOModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-xl border border-white/10 p-2 text-slate-400 hover:bg-white/5 hover:text-white transition disabled:opacity-50"
+            className="rounded-xl border border-[#E2E8F0] p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition disabled:opacity-50"
+            aria-label="Close modal"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -210,26 +256,31 @@ function CreateIOModal({
 
         {/* Error Alert */}
         {error && (
-          <div className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs font-medium text-rose-300">
+          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
             {error}
           </div>
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {/* Assigned Investigator for Client Admin */}
           {isClientAdmin && (
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                Assign to Investigator <span className="text-emerald-400">*</span>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#64748B] mb-1.5">
+                Assigned Investigator {!isEditMode && <span className="text-[#059669]">*</span>}
               </label>
-              {loadingUsers ? (
-                <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+              {isEditMode ? (
+                <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-3.5 py-2.5 text-xs font-semibold text-blue-900">
+                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span>Assigned to: {editingOfficer.assigned_user_name || "Primary User"}</span>
+                </div>
+              ) : loadingUsers ? (
+                <div className="flex items-center gap-2 text-xs text-[#64748B] py-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#059669] border-t-transparent" />
                   Loading investigators...
                 </div>
               ) : companyUsers.length === 0 ? (
-                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
                   No active investigators found in your company. Please create or activate an investigator first.
                 </div>
               ) : (
@@ -240,10 +291,10 @@ function CreateIOModal({
                     if (error) setError("");
                   }}
                   disabled={isSubmitting}
-                  className="w-full rounded-xl border border-emerald-400/20 bg-[#040e0b] px-4 py-3 text-sm text-white focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="w-full rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-2.5 text-xs font-medium text-[#172033] outline-none transition focus:border-[#059669] focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 >
                   {companyUsers.map((u) => (
-                    <option key={u.id} value={u.id} className="bg-[#040e0b] text-white">
+                    <option key={u.id} value={u.id}>
                       {u.username} ({u.email})
                     </option>
                   ))}
@@ -254,8 +305,8 @@ function CreateIOModal({
 
           {/* Officer Name */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-              Officer Name <span className="text-emerald-400">*</span>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#64748B] mb-1.5">
+              Officer Name <span className="text-[#059669]">*</span>
             </label>
             <input
               type="text"
@@ -264,32 +315,32 @@ function CreateIOModal({
               onChange={handleChange}
               disabled={isSubmitting}
               placeholder="e.g. Rajesh Kumar Sharma"
-              className="w-full rounded-xl border border-emerald-400/20 bg-black/40 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              className="w-full rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-2.5 text-xs sm:text-sm font-medium text-[#172033] placeholder-slate-400 outline-none transition focus:border-[#059669] focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
             />
           </div>
 
           {/* Designation */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-              Designation / Rank <span className="text-emerald-400">*</span>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#64748B] mb-1.5">
+              Designation / Rank <span className="text-[#059669]">*</span>
             </label>
             <select
               name="designation"
               value={formData.designation}
               onChange={handleChange}
               disabled={isSubmitting}
-              className="w-full rounded-xl border border-emerald-400/20 bg-[#040e0b] px-4 py-3 text-sm text-white focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              className="w-full rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-2.5 text-xs sm:text-sm font-medium text-[#172033] outline-none transition focus:border-[#059669] focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
             >
               {DESIGNATION_OPTIONS.map((opt) => (
-                <option key={opt} value={opt} className="bg-[#040e0b] text-white">
+                <option key={opt} value={opt}>
                   {opt}
                 </option>
               ))}
             </select>
 
-            {/* When Other is selected: writing line directly below it */}
+            {/* When Other is selected: text input below it */}
             {formData.designation === "Other" && (
-              <div className="mt-3">
+              <div className="mt-2.5">
                 <input
                   type="text"
                   name="custom_designation"
@@ -297,7 +348,7 @@ function CreateIOModal({
                   onChange={handleChange}
                   disabled={isSubmitting}
                   placeholder="Specify other designation / rank..."
-                  className="w-full border-0 border-b-2 border-emerald-400/60 bg-transparent px-1 py-2 text-sm text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none transition-colors"
+                  className="w-full rounded-xl border border-emerald-300 bg-emerald-50/40 px-3.5 py-2 text-xs sm:text-sm font-medium text-[#172033] placeholder-slate-400 outline-none transition focus:border-[#059669] focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                   autoFocus
                 />
               </div>
@@ -306,10 +357,10 @@ function CreateIOModal({
 
           {/* Police Station / Branch */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
-              Police Station / Branch <span className="text-emerald-400">*</span>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#64748B] mb-1">
+              Police Station / Branch <span className="text-[#059669]">*</span>
             </label>
-            <p className="text-[11px] text-slate-400 mb-2">
+            <p className="text-[11px] text-[#64748B] mb-1.5">
               Officer's current posting police station, thana, or unit branch
             </p>
             <input
@@ -319,17 +370,17 @@ function CreateIOModal({
               onChange={handleChange}
               disabled={isSubmitting}
               placeholder="e.g. Navrangpura Police Station / Cyber Crime Branch"
-              className="w-full rounded-xl border border-emerald-400/20 bg-black/40 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              className="w-full rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-2.5 text-xs sm:text-sm font-medium text-[#172033] placeholder-slate-400 outline-none transition focus:border-[#059669] focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
             />
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-emerald-400/10">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E2E8F0]">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="rounded-xl border border-white/10 px-5 py-2.5 text-xs font-semibold text-slate-300 hover:bg-white/5 transition disabled:opacity-50"
+              className="rounded-xl border border-[#E2E8F0] bg-white px-4 py-2.5 text-xs font-bold text-[#172554] hover:bg-slate-50 transition disabled:opacity-50"
             >
               Cancel
             </button>
@@ -337,15 +388,15 @@ function CreateIOModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-6 py-2.5 text-xs font-bold text-black transition shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-xl bg-[#059669] hover:bg-[#047857] px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-900/10 transition disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
-                  Saving...
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  {isEditMode ? "Updating..." : "Saving..."}
                 </>
               ) : (
-                "Save IO Record"
+                isEditMode ? "Update IO Record" : "Save IO Record"
               )}
             </button>
           </div>

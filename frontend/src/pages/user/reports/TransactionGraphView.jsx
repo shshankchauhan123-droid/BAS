@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { formatFinancialValue } from "../../../utils/chartFormatter";
 
 function formatCurrency(amount) {
   if (amount === null || amount === undefined || isNaN(amount)) {
@@ -22,11 +23,10 @@ function formatCurrencyFull(amount) {
   }).format(amount);
 }
 
-import { formatFinancialValue } from "../../../utils/chartFormatter";
-
 function formatCompact(num) {
   return formatFinancialValue(num);
 }
+
 function extractCounterparty(narration) {
   if (!narration) return "General Transfer";
   const str = String(narration).trim();
@@ -44,14 +44,14 @@ function extractCounterparty(narration) {
 }
 
 export const FILE_PALETTE = [
-  { badge: "border-cyan-500/30 bg-cyan-950/40 text-cyan-300", dot: "bg-cyan-400", hex: "#06b6d4" },
-  { badge: "border-purple-500/30 bg-purple-950/40 text-purple-300", dot: "bg-purple-400", hex: "#a855f7" },
-  { badge: "border-amber-500/30 bg-amber-950/40 text-amber-300", dot: "bg-amber-400", hex: "#f59e0b" },
-  { badge: "border-emerald-500/30 bg-emerald-950/40 text-emerald-300", dot: "bg-emerald-400", hex: "#10b981" },
-  { badge: "border-pink-500/30 bg-pink-950/40 text-pink-300", dot: "bg-pink-400", hex: "#ec4899" },
-  { badge: "border-blue-500/30 bg-blue-950/40 text-blue-300", dot: "bg-blue-400", hex: "#3b82f6" },
-  { badge: "border-indigo-500/30 bg-indigo-950/40 text-indigo-300", dot: "bg-indigo-400", hex: "#6366f1" },
-  { badge: "border-orange-500/30 bg-orange-950/40 text-orange-300", dot: "bg-orange-400", hex: "#f97316" },
+  { badge: "border-cyan-200 bg-cyan-50 text-cyan-800", dot: "bg-cyan-600", hex: "#0891b2" },
+  { badge: "border-purple-200 bg-purple-50 text-purple-800", dot: "bg-purple-600", hex: "#9333ea" },
+  { badge: "border-amber-200 bg-amber-50 text-amber-800", dot: "bg-amber-500", hex: "#d97706" },
+  { badge: "border-emerald-200 bg-emerald-50 text-emerald-800", dot: "bg-emerald-600", hex: "#059669" },
+  { badge: "border-pink-200 bg-pink-50 text-pink-800", dot: "bg-pink-600", hex: "#db2777" },
+  { badge: "border-blue-200 bg-blue-50 text-blue-800", dot: "bg-blue-600", hex: "#2563eb" },
+  { badge: "border-indigo-200 bg-indigo-50 text-indigo-800", dot: "bg-indigo-600", hex: "#4f46e5" },
+  { badge: "border-orange-200 bg-orange-50 text-orange-800", dot: "bg-orange-600", hex: "#ea580c" },
 ];
 
 export function getFileColor(fileId) {
@@ -299,8 +299,8 @@ export default function TransactionGraphView({
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const [metric, setMetric] = useState("both");
-  const [chartType, setChartType] = useState("combo"); // "combo" (Bar + Line together!)
-  const [scaleMode, setScaleMode] = useState("balanced"); // "balanced" (sqrt distribution) vs "linear" (1:1 strict)
+  const [chartType, setChartType] = useState("combo"); // "combo", "area", "donut"
+  const [scaleMode, setScaleMode] = useState("balanced"); // "balanced" vs "linear"
 
   const isDateGrouping = groupBy === "date_auto" || groupBy.startsWith("date_");
 
@@ -363,7 +363,7 @@ export default function TransactionGraphView({
   // Filtered transactions based on active statement files, custom date range, and active drill-down
   const filteredTransactions = useMemo(() => {
     if (!transactions || transactions.length === 0) return [];
-    
+
     return transactions.filter((tx) => {
       // 1. File Filter
       if (selectedFileIds.length > 1 && activeFileFilter.size > 0) {
@@ -408,7 +408,6 @@ export default function TransactionGraphView({
     }
 
     // 3. If groupBy was manually picked in dropdown (and not date_auto):
-    // If date_month has too many points, auto-manage to larger range as requested
     if (groupBy !== "date_auto") {
       if (groupBy === "date_month" && (dateSpanInfo.spanYears > 2 || dateSpanInfo.spanMonths > 24)) {
         return "date_year";
@@ -421,7 +420,7 @@ export default function TransactionGraphView({
 
     // 4. Default Smart Dynamic Auto-Scale (when groupBy === "date_auto"):
     if (dateSpanInfo.spanYears > 2 || dateSpanInfo.spanMonths > 24) {
-      return "date_year"; // Auto-manage into Year-by-Year (bdi range)
+      return "date_year";
     }
     if (dateSpanInfo.spanMonths > 12 || dateSpanInfo.spanYears > 1) {
       return "date_quarter";
@@ -686,7 +685,6 @@ export default function TransactionGraphView({
         label = cat;
         sortKey = cat;
       } else {
-        // Any dynamic column from data
         const val = tx[effectiveGroupBy] !== null && tx[effectiveGroupBy] !== undefined && String(tx[effectiveGroupBy]).trim() !== ""
           ? String(tx[effectiveGroupBy]).trim()
           : "Unspecified";
@@ -722,7 +720,6 @@ export default function TransactionGraphView({
         item.balances.push(bal);
       }
 
-      // Track per-file breakdown
       const fid = String(tx.file_id || "unassigned");
       if (!item.fileBreakdown[fid]) {
         const fObj = fileMap.get(fid);
@@ -760,7 +757,6 @@ export default function TransactionGraphView({
       };
     });
 
-    // Always sort naturally / chronologically so full dataset is clear
     items.sort((a, b) => {
       if (typeof a.sortKey === "number" && typeof b.sortKey === "number") {
         return a.sortKey - b.sortKey;
@@ -774,14 +770,14 @@ export default function TransactionGraphView({
   // If no transactions
   if (!transactions || transactions.length === 0) {
     return (
-      <div className="rounded-2xl border border-white/[0.08] bg-[#020b09] p-12 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-400 mb-4 border border-cyan-400/20">
+      <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mb-4 border border-slate-200">
           <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
         </div>
-        <h4 className="text-base font-bold text-white">No Visual Data Available</h4>
-        <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+        <h4 className="text-base font-extrabold text-[#172554]">No Visual Data Available</h4>
+        <p className="text-xs text-[#64748B] mt-1 max-w-sm mx-auto">
           No transactions are currently available to chart. Please ensure statements are uploaded and selected.
         </p>
       </div>
@@ -814,11 +810,11 @@ export default function TransactionGraphView({
 
   const totalVol = chartData.reduce((acc, d) => acc + (d.credit + d.debit), 0) || 1;
 
-  // Donut colors palette
+  // Donut colors palette - High-contrast, elegant light-theme hues
   const donutColors = [
-    "#10b981", "#06b6d4", "#6366f1", "#f59e0b", "#f43f5e",
-    "#3b82f6", "#ec4899", "#14b8a6", "#84cc16", "#f97316",
-    "#a855f7", "#64748b",
+    "#059669", "#0891b2", "#6366f1", "#f59e0b", "#e11d48",
+    "#2563eb", "#ec4899", "#0d9488", "#84cc16", "#ea580c",
+    "#9333ea", "#64748b",
   ];
 
   return (
@@ -828,21 +824,21 @@ export default function TransactionGraphView({
           MULTI-STATEMENT INTERACTIVE CONTROLS (when >1 files selected)
       ============================================================ */}
       {selectedFileIds && selectedFileIds.length > 1 && (
-        <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/25 p-4 shadow-xl backdrop-blur-sm space-y-3">
+        <div className="rounded-2xl border border-cyan-200 bg-white p-4 sm:p-5 shadow-sm shadow-slate-900/5 space-y-3.5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-300 font-bold text-sm border border-cyan-400/30">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700 font-bold text-sm border border-cyan-200 shadow-2xs">
                 📁
               </div>
               <div>
-                <p className="text-xs font-bold text-white flex items-center gap-2">
-                  <span>Multi-Statement Analysis Active</span>
-                  <span className="rounded-full bg-cyan-400/20 text-cyan-300 px-2 py-0.5 text-[10px] font-mono font-semibold">
+                <p className="text-xs font-extrabold text-[#172554] flex items-center gap-2">
+                  <span>Multi-Statement Comparative Analysis</span>
+                  <span className="rounded-full bg-cyan-50 border border-cyan-200 text-cyan-800 px-2.5 py-0.5 text-[10px] font-bold">
                     {activeFileFilter.size} of {selectedFileIds.length} Statements in Graph
                   </span>
                 </p>
-                <p className="text-[11px] text-cyan-200/80 mt-0.5">
-                  Click any statement badge below to isolate or include it in the graph.
+                <p className="text-xs text-[#64748B] mt-0.5 font-medium">
+                  Click any statement badge below to isolate or include it in the graph calculations.
                 </p>
               </div>
             </div>
@@ -850,15 +846,15 @@ export default function TransactionGraphView({
               <button
                 type="button"
                 onClick={() => setActiveFileFilter(new Set(selectedFileIds.map(String)))}
-                className="rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-300 transition cursor-pointer"
+                className="rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition cursor-pointer shadow-2xs"
               >
                 Select All ({selectedFileIds.length})
               </button>
-              {groupBy !== "file" && (
+              {groupBy !== "file_id" && (
                 <button
                   type="button"
-                  onClick={() => setGroupBy("file")}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-400/20 hover:bg-cyan-400/30 border border-cyan-400/40 px-3 py-1.5 text-xs font-bold text-cyan-300 transition-all cursor-pointer shadow-sm"
+                  onClick={() => setGroupBy("file_id")}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 px-3.5 py-1.5 text-xs font-bold text-cyan-800 transition cursor-pointer shadow-2xs"
                 >
                   <span>📁 Compare Statements Side-by-Side</span>
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -870,8 +866,8 @@ export default function TransactionGraphView({
           </div>
 
           {/* Interactive Statement File Pills Strip */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-cyan-500/20">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-1 flex items-center gap-1.5">
               <span>Filter Statements:</span>
             </span>
             {selectedFileIds.map((fid) => {
@@ -894,17 +890,17 @@ export default function TransactionGraphView({
                       return next;
                     });
                   }}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-[11px] font-semibold transition cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition cursor-pointer ${
                     isChecked
-                      ? `${col.badge} shadow-sm ring-1 ring-cyan-400/50 font-bold`
-                      : "border-white/10 bg-black/40 text-slate-500 opacity-50 hover:opacity-100"
+                      ? `${col.badge} shadow-xs ring-1 ring-cyan-500/30 font-bold`
+                      : "border-slate-200 bg-slate-50 text-slate-400 opacity-60 hover:opacity-100 hover:text-slate-600"
                   }`}
-                  title={`Click to ${isChecked ? "exclude" : "include"} ${f.account_number?.toString().trim() || f.original_filename} (File: ${f.original_filename}) in graph`}
+                  title={`Click to ${isChecked ? "exclude" : "include"} ${f.account_number?.toString().trim() || f.original_filename} in graph`}
                 >
-                  <span className={`h-2 w-2 rounded-full ${isChecked ? col.dot : "bg-slate-600"}`} />
+                  <span className={`h-2 w-2 rounded-full ${isChecked ? col.dot : "bg-slate-400"}`} />
                   <span className="truncate max-w-[150px]">{f.account_number?.toString().trim() || f.original_filename}</span>
                   {f.is_merged && (
-                    <span className="rounded bg-teal-400/20 px-1 py-0.2 text-[8px] font-bold text-teal-300 border border-teal-400/30">
+                    <span className="rounded bg-teal-50 px-1 py-0.2 text-[8px] font-bold text-teal-800 border border-teal-200">
                       MERGED
                     </span>
                   )}
@@ -919,64 +915,119 @@ export default function TransactionGraphView({
       {/* ============================================================
           DYNAMIC CHART STUDIO / GRAPH BUILDER TOOLBAR
       ============================================================ */}
-      <div className="rounded-2xl border border-white/[0.08] bg-[#020b09] p-4 sm:p-6 shadow-2xl space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm shadow-slate-900/5 space-y-5 transition-all">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 animate-pulse" />
-                <h4 className="text-base font-bold text-white tracking-wide">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#059669]" />
+                <h4 className="text-base font-extrabold text-[#172554] tracking-tight">
                   Dynamic Financial Graph Studio
                 </h4>
-                <span className="rounded-md bg-cyan-400/10 border border-cyan-400/20 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-300">
+                <span className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
                   {filteredTransactions.length} of {transactions.length} Txs Plotted
                 </span>
-                <span className="rounded-md bg-emerald-500/10 border border-emerald-400/25 px-2.5 py-0.5 text-[11px] font-medium text-emerald-300">
+                <span className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-xs font-bold text-[#172554]">
                   📊 {currentYOption.label} by {currentXOption.label}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1">
-                Choose any column or data type from your bank statement for X-Axis and any financial metric for Y-Axis.
+              <p className="text-xs text-[#64748B] mt-1 font-medium">
+                Select any dimension from your bank statement for the X-Axis and any financial metric for the Y-Axis.
               </p>
+            </div>
+
+            {/* Visualization Mode Segmented Control (Combo / Area / Donut) */}
+            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-100 p-1 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setChartType("combo")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                  chartType === "combo"
+                    ? "bg-white text-[#172554] shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="Bar & Line Combo Chart"
+              >
+                <span>📊 Combo (Bar + Line)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartType("area")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                  chartType === "area"
+                    ? "bg-white text-[#172554] shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="Continuous Area Trend"
+              >
+                <span>📈 Area Flow</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartType("donut")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                  chartType === "donut"
+                    ? "bg-white text-[#172554] shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="Proportional Share Breakdown"
+              >
+                <span>🍩 Donut Share</span>
+              </button>
             </div>
           </div>
 
-          {/* Quick Metrics Bar (Clean summary without date presets) */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#020b09] border border-white/[0.06] rounded-xl px-4 py-2 text-xs font-mono">
-            <div className="flex items-center gap-4">
-              <span className="text-slate-400 text-[11px] font-sans font-semibold uppercase tracking-wider">
-                Total Flow:
+          {/* Financial Summary Strip */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/90 border border-slate-200 rounded-xl px-5 py-3 text-xs">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="text-[#172554] text-xs font-extrabold uppercase tracking-wider">
+                Total Financial Flow:
               </span>
-              <div className="text-emerald-400 font-semibold" title={`Total Inflow: ${formatCurrencyFull(graphFinancialMetrics.totalCredits)}`}>
-                <span className="text-[10px] text-slate-400 mr-1">Cr:</span>
+              <div
+                className="bg-white border border-emerald-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-mono text-xs font-bold text-[#059669] shadow-2xs"
+                title={`Total Inflow: ${formatCurrencyFull(graphFinancialMetrics.totalCredits)}`}
+              >
+                <span className="text-[10px] text-slate-500 mr-0.5">Cr:</span>
                 <span>+{formatCurrency(graphFinancialMetrics.totalCredits)}</span>
               </div>
-              <div className="text-rose-400 font-semibold" title={`Total Outflow: ${formatCurrencyFull(graphFinancialMetrics.totalDebits)}`}>
-                <span className="text-[10px] text-slate-400 mr-1">Dr:</span>
+              <div
+                className="bg-white border border-rose-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-mono text-xs font-bold text-[#E11D48] shadow-2xs"
+                title={`Total Outflow: ${formatCurrencyFull(graphFinancialMetrics.totalDebits)}`}
+              >
+                <span className="text-[10px] text-slate-500 mr-0.5">Dr:</span>
                 <span>-{formatCurrency(graphFinancialMetrics.totalDebits)}</span>
               </div>
-              <div className={`font-bold ${graphFinancialMetrics.net >= 0 ? "text-cyan-300" : "text-amber-400"}`}>
-                <span className="text-[10px] text-slate-400 mr-1">Net:</span>
+              <div
+                className={`bg-white border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-mono text-xs font-extrabold shadow-2xs ${
+                  graphFinancialMetrics.net >= 0 ? "text-[#059669]" : "text-[#E11D48]"
+                }`}
+                title={`Net Cash Movement: ${formatCurrencyFull(graphFinancialMetrics.net)}`}
+              >
+                <span className="text-[10px] text-slate-500 mr-0.5">Net:</span>
                 <span>{graphFinancialMetrics.net >= 0 ? "+" : ""}{formatCurrency(graphFinancialMetrics.net)}</span>
               </div>
             </div>
-            <div className="text-slate-400 text-[11px]">
-              <span className="text-cyan-300 font-bold">{chartData.length}</span> categories plotted across <span className="text-white font-bold">{graphFinancialMetrics.count}</span> transactions
+            <div className="text-[#64748B] text-xs font-medium">
+              <span className="text-[#172554] font-extrabold">{chartData.length}</span> categories plotted across{" "}
+              <span className="text-[#172554] font-extrabold">{graphFinancialMetrics.count}</span> transactions
             </div>
           </div>
 
-          {/* Interactive Axis Pickers (Full Dataset Always Loaded) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* Interactive Axis Selectors */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* 1. X-Axis (Dynamic Data Column) */}
-            <div className="rounded-xl border border-cyan-500/20 bg-cyan-950/10 p-3">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-cyan-300 mb-1.5 flex items-center justify-between">
-                <span>📅 X-Axis (Column / Data Type)</span>
-                <span className="text-[10px] text-cyan-400/80 font-normal">Horizontal Dimension</span>
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs hover:border-slate-300 transition">
+              <label className="block text-xs font-extrabold uppercase tracking-wider text-[#172554] mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <span>📅</span>
+                  <span>X-Axis — Dimension</span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-semibold normal-case">Horizontal grouping</span>
               </label>
               <select
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#061411] px-3 py-2 text-xs text-white font-medium focus:border-cyan-400 focus:outline-none cursor-pointer"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 font-semibold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 focus:outline-none transition cursor-pointer shadow-2xs"
               >
                 {Object.entries(
                   dynamicFieldOptions.xOptions.reduce((acc, opt) => {
@@ -985,9 +1036,9 @@ export default function TransactionGraphView({
                     return acc;
                   }, {})
                 ).map(([grpName, opts]) => (
-                  <optgroup key={grpName} label={grpName} className="bg-[#020b09] text-cyan-300 font-bold">
+                  <optgroup key={grpName} label={grpName} className="bg-slate-100 text-[#172554] font-bold">
                     {opts.map((opt) => (
-                      <option key={opt.id} value={opt.id} className="text-white font-normal bg-[#061411]">
+                      <option key={opt.id} value={opt.id} className="text-slate-800 font-normal bg-white">
                         {opt.icon} {opt.label}
                       </option>
                     ))}
@@ -997,15 +1048,18 @@ export default function TransactionGraphView({
             </div>
 
             {/* 2. Y-Axis (Dynamic Metric / Value) */}
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-950/10 p-3">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-emerald-300 mb-1.5 flex items-center justify-between">
-                <span>📈 Y-Axis (Metric / Value)</span>
-                <span className="text-[10px] text-emerald-400/80 font-normal">Vertical Metric</span>
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs hover:border-slate-300 transition">
+              <label className="block text-xs font-extrabold uppercase tracking-wider text-[#172554] mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <span>📈</span>
+                  <span>Y-Axis — Financial Metric</span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-semibold normal-case">Vertical metric</span>
               </label>
               <select
                 value={metric}
                 onChange={(e) => setMetric(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#061411] px-3 py-2 text-xs text-white font-medium focus:border-emerald-400 focus:outline-none cursor-pointer"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 font-semibold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 focus:outline-none transition cursor-pointer shadow-2xs"
               >
                 {Object.entries(
                   dynamicFieldOptions.yOptions.reduce((acc, opt) => {
@@ -1014,9 +1068,9 @@ export default function TransactionGraphView({
                     return acc;
                   }, {})
                 ).map(([grpName, opts]) => (
-                  <optgroup key={grpName} label={grpName} className="bg-[#020b09] text-emerald-300 font-bold">
+                  <optgroup key={grpName} label={grpName} className="bg-slate-100 text-[#172554] font-bold">
                     {opts.map((opt) => (
-                      <option key={opt.id} value={opt.id} className="text-white font-normal bg-[#061411]">
+                      <option key={opt.id} value={opt.id} className="text-slate-800 font-normal bg-white">
                         {opt.icon} {opt.label}
                       </option>
                     ))}
@@ -1026,15 +1080,15 @@ export default function TransactionGraphView({
             </div>
           </div>
 
-          {/* Dynamic Timeline Granularity & Custom Date Range Filter */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#061411]/90 border border-white/[0.08] rounded-xl p-3 text-xs">
+          {/* Date Scope and Timeline Controls Card */}
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50/70 border border-slate-200 rounded-xl p-4 text-xs shadow-2xs">
             {/* Custom Date Range Filter */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs font-bold text-[#172554] flex items-center gap-1.5">
                 <span>📅 Date Scope:</span>
               </span>
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-slate-400">From</span>
+                <span className="text-xs text-[#64748B] font-medium">From</span>
                 <input
                   type="date"
                   value={startDateFilter}
@@ -1042,11 +1096,11 @@ export default function TransactionGraphView({
                     setStartDateFilter(e.target.value);
                     setDrillDown(null);
                   }}
-                  className="rounded-lg border border-white/10 bg-black/50 px-2.5 py-1 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 focus:outline-none shadow-2xs"
                 />
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-slate-400">To</span>
+                <span className="text-xs text-[#64748B] font-medium">To</span>
                 <input
                   type="date"
                   value={endDateFilter}
@@ -1054,7 +1108,7 @@ export default function TransactionGraphView({
                     setEndDateFilter(e.target.value);
                     setDrillDown(null);
                   }}
-                  className="rounded-lg border border-white/10 bg-black/50 px-2.5 py-1 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 focus:outline-none shadow-2xs"
                 />
               </div>
               {(startDateFilter || endDateFilter) && (
@@ -1065,20 +1119,20 @@ export default function TransactionGraphView({
                     setEndDateFilter("");
                     setDrillDown(null);
                   }}
-                  className="text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg hover:bg-rose-500/25 cursor-pointer transition"
+                  className="text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1.5 rounded-lg hover:bg-rose-100 cursor-pointer transition shadow-2xs"
                 >
                   ✖ Clear Dates
                 </button>
               )}
             </div>
 
-            {/* Step Granularity Pills (When date dimension is active) */}
+            {/* Timeline Range Step Pills (When date dimension is active) */}
             {isDateGrouping && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                <span className="text-xs text-[#64748B] font-bold uppercase tracking-wider">
                   Timeline Range Step:
                 </span>
-                <div className="flex items-center gap-1 bg-black/40 border border-white/[0.08] p-1 rounded-xl">
+                <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl">
                   {[
                     { id: "auto", label: `⚡ Auto (${effectiveGroupBy === "date_year" ? "Yearly" : effectiveGroupBy === "date_quarter" ? "Quarterly" : effectiveGroupBy === "date_month" ? "Monthly" : "Daily"})` },
                     { id: "date_year", label: "📆 Yearly" },
@@ -1093,10 +1147,10 @@ export default function TransactionGraphView({
                         setDateGranularity(s.id);
                         setDrillDown(null);
                       }}
-                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer ${
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
                         dateGranularity === s.id
-                          ? "bg-cyan-400 text-black shadow-md font-bold"
-                          : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                          ? "bg-[#059669] text-white shadow-xs font-extrabold"
+                          : "text-slate-700 hover:text-slate-900 hover:bg-white/60 font-semibold"
                       }`}
                     >
                       {s.label}
@@ -1109,35 +1163,35 @@ export default function TransactionGraphView({
 
           {/* Drill-Down Breadcrumb Banner */}
           {drillDown && (
-            <div className="flex flex-wrap items-center justify-between gap-2.5 bg-cyan-950/40 border border-cyan-400/30 px-4 py-2.5 rounded-xl text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-emerald-50/80 border border-emerald-200 px-4 py-3 rounded-xl text-xs shadow-2xs">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-cyan-300 font-bold flex items-center gap-1.5">
+                <span className="text-emerald-900 font-extrabold flex items-center gap-1.5">
                   <span className="animate-pulse">🔍</span> Timeline Drill-Down:
                 </span>
                 <button
                   type="button"
                   onClick={() => setDrillDown(null)}
-                  className="text-slate-300 hover:text-cyan-300 underline font-semibold cursor-pointer"
+                  className="text-emerald-800 hover:text-emerald-950 underline font-bold cursor-pointer"
                 >
                   All Years ({dateSpanInfo.spanYears} Yrs)
                 </button>
-                <span className="text-slate-500 font-mono">&gt;</span>
+                <span className="text-emerald-400 font-mono">&gt;</span>
                 {drillDown.level === "month" ? (
                   <>
                     <button
                       type="button"
                       onClick={() => setDrillDown({ level: "year", year: drillDown.year, label: `Year ${drillDown.year}` })}
-                      className="text-slate-300 hover:text-cyan-300 underline font-semibold cursor-pointer"
+                      className="text-emerald-800 hover:text-emerald-950 underline font-bold cursor-pointer"
                     >
                       Year {drillDown.year}
                     </button>
-                    <span className="text-slate-500 font-mono">&gt;</span>
-                    <span className="text-emerald-400 font-bold bg-emerald-950/50 border border-emerald-400/30 px-2 py-0.5 rounded">
+                    <span className="text-emerald-400 font-mono">&gt;</span>
+                    <span className="text-emerald-900 font-extrabold bg-white border border-emerald-300 px-2.5 py-1 rounded-lg shadow-2xs">
                       {drillDown.label} (Daily Breakdown)
                     </span>
                   </>
                 ) : (
-                  <span className="text-emerald-400 font-bold bg-emerald-950/50 border border-emerald-400/30 px-2 py-0.5 rounded">
+                  <span className="text-emerald-900 font-extrabold bg-white border border-emerald-300 px-2.5 py-1 rounded-lg shadow-2xs">
                     {drillDown.label} (Monthly Breakdown)
                   </span>
                 )}
@@ -1147,7 +1201,7 @@ export default function TransactionGraphView({
                   <button
                     type="button"
                     onClick={() => setDrillDown({ level: "year", year: drillDown.year, label: `Year ${drillDown.year}` })}
-                    className="text-[11px] bg-white/10 hover:bg-white/20 text-slate-200 px-2.5 py-1 rounded-lg cursor-pointer transition font-semibold"
+                    className="text-xs bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg cursor-pointer transition font-bold shadow-2xs"
                   >
                     ⬅ Back to Year {drillDown.year}
                   </button>
@@ -1155,7 +1209,7 @@ export default function TransactionGraphView({
                   <button
                     type="button"
                     onClick={() => setDrillDown(null)}
-                    className="text-[11px] bg-white/10 hover:bg-white/20 text-slate-200 px-2.5 py-1 rounded-lg cursor-pointer transition font-semibold"
+                    className="text-xs bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg cursor-pointer transition font-bold shadow-2xs"
                   >
                     ⬅ Back to All Years
                   </button>
@@ -1163,7 +1217,7 @@ export default function TransactionGraphView({
                 <button
                   type="button"
                   onClick={() => setDrillDown(null)}
-                  className="text-[11px] bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg cursor-pointer transition font-semibold"
+                  className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg cursor-pointer transition font-bold shadow-2xs"
                 >
                   ✖ Reset Zoom
                 </button>
@@ -1175,9 +1229,9 @@ export default function TransactionGraphView({
         {/* ============================================================
             MAIN ENLARGED CHART CANVAS (Height ~500px for large view)
         ============================================================ */}
-        <div className="mt-6 pt-5 border-t border-white/[0.06]">
+        <div className="mt-6 pt-5 border-t border-slate-100">
           {chartData.length === 0 ? (
-            <div className="py-24 text-center text-sm text-slate-500">
+            <div className="py-24 text-center text-sm text-[#64748B]">
               No matching data found for the current chart parameters.
             </div>
           ) : chartType === "combo" ? (
@@ -1188,27 +1242,27 @@ export default function TransactionGraphView({
               {/* Chart Top Header & Legend */}
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-white text-sm">
+                  <span className="font-extrabold text-[#172554] text-sm">
                     {currentYOption.label} by {currentXOption.label}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-950/70 border border-emerald-400/30 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
                     📈 {currentYOption.axisName}
                   </span>
-                  <span className="text-slate-400 text-xs font-mono">
+                  <span className="text-[#64748B] text-xs font-mono font-medium">
                     ({chartData.length} Plotted)
                   </span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs">
                   {/* Height Scale Mode Toggle */}
-                  <div className="flex items-center gap-1 bg-black/40 border border-white/[0.08] p-1 rounded-xl">
+                  <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 p-1 rounded-xl">
                     <button
                       type="button"
                       onClick={() => setScaleMode("balanced")}
                       className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer ${
                         scaleMode === "balanced"
-                          ? "bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 shadow-sm"
-                          : "text-slate-400 hover:text-white"
+                          ? "bg-white text-[#172554] shadow-xs font-bold"
+                          : "text-slate-600 hover:text-slate-900"
                       }`}
                       title="Balanced Scaling (Square-Root): Prevents lower volume periods from squashing into invisible flat bars"
                     >
@@ -1219,8 +1273,8 @@ export default function TransactionGraphView({
                       onClick={() => setScaleMode("linear")}
                       className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer ${
                         scaleMode === "linear"
-                          ? "bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 shadow-sm"
-                          : "text-slate-400 hover:text-white"
+                          ? "bg-white text-[#172554] shadow-xs font-bold"
+                          : "text-slate-600 hover:text-slate-900"
                       }`}
                       title="Strict Linear 1:1 Scaling"
                     >
@@ -1229,38 +1283,38 @@ export default function TransactionGraphView({
                   </div>
 
                   {metric === "both" ? (
-                    <div className="flex flex-wrap items-center gap-2.5 bg-white/[0.04] border border-white/[0.08] px-3.5 py-1.5 rounded-xl">
-                      <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Legend:</span>
+                    <div className="flex flex-wrap items-center gap-2.5 bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-xl">
+                      <span className="text-[11px] font-bold text-[#172554] uppercase tracking-wider">Legend:</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="h-3 w-3 rounded-sm bg-gradient-to-t from-emerald-600 to-emerald-400 shadow-sm" />
-                        <span className="text-emerald-300 font-semibold text-xs">Credit Bar</span>
+                        <span className="h-3 w-3 rounded-sm bg-gradient-to-t from-emerald-600 to-[#059669] shadow-2xs" />
+                        <span className="text-emerald-800 font-bold text-xs">Credit Bar</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="h-0.5 w-3 bg-emerald-400 rounded-full" />
-                        <span className="h-2 w-2 rounded-full bg-emerald-400 border border-black" />
-                        <span className="text-emerald-400 font-semibold text-xs">Credit Line</span>
+                        <span className="h-0.5 w-3 bg-[#059669] rounded-full" />
+                        <span className="h-2 w-2 rounded-full bg-[#059669] border border-white" />
+                        <span className="text-emerald-800 font-bold text-xs">Credit Line</span>
                       </div>
-                      <span className="text-slate-600">|</span>
+                      <span className="text-slate-300">|</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="h-3 w-3 rounded-sm bg-gradient-to-t from-rose-600 to-rose-400 shadow-sm" />
-                        <span className="text-rose-300 font-semibold text-xs">Debit Bar</span>
+                        <span className="h-3 w-3 rounded-sm bg-gradient-to-t from-rose-600 to-[#E11D48] shadow-2xs" />
+                        <span className="text-rose-700 font-bold text-xs">Debit Bar</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="h-0.5 w-3 bg-rose-400 rounded-full" />
-                        <span className="h-2 w-2 rounded-full bg-rose-400 border border-black" />
-                        <span className="text-rose-400 font-semibold text-xs">Debit Line</span>
+                        <span className="h-0.5 w-3 bg-[#E11D48] rounded-full" />
+                        <span className="h-2 w-2 rounded-full bg-[#E11D48] border border-white" />
+                        <span className="text-rose-700 font-bold text-xs">Debit Line</span>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.08] px-3 py-1 rounded-xl text-xs">
-                        <span className="h-0.5 w-3 bg-cyan-400 rounded-full" />
-                        <span className="h-2 w-2 rounded-full bg-cyan-300 border border-black" />
-                        <span className="text-cyan-300 font-semibold">
+                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1 rounded-xl text-xs">
+                        <span className="h-0.5 w-3 bg-cyan-600 rounded-full" />
+                        <span className="h-2 w-2 rounded-full bg-cyan-600 border border-white" />
+                        <span className="text-cyan-800 font-bold">
                           {currentYOption.label} Line
                         </span>
                       </div>
-                      <div className="font-mono text-cyan-300 font-semibold bg-cyan-950/30 px-3 py-1 rounded-lg border border-cyan-400/20">
+                      <div className="font-mono text-[#172554] font-bold bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
                         Peak: {formatCurrency(maxVal)}
                       </div>
                     </div>
@@ -1270,32 +1324,32 @@ export default function TransactionGraphView({
 
               {/* Main Chart Frame: Left Y-Axis Rail + Center Large Plot Area */}
               <div className="flex gap-2 sm:gap-4 pt-4">
-                {/* DEDICATED Y-AXIS RAIL (Clean, unobstructed ticks with zero overlap) */}
-                <div className="flex flex-col justify-between items-end pr-2.5 border-r-2 border-white/[0.12] select-none text-[11px] font-mono text-slate-300 w-16 sm:w-20 flex-shrink-0 relative pb-14">
-                  <div className="text-[10px] font-bold text-emerald-400 font-mono tracking-wider">
+                {/* DEDICATED Y-AXIS RAIL */}
+                <div className="flex flex-col justify-between items-end pr-2.5 border-r-2 border-slate-200 select-none text-[11px] font-mono text-slate-500 w-16 sm:w-20 flex-shrink-0 relative pb-14">
+                  <div className="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-mono tracking-wider">
                     ₹ MAX
                   </div>
-                  <div className="font-bold text-white bg-white/[0.06] px-1.5 py-0.5 rounded text-[11px]">
+                  <div className="font-bold text-[#172554] bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
                     {formatCompact(maxVal)}
                   </div>
-                  <div className="text-slate-400 font-medium text-[11px]">{formatCompact(maxVal * 0.75)}</div>
-                  <div className="text-slate-400 font-medium text-[11px]">{formatCompact(maxVal * 0.50)}</div>
-                  <div className="text-slate-400 font-medium text-[11px]">{formatCompact(maxVal * 0.25)}</div>
-                  <div className="text-slate-500 font-bold text-[11px]">₹0</div>
+                  <div className="text-slate-500 font-medium text-[11px]">{formatCompact(maxVal * 0.75)}</div>
+                  <div className="text-slate-500 font-medium text-[11px]">{formatCompact(maxVal * 0.50)}</div>
+                  <div className="text-slate-500 font-medium text-[11px]">{formatCompact(maxVal * 0.25)}</div>
+                  <div className="text-slate-600 font-bold text-[11px]">₹0</div>
                 </div>
 
-                {/* LARGE BAR PLOT CANVAS (Height: 480px, Responsive in SAME fixed space) */}
-                <div className="relative flex-1 h-[480px]">
+                {/* LARGE BAR PLOT CANVAS (Height: 480px) */}
+                <div className="relative flex-1 h-[480px] bg-slate-50/40 rounded-xl border border-slate-100 p-2">
                   {/* Horizontal Background Guidelines */}
-                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-14">
-                    <div className="border-b border-white/[0.1] w-full" />
-                    <div className="border-b border-dashed border-white/[0.06] w-full" />
-                    <div className="border-b border-dashed border-white/[0.06] w-full" />
-                    <div className="border-b border-dashed border-white/[0.06] w-full" />
-                    <div className="border-b-2 border-white/[0.15] w-full" />
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-14 p-2">
+                    <div className="border-b border-slate-200 w-full" />
+                    <div className="border-b border-dashed border-slate-200/80 w-full" />
+                    <div className="border-b border-dashed border-slate-200/80 w-full" />
+                    <div className="border-b border-dashed border-slate-200/80 w-full" />
+                    <div className="border-b-2 border-slate-300 w-full" />
                   </div>
 
-                  {/* Bars Flex Container: Dynamically fits 100% within space, NO horizontal scrollbar! */}
+                  {/* Bars Flex Container */}
                   <div className="relative z-10 h-full w-full flex items-end overflow-hidden pb-14">
                     {/* Authentic Line Graph Overlay: Point-to-Point Straight Lines with Node Dots */}
                     {chartData.length > 1 && (() => {
@@ -1336,11 +1390,11 @@ export default function TransactionGraphView({
                             preserveAspectRatio="none"
                             className="absolute inset-x-0 top-0 h-[calc(100%-56px)] w-full pointer-events-none z-20 overflow-visible"
                           >
-                            {/* 🟢 Credit / Inflow Straight Line */}
+                            {/* 🟢 Credit / Inflow Line */}
                             <path
                               d={crPath}
                               fill="none"
-                              stroke="#10b981"
+                              stroke="#059669"
                               strokeWidth="2.5"
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -1353,18 +1407,18 @@ export default function TransactionGraphView({
                                   cx={pt.x}
                                   cy={pt.y}
                                   r={isHovered ? 5.5 : chartData.length > 25 ? 2.5 : 3.5}
-                                  fill="#10b981"
-                                  stroke="#020b09"
+                                  fill="#059669"
+                                  stroke="#ffffff"
                                   strokeWidth={isHovered ? 2.5 : 1.5}
                                 />
                               );
                             })}
 
-                            {/* 🔴 Debit / Outflow Straight Line */}
+                            {/* 🔴 Debit / Outflow Line */}
                             <path
                               d={drPath}
                               fill="none"
-                              stroke="#f43f5e"
+                              stroke="#E11D48"
                               strokeWidth="2.5"
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -1377,8 +1431,8 @@ export default function TransactionGraphView({
                                   cx={pt.x}
                                   cy={pt.y}
                                   r={isHovered ? 5.5 : chartData.length > 25 ? 2.5 : 3.5}
-                                  fill="#f43f5e"
-                                  stroke="#020b09"
+                                  fill="#E11D48"
+                                  stroke="#ffffff"
                                   strokeWidth={isHovered ? 2.5 : 1.5}
                                 />
                               );
@@ -1390,12 +1444,12 @@ export default function TransactionGraphView({
                       // Single Metric Selected
                       const lineColor =
                         metric === "credit"
-                          ? "#10b981"
+                          ? "#059669"
                           : metric === "debit"
-                          ? "#f43f5e"
+                          ? "#E11D48"
                           : metric === "balance"
-                          ? "#38bdf8"
-                          : "#06b6d4";
+                          ? "#0891B2"
+                          : "#2563EB";
 
                       let singlePath = "";
                       const singlePoints = [];
@@ -1436,7 +1490,7 @@ export default function TransactionGraphView({
                                 cy={pt.y}
                                 r={isHovered ? 5.5 : chartData.length > 25 ? 2.5 : 3.5}
                                 fill={lineColor}
-                                stroke="#020b09"
+                                stroke="#ffffff"
                                 strokeWidth={isHovered ? 2.5 : 1.5}
                               />
                             );
@@ -1444,6 +1498,7 @@ export default function TransactionGraphView({
                         </svg>
                       );
                     })()}
+
                     {chartData.map((d, idx) => {
                       const totalAmount = d.credit + d.debit;
                       const rawRatio = maxVal > 0 ? totalAmount / maxVal : 0;
@@ -1471,7 +1526,7 @@ export default function TransactionGraphView({
                           onMouseEnter={() => setHoveredItem(d)}
                           onMouseLeave={() => setHoveredItem(null)}
                         >
-                          {/* Value Tag Above Bar (Always visible when <= 8 items, or on hover when > 8 items) */}
+                          {/* Value Tag Above Bar */}
                           {valForDisplay > 0 && (
                             <div
                               style={{ bottom: `calc(${currentBarH}% + 8px)` }}
@@ -1481,54 +1536,56 @@ export default function TransactionGraphView({
                                   : "opacity-0 group-hover:opacity-100 group-hover:-translate-y-1"
                               }`}
                             >
-                              <span className="font-mono font-bold text-[10px] text-cyan-200 bg-[#020b09]/95 border border-cyan-400/50 px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap">
+                              <span className="font-mono font-bold text-[10px] text-[#172554] bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-md whitespace-nowrap">
                                 {formatCompact(valForDisplay)}
                               </span>
                             </div>
                           )}
 
                           {/* Floating Hover Tooltip */}
-                          <div className="absolute bottom-[105%] mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30 rounded-2xl bg-[#061411] border border-cyan-400/40 p-3.5 shadow-2xl min-w-[220px]">
-                            <div className="font-bold text-white text-xs border-b border-white/10 pb-1.5 mb-2 flex items-center justify-between">
+                          <div className="absolute bottom-[105%] mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30 rounded-2xl bg-white border border-slate-200 p-4 shadow-2xl shadow-slate-900/15 min-w-[240px] text-slate-800">
+                            <div className="font-extrabold text-[#172554] text-xs border-b border-slate-100 pb-2 mb-2 flex items-center justify-between">
                               <span className="truncate max-w-[170px]" title={d.label}>{d.label}</span>
-                              <span className="text-[10px] text-cyan-300 font-mono">#{idx + 1}</span>
+                              <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-mono font-bold">#{idx + 1}</span>
                             </div>
                             <div className="space-y-1.5 font-mono text-[11px]">
-                              <div className="flex justify-between text-rose-400">
+                              <div className="flex justify-between text-rose-600 font-medium">
                                 <span>▲ Top (Debit):</span>
                                 <span className="font-bold">{formatCurrencyFull(d.debit)}</span>
                               </div>
-                              <div className="flex justify-between text-emerald-400">
+                              <div className="flex justify-between text-emerald-700 font-medium">
                                 <span>▼ Bottom (Credit):</span>
                                 <span className="font-bold">{formatCurrencyFull(d.credit)}</span>
                               </div>
                               {metric === "both" && (
-                                <div className="flex justify-between text-white font-bold pt-1 border-t border-white/10">
-                                  <span>Combined Bar:</span>
+                                <div className="flex justify-between text-[#172554] font-extrabold pt-1.5 border-t border-slate-100">
+                                  <span>Combined Volume:</span>
                                   <span>{formatCurrencyFull(totalAmount)}</span>
                                 </div>
                               )}
-                              <div className="flex justify-between text-cyan-300 pt-1 border-t border-white/10 font-bold">
+                              <div className="flex justify-between text-[#172554] pt-1.5 border-t border-slate-100 font-bold">
                                 <span>Net Flow:</span>
-                                <span>{d.net >= 0 ? `+${formatCurrencyFull(d.net)}` : formatCurrencyFull(d.net)}</span>
+                                <span className={d.net >= 0 ? "text-emerald-700" : "text-rose-600"}>
+                                  {d.net >= 0 ? `+${formatCurrencyFull(d.net)}` : formatCurrencyFull(d.net)}
+                                </span>
                               </div>
                               {d.balance !== null && (
-                                <div className="flex justify-between text-slate-300">
+                                <div className="flex justify-between text-cyan-800 font-semibold">
                                   <span>Closing Balance:</span>
                                   <span>{formatCurrencyFull(d.balance)}</span>
                                 </div>
                               )}
-                              <div className="flex justify-between text-slate-400 pt-1.5 border-t border-white/10 text-[10px]">
+                              <div className="flex justify-between text-[#64748B] pt-1.5 border-t border-slate-100 text-[10px]">
                                 <span>Activity:</span>
                                 <span>{d.count} transactions</span>
                               </div>
 
                               {/* Statement File Breakdown inside Tooltip */}
                               {d.fileBreakdownList && d.fileBreakdownList.length > 1 && (
-                                <div className="pt-2 mt-2 border-t border-white/10 space-y-1.5">
-                                  <div className="text-[10px] uppercase font-bold text-cyan-300 flex items-center justify-between">
+                                <div className="pt-2 mt-2 border-t border-slate-100 space-y-1.5">
+                                  <div className="text-[10px] uppercase font-bold text-[#172554] flex items-center justify-between">
                                     <span>📁 Statement Breakdown</span>
-                                    <span className="text-[9px] text-slate-400 font-normal">({d.fileBreakdownList.length} files)</span>
+                                    <span className="text-[9px] text-[#64748B] font-normal">({d.fileBreakdownList.length} files)</span>
                                   </div>
                                   <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
                                     {d.fileBreakdownList.map((fb) => {
@@ -1536,18 +1593,18 @@ export default function TransactionGraphView({
                                       return (
                                         <div
                                           key={fb.fileId}
-                                          className="flex items-center justify-between text-[10px] bg-white/[0.04] px-2 py-1 rounded border border-white/[0.04]"
+                                          className="flex items-center justify-between text-[10px] bg-slate-50 px-2 py-1 rounded border border-slate-100"
                                         >
                                           <div className="flex items-center gap-1.5 min-w-0 pr-2">
                                             <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${col.dot}`} />
-                                            <span className="truncate max-w-[105px] text-slate-200 font-medium" title={fb.fileName}>
+                                            <span className="truncate max-w-[105px] text-slate-700 font-medium" title={fb.fileName}>
                                               {fb.fileName}
                                             </span>
                                           </div>
                                           <div className="font-mono text-right shrink-0">
-                                            <span className="text-emerald-400 font-semibold">+{formatCompact(fb.credit)}</span>
-                                            <span className="text-slate-600 mx-1">|</span>
-                                            <span className="text-rose-400 font-semibold">-{formatCompact(fb.debit)}</span>
+                                            <span className="text-emerald-700 font-bold">+{formatCompact(fb.credit)}</span>
+                                            <span className="text-slate-300 mx-1">|</span>
+                                            <span className="text-rose-600 font-bold">-{formatCompact(fb.debit)}</span>
                                           </div>
                                         </div>
                                       );
@@ -1558,7 +1615,7 @@ export default function TransactionGraphView({
 
                               {/* Drill-down hint when viewing dates */}
                               {isDateGrouping && (effectiveGroupBy === "date_year" || effectiveGroupBy === "date_month") && (
-                                <div className="pt-2 mt-2 border-t border-cyan-400/25 flex items-center justify-between text-[10px] text-cyan-300 font-semibold bg-cyan-950/40 px-2 py-1 rounded">
+                                <div className="pt-2 mt-2 border-t border-emerald-200 flex items-center justify-between text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-1 rounded">
                                   <span>👆 Click bar to view {effectiveGroupBy === "date_year" ? "monthly breakdown" : "daily breakdown"}</span>
                                   <span className="text-xs">🔍</span>
                                 </div>
@@ -1579,28 +1636,28 @@ export default function TransactionGraphView({
                                   : chartData.length <= 25
                                   ? "max-w-[28px]"
                                   : "max-w-[20px]"
-                              } flex flex-col justify-end rounded-t-lg overflow-hidden transition-all duration-200 group-hover:brightness-110 shadow-lg shadow-black/40 border border-white/10`}
+                              } flex flex-col justify-end rounded-t-lg overflow-hidden transition-all duration-200 group-hover:brightness-95 shadow-md border border-slate-200/70`}
                             >
-                              {/* Top Segment: Debit (Outflow - Red/Rose) */}
+                              {/* Top Segment: Debit (Outflow - Rose) */}
                               {d.debit > 0 && (
                                 <div
                                   style={{ height: `${drPct}%` }}
-                                  className={`w-full bg-gradient-to-t from-rose-600 via-rose-500 to-rose-400 ${
-                                    d.credit > 0 ? "border-b border-black/40" : ""
+                                  className={`w-full bg-gradient-to-t from-rose-600 via-rose-500 to-[#E11D48] ${
+                                    d.credit > 0 ? "border-b border-white" : ""
                                   }`}
                                   title={`Top Segment - Debit: ${formatCurrencyFull(d.debit)}`}
                                 />
                               )}
-                              {/* Bottom Segment: Credit (Inflow - Green/Emerald) */}
+                              {/* Bottom Segment: Credit (Inflow - Emerald) */}
                               {d.credit > 0 && (
                                 <div
                                   style={{ height: `${crPct}%` }}
-                                  className="w-full bg-gradient-to-t from-emerald-600 via-emerald-500 to-emerald-400"
+                                  className="w-full bg-gradient-to-t from-emerald-600 via-emerald-500 to-[#059669]"
                                   title={`Bottom Segment - Credit: ${formatCurrencyFull(d.credit)}`}
                                 />
                               )}
                               {totalAmount === 0 && (
-                                <div className="w-full h-full bg-slate-700/50" />
+                                <div className="w-full h-full bg-slate-200" />
                               )}
                             </div>
                           ) : (
@@ -1614,23 +1671,23 @@ export default function TransactionGraphView({
                                   : chartData.length <= 25
                                   ? "max-w-[28px]"
                                   : "max-w-[20px]"
-                              } rounded-t-lg transition-all duration-200 group-hover:brightness-125 shadow-lg ${
+                              } rounded-t-lg transition-all duration-200 group-hover:brightness-95 shadow-md border border-slate-200/70 ${
                                 metric === "credit"
-                                  ? "bg-gradient-to-t from-emerald-600/90 via-emerald-500 to-emerald-400 shadow-emerald-500/10"
+                                  ? "bg-gradient-to-t from-emerald-600 via-emerald-500 to-[#059669]"
                                   : metric === "debit"
-                                  ? "bg-gradient-to-t from-rose-600/90 via-rose-500 to-rose-400 shadow-rose-500/10"
+                                  ? "bg-gradient-to-t from-rose-600 via-rose-500 to-[#E11D48]"
                                   : metric === "net"
                                   ? d.net >= 0
-                                    ? "bg-gradient-to-t from-emerald-600/90 via-emerald-500 to-emerald-400"
-                                    : "bg-gradient-to-t from-rose-600/90 via-rose-500 to-rose-400"
+                                    ? "bg-gradient-to-t from-emerald-600 via-emerald-500 to-[#059669]"
+                                    : "bg-gradient-to-t from-rose-600 via-rose-500 to-[#E11D48]"
                                   : metric === "balance"
-                                  ? "bg-gradient-to-t from-cyan-600/90 via-cyan-500 to-cyan-400 shadow-cyan-500/10"
-                                  : "bg-gradient-to-t from-indigo-600/90 via-indigo-500 to-indigo-400 shadow-indigo-500/10"
+                                  ? "bg-gradient-to-t from-cyan-600 via-cyan-500 to-[#0891B2]"
+                                  : "bg-gradient-to-t from-indigo-600 via-indigo-500 to-indigo-400"
                               }`}
                             />
                           )}
 
-                          {/* Category Ticks (Smart decimation + rotation for high density) */}
+                          {/* Category Ticks */}
                           <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex items-center justify-center w-full">
                             {(() => {
                               const isDense = chartData.length > 12;
@@ -1640,8 +1697,7 @@ export default function TransactionGraphView({
 
                               return (
                                 <div className="flex flex-col items-center">
-                                  {/* Subtle tick line */}
-                                  <span className={`h-1.5 w-0.5 ${shouldShowText ? "bg-cyan-400/40" : "bg-white/10"}`} />
+                                  <span className={`h-1.5 w-0.5 ${shouldShowText ? "bg-slate-400" : "bg-slate-200"}`} />
                                   <span
                                     className={`font-mono transition-all select-none ${
                                       isDense
@@ -1649,10 +1705,10 @@ export default function TransactionGraphView({
                                         : "text-[10px] sm:text-[11px] truncate max-w-full text-center mt-1"
                                     } ${
                                       hoveredItem?.key === d.key
-                                        ? "text-cyan-300 font-bold opacity-100 scale-105"
+                                        ? "text-emerald-800 font-extrabold opacity-100 scale-105"
                                         : shouldShowText
-                                        ? "text-slate-400 group-hover:text-white"
-                                        : "opacity-0 group-hover:opacity-100 text-slate-400"
+                                        ? "text-slate-600 group-hover:text-[#172554] font-medium"
+                                        : "opacity-0 group-hover:opacity-100 text-slate-500"
                                     }`}
                                     title={d.label}
                                   >
@@ -1672,11 +1728,11 @@ export default function TransactionGraphView({
               </div>
 
               {/* DEDICATED X-AXIS BOTTOM TITLE BAR */}
-              <div className="flex items-center justify-center pt-3 border-t-2 border-white/[0.12] mt-2">
-                <div className="inline-flex items-center gap-2.5 rounded-full bg-cyan-400/10 border border-cyan-400/30 px-5 py-2 text-xs font-bold text-cyan-300 shadow-lg">
-                  <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+              <div className="flex items-center justify-center pt-3 border-t-2 border-slate-200 mt-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-5 py-2 text-xs font-bold text-[#172554] shadow-2xs">
+                  <span className="h-2 w-2 rounded-full bg-[#059669]" />
                   <span>📅 X-Axis: {currentXOption.label}</span>
-                  <span className="text-[11px] text-slate-400 font-normal">
+                  <span className="text-[11px] text-[#64748B] font-normal">
                     (Full Dataset: All {chartData.length} Points Plotted)
                   </span>
                 </div>
@@ -1687,18 +1743,18 @@ export default function TransactionGraphView({
                ENLARGED LINE & AREA CHART WITH EXPLICIT AXIS TITLES
             ======================================================== */
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-bold text-white text-sm">
+              <div className="flex items-center justify-between text-xs text-[#64748B]">
+                <span className="font-extrabold text-[#172554] text-sm">
                   {currentYOption.label} Trajectory ({chartData.length} Nodes)
                 </span>
                 <div className="flex items-center gap-4 text-xs font-mono">
                   {metric === "both" ? (
                     <>
-                      <span className="text-emerald-400 font-bold">🟢 Inflow Curve</span>
-                      <span className="text-rose-400 font-bold">🔴 Outflow Curve</span>
+                      <span className="text-emerald-700 font-bold">🟢 Inflow Curve</span>
+                      <span className="text-rose-600 font-bold">🔴 Outflow Curve</span>
                     </>
                   ) : (
-                    <span className="text-cyan-300 font-bold">
+                    <span className="text-[#172554] font-bold">
                       Range: {formatCurrency(minVal)} to {formatCurrency(maxVal)}
                     </span>
                   )}
@@ -1706,7 +1762,7 @@ export default function TransactionGraphView({
               </div>
 
               {chartData.length < 2 ? (
-                <div className="py-24 text-center text-xs text-slate-500">
+                <div className="py-24 text-center text-xs text-[#64748B]">
                   At least 2 data periods required to plot curve.
                 </div>
               ) : (
@@ -1747,19 +1803,19 @@ export default function TransactionGraphView({
 
                     return (
                       <div className="space-y-3">
-                        <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-[460px] sm:h-[500px] overflow-visible">
+                        <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-[460px] sm:h-[500px] overflow-visible bg-slate-50/40 rounded-xl border border-slate-100 p-2">
                           <defs>
                             <linearGradient id="areaGradCr" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#10b981" stopOpacity="0.45" />
-                              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                              <stop offset="0%" stopColor="#059669" stopOpacity="0.30" />
+                              <stop offset="100%" stopColor="#059669" stopOpacity="0.0" />
                             </linearGradient>
                             <linearGradient id="areaGradDr" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.4" />
-                              <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.0" />
+                              <stop offset="0%" stopColor="#E11D48" stopOpacity="0.25" />
+                              <stop offset="100%" stopColor="#E11D48" stopOpacity="0.0" />
                             </linearGradient>
                             <linearGradient id="areaGradCyan" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.45" />
-                              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+                              <stop offset="0%" stopColor="#0891B2" stopOpacity="0.30" />
+                              <stop offset="100%" stopColor="#0891B2" stopOpacity="0.0" />
                             </linearGradient>
                           </defs>
 
@@ -1768,7 +1824,7 @@ export default function TransactionGraphView({
                             x={-svgH / 2}
                             y={22}
                             transform="rotate(-90)"
-                            fill="#10b981"
+                            fill="#172554"
                             fontSize="11"
                             fontWeight="bold"
                             textAnchor="middle"
@@ -1778,23 +1834,23 @@ export default function TransactionGraphView({
                           </text>
 
                           {/* Guidelines with Y-ticks */}
-                          <line x1={padX} y1={padY} x2={svgW - padX} y2={padY} stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" />
-                          <text x={padX - 8} y={padY + 4} fill="#94a3b8" fontSize="10" fontName="monospace" textAnchor="end">
+                          <line x1={padX} y1={padY} x2={svgW - padX} y2={padY} stroke="#E2E8F0" strokeDasharray="3 3" />
+                          <text x={padX - 8} y={padY + 4} fill="#64748B" fontSize="10" fontFamily="monospace" textAnchor="end">
                             {formatCompact(maxVal)}
                           </text>
 
-                          <line x1={padX} y1={padY + plotH * 0.33} x2={svgW - padX} y2={padY + plotH * 0.33} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-                          <text x={padX - 8} y={padY + plotH * 0.33 + 4} fill="#94a3b8" fontSize="10" fontName="monospace" textAnchor="end">
+                          <line x1={padX} y1={padY + plotH * 0.33} x2={svgW - padX} y2={padY + plotH * 0.33} stroke="#E2E8F0" strokeDasharray="3 3" />
+                          <text x={padX - 8} y={padY + plotH * 0.33 + 4} fill="#64748B" fontSize="10" fontFamily="monospace" textAnchor="end">
                             {formatCompact(maxVal * 0.66)}
                           </text>
 
-                          <line x1={padX} y1={padY + plotH * 0.66} x2={svgW - padX} y2={padY + plotH * 0.66} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-                          <text x={padX - 8} y={padY + plotH * 0.66 + 4} fill="#94a3b8" fontSize="10" fontName="monospace" textAnchor="end">
+                          <line x1={padX} y1={padY + plotH * 0.66} x2={svgW - padX} y2={padY + plotH * 0.66} stroke="#E2E8F0" strokeDasharray="3 3" />
+                          <text x={padX - 8} y={padY + plotH * 0.66 + 4} fill="#64748B" fontSize="10" fontFamily="monospace" textAnchor="end">
                             {formatCompact(maxVal * 0.33)}
                           </text>
 
-                          <line x1={padX} y1={svgH - padY} x2={svgW - padX} y2={svgH - padY} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
-                          <text x={padX - 8} y={svgH - padY + 4} fill="#64748b" fontSize="10" fontName="monospace" textAnchor="end">
+                          <line x1={padX} y1={svgH - padY} x2={svgW - padX} y2={svgH - padY} stroke="#CBD5E1" strokeWidth="1.5" />
+                          <text x={padX - 8} y={svgH - padY + 4} fill="#64748B" fontSize="10" fontFamily="monospace" textAnchor="end">
                             ₹0
                           </text>
 
@@ -1806,8 +1862,8 @@ export default function TransactionGraphView({
                                   <path d={makeArea(pointsDr)} fill="url(#areaGradDr)" />
                                 </>
                               )}
-                              <path d={makePath(pointsCr)} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                              <path d={makePath(pointsDr)} fill="none" stroke="#f43f5e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d={makePath(pointsCr)} fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d={makePath(pointsDr)} fill="none" stroke="#E11D48" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
                               {pointsCr.map((pt, i) => (
                                 <circle
@@ -1815,7 +1871,7 @@ export default function TransactionGraphView({
                                   cx={pt.x}
                                   cy={pt.y}
                                   r="4"
-                                  className="fill-emerald-400 hover:r-6 cursor-pointer stroke-slate-900 stroke-2 transition-all"
+                                  className="fill-emerald-600 hover:r-6 cursor-pointer stroke-white stroke-2 transition-all"
                                   onMouseEnter={() => setHoveredItem(pt)}
                                   onMouseLeave={() => setHoveredItem(null)}
                                 />
@@ -1826,7 +1882,7 @@ export default function TransactionGraphView({
                                   cx={pt.x}
                                   cy={pt.y}
                                   r="4"
-                                  className="fill-rose-400 hover:r-6 cursor-pointer stroke-slate-900 stroke-2 transition-all"
+                                  className="fill-rose-600 hover:r-6 cursor-pointer stroke-white stroke-2 transition-all"
                                   onMouseEnter={() => setHoveredItem(pt)}
                                   onMouseLeave={() => setHoveredItem(null)}
                                 />
@@ -1840,7 +1896,7 @@ export default function TransactionGraphView({
                               <path
                                 d={makePath(pointsSingle)}
                                 fill="none"
-                                stroke="#06b6d4"
+                                stroke="#0891B2"
                                 strokeWidth="3"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -1851,7 +1907,7 @@ export default function TransactionGraphView({
                                   cx={pt.x}
                                   cy={pt.y}
                                   r="4.5"
-                                  className="fill-cyan-400 hover:fill-white hover:r-7 cursor-pointer stroke-slate-900 stroke-2 transition-all"
+                                  className="fill-cyan-600 hover:fill-cyan-800 hover:r-7 cursor-pointer stroke-white stroke-2 transition-all"
                                   onMouseEnter={() => setHoveredItem(pt)}
                                   onMouseLeave={() => setHoveredItem(null)}
                                 />
@@ -1861,11 +1917,11 @@ export default function TransactionGraphView({
                         </svg>
 
                         {/* Dedicated X-Axis Bottom Title Bar */}
-                        <div className="flex items-center justify-center pt-2 border-t-2 border-white/[0.12]">
-                          <div className="inline-flex items-center gap-2.5 rounded-full bg-cyan-400/10 border border-cyan-400/30 px-5 py-2 text-xs font-bold text-cyan-300 shadow-lg">
-                            <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                        <div className="flex items-center justify-center pt-2 border-t-2 border-slate-200">
+                          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-5 py-2 text-xs font-bold text-[#172554] shadow-2xs">
+                            <span className="h-2 w-2 rounded-full bg-[#059669]" />
                             <span>📅 X-Axis: {currentXOption.label}</span>
-                            <span className="text-[11px] text-slate-400 font-normal">
+                            <span className="text-[11px] text-[#64748B] font-normal">
                               ({chartData.length} Points)
                             </span>
                           </div>
@@ -1881,11 +1937,11 @@ export default function TransactionGraphView({
                ENLARGED DONUT / SHARE BREAKDOWN WITH EXPLICIT TITLES
             ======================================================== */
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-bold text-white text-sm">
+              <div className="flex items-center justify-between text-xs text-[#64748B]">
+                <span className="font-extrabold text-[#172554] text-sm">
                   Proportional Breakdown Share by {currentXOption.label}
                 </span>
-                <span className="font-mono text-cyan-300 font-semibold bg-cyan-950/30 px-3 py-1 rounded-lg border border-cyan-400/20">
+                <span className="font-mono text-[#172554] font-bold bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
                   Total Volume: {formatCurrency(totalVol)}
                 </span>
               </div>
@@ -1933,16 +1989,16 @@ export default function TransactionGraphView({
 
                   {/* Donut Center Display */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
-                    <span className="text-[11px] uppercase font-bold tracking-wider text-slate-400">
+                    <span className="text-[11px] uppercase font-bold tracking-wider text-[#64748B]">
                       {hoveredItem ? hoveredItem.label : "Total Volume"}
                     </span>
-                    <span className="text-lg font-extrabold text-white font-mono mt-1">
+                    <span className="text-xl font-extrabold text-[#172554] font-mono mt-1">
                       {hoveredItem
                         ? formatCurrency(getMetricValue(hoveredItem, metric))
                         : formatCurrency(totalVol)}
                     </span>
                     {hoveredItem && (
-                      <span className="text-xs text-cyan-300 font-mono mt-0.5 font-bold">
+                      <span className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-mono mt-1 font-bold">
                         {((getMetricValue(hoveredItem, metric) / totalVol) * 100).toFixed(1)}% Share
                       </span>
                     )}
@@ -1950,7 +2006,7 @@ export default function TransactionGraphView({
                 </div>
 
                 {/* Donut Legend Table */}
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full">
                   {chartData.map((d, i) => {
                     const val = getMetricValue(d, metric);
                     const pct = ((val / totalVol) * 100).toFixed(1);
@@ -1963,8 +2019,8 @@ export default function TransactionGraphView({
                         onMouseLeave={() => setHoveredItem(null)}
                         className={`flex items-center justify-between p-2.5 rounded-xl transition cursor-pointer ${
                           hoveredItem?.key === d.key
-                            ? "bg-white/[0.08] border border-cyan-400/40 shadow-md"
-                            : "bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04]"
+                            ? "bg-emerald-50/70 border border-emerald-300 shadow-sm"
+                            : "bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-2xs"
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -1972,13 +2028,13 @@ export default function TransactionGraphView({
                             style={{ backgroundColor: color }}
                             className="h-3.5 w-3.5 rounded-full flex-shrink-0"
                           />
-                          <span className="text-xs font-semibold text-slate-200 truncate">
+                          <span className="text-xs font-bold text-slate-800 truncate">
                             {d.label}
                           </span>
                         </div>
                         <div className="flex items-center gap-3 font-mono text-right flex-shrink-0">
-                          <span className="text-[11px] text-slate-400">{pct}%</span>
-                          <span className="text-xs font-bold text-white">
+                          <span className="text-[11px] text-[#64748B] font-semibold">{pct}%</span>
+                          <span className="text-xs font-extrabold text-[#172554]">
                             {formatCurrency(val)}
                           </span>
                         </div>
@@ -1989,10 +2045,10 @@ export default function TransactionGraphView({
               </div>
 
               {/* Dedicated Dimension Badge at Bottom */}
-              <div className="flex items-center justify-center pt-3 border-t-2 border-white/[0.12]">
-                <div className="inline-flex items-center gap-2.5 rounded-full bg-cyan-400/10 border border-cyan-400/30 px-5 py-2 text-xs font-bold text-cyan-300 shadow-lg">
+              <div className="flex items-center justify-center pt-3 border-t-2 border-slate-200">
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-5 py-2 text-xs font-bold text-[#172554] shadow-2xs">
                   <span>🍩 Breakdown Dimension: {currentXOption.label}</span>
-                  <span className="text-[11px] text-slate-400 font-normal">
+                  <span className="text-[11px] text-[#64748B] font-normal">
                     ({chartData.length} Segments)
                   </span>
                 </div>
@@ -2003,36 +2059,37 @@ export default function TransactionGraphView({
           {/* ============================================================
               BOTTOM HOVER DETAIL INSPECTION BANNER
           ============================================================ */}
-          <div className="mt-5 pt-4 border-t border-white/[0.08]">
+          <div className="mt-5 pt-4 border-t border-slate-100">
             {hoveredItem ? (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-cyan-950/30 border border-cyan-400/30 rounded-2xl px-5 py-3 text-xs gap-3 shadow-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs gap-3 shadow-xs">
                 <div className="flex items-center gap-2.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 animate-pulse" />
-                  <span className="font-bold text-white text-sm">{hoveredItem.label}</span>
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#059669]" />
+                  <span className="font-extrabold text-[#172554] text-sm">{hoveredItem.label}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-5 font-mono text-xs">
-                  <span className="text-emerald-400 font-bold">
+                  <span className="text-[#059669] font-bold">
                     Inflow: +{formatCurrencyFull(hoveredItem.credit)}
                   </span>
-                  <span className="text-rose-400 font-bold">
+                  <span className="text-[#E11D48] font-bold">
                     Outflow: -{formatCurrencyFull(hoveredItem.debit)}
                   </span>
-                  <span className={`font-bold ${hoveredItem.net >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  <span className={`font-extrabold ${hoveredItem.net >= 0 ? "text-[#059669]" : "text-[#E11D48]"}`}>
                     Net: {hoveredItem.net >= 0 ? `+${formatCurrencyFull(hoveredItem.net)}` : formatCurrencyFull(hoveredItem.net)}
                   </span>
                   {hoveredItem.balance !== null && (
-                    <span className="text-cyan-200">
+                    <span className="text-cyan-800 font-semibold">
                       Balance: {formatCurrencyFull(hoveredItem.balance)}
                     </span>
                   )}
-                  <span className="text-slate-400 text-[11px]">
-                    ({hoveredItem.count} txs)
+                  <span className="text-[#64748B] text-[11px] font-sans font-medium">
+                    ({hoveredItem.count} transactions)
                   </span>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-400 italic text-center py-1">
-                💡 Tip: Hover over any bar, curve node, or donut slice to inspect full details for that exact category.
+              <p className="text-xs text-[#64748B] italic text-center py-1.5 flex items-center justify-center gap-1.5">
+                <span>💡</span>
+                <span>Tip: Hover over any bar, curve node, or donut slice to inspect full details for that exact category.</span>
               </p>
             )}
           </div>

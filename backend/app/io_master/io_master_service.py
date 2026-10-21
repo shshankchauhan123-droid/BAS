@@ -194,17 +194,36 @@ def update_io_service(
     data: IOMasterUpdateRequest,
     user_id: int,
 ) -> IOMaster:
-    user = get_user_by_id(db=db, user_id=user_id)
-    if user and str(user.role).lower() == USER_ROLE:
-        perms = getattr(user, "permissions", None)
+    actor = get_user_by_id(db=db, user_id=user_id)
+    if not actor:
+        raise ValueError("User not found.")
+
+    actor_role = str(actor.role).lower()
+
+    if actor_role == USER_ROLE:
+        perms = getattr(actor, "permissions", None)
         if perms and perms.can_update_io is False:
             raise PermissionError("You do not have permission to update Investigating Officers.")
+        io = get_io_by_id_and_user(
+            db=db,
+            io_id=io_id,
+            user_id=user_id,
+        )
+    elif actor_role == CLIENT_ADMIN_ROLE:
+        io = get_io_by_id(db=db, io_id=io_id)
+        if not io:
+            raise ValueError("Investigating Officer not found.")
+        if not io.creator or io.creator.client_id != actor.client_id:
+            raise PermissionError("Access denied. Investigating Officer does not belong to your company.")
+    elif actor_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        io = get_io_by_id(db=db, io_id=io_id)
+    else:
+        io = get_io_by_id_and_user(
+            db=db,
+            io_id=io_id,
+            user_id=user_id,
+        )
 
-    io = get_io_by_id_and_user(
-        db=db,
-        io_id=io_id,
-        user_id=user_id,
-    )
     if not io:
         raise ValueError("Investigating Officer not found.")
 
@@ -226,10 +245,28 @@ def update_io_service(
             raise ValueError("Police station cannot be empty.")
         io.police_station = police_station
 
-    return repository_update_io(
+    updated_io = repository_update_io(
         db=db,
         io=io,
     )
+
+    record_audit_log(
+        db=db,
+        actor=actor,
+        action="IO_UPDATED",
+        entity_type="io_master",
+        entity_id=str(updated_io.id),
+        entity_name=updated_io.officer_name,
+        description=f"{actor.role.capitalize()} {actor.username} updated IO '{updated_io.officer_name}'",
+        details={
+            "officer_name": updated_io.officer_name,
+            "designation": updated_io.designation,
+            "police_station": updated_io.police_station,
+        },
+        client_id=actor.client_id,
+    )
+
+    return updated_io
 
 
 def delete_io_service(
@@ -237,19 +274,54 @@ def delete_io_service(
     io_id: int,
     user_id: int,
 ) -> None:
-    user = get_user_by_id(db=db, user_id=user_id)
-    if user and str(user.role).lower() == USER_ROLE:
-        perms = getattr(user, "permissions", None)
+    actor = get_user_by_id(db=db, user_id=user_id)
+    if not actor:
+        raise ValueError("User not found.")
+
+    actor_role = str(actor.role).lower()
+
+    if actor_role == USER_ROLE:
+        perms = getattr(actor, "permissions", None)
         if perms and perms.can_delete_io is False:
             raise PermissionError("You do not have permission to delete Investigating Officers.")
+        io = get_io_by_id_and_user(
+            db=db,
+            io_id=io_id,
+            user_id=user_id,
+        )
+    elif actor_role == CLIENT_ADMIN_ROLE:
+        io = get_io_by_id(db=db, io_id=io_id)
+        if not io:
+            raise ValueError("Investigating Officer not found.")
+        if not io.creator or io.creator.client_id != actor.client_id:
+            raise PermissionError("Access denied. Investigating Officer does not belong to your company.")
+    elif actor_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        io = get_io_by_id(db=db, io_id=io_id)
+    else:
+        io = get_io_by_id_and_user(
+            db=db,
+            io_id=io_id,
+            user_id=user_id,
+        )
 
-    io = get_io_by_id_and_user(
-        db=db,
-        io_id=io_id,
-        user_id=user_id,
-    )
     if not io:
         raise ValueError("Investigating Officer not found.")
+
+    record_audit_log(
+        db=db,
+        actor=actor,
+        action="IO_DELETED",
+        entity_type="io_master",
+        entity_id=str(io.id),
+        entity_name=io.officer_name,
+        description=f"{actor.role.capitalize()} {actor.username} deleted IO '{io.officer_name}'",
+        details={
+            "officer_name": io.officer_name,
+            "designation": io.designation,
+            "police_station": io.police_station,
+        },
+        client_id=actor.client_id,
+    )
 
     repository_delete_io(
         db=db,

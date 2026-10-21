@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as echarts from 'echarts';
 
 import { formatFinancialValue } from "../../utils/chartFormatter";
@@ -17,33 +17,38 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
     const myChart = echarts.init(chartRef.current);
 
     let chartNodes = nodes.map((node) => {
-      const displayAccount = (node.account_number && String(node.account_number).trim()) || 'Account number not available';
+      const displayAccount =
+        (node.account_number && String(node.account_number).trim()) ||
+        (node.file_name && (node.file_name.match(/(?:Merged_Statement_|Statement_)?(\d{9,18})/i)?.[1])) ||
+        'Unknown Account';
+
       return {
         id: String(node.id),
         name: displayAccount,
         value: node.matching_transaction_count,
-        symbolSize: 70,
+        symbolSize: 72,
         itemStyle: {
           color: '#059669',
-          borderColor: '#34d399',
-          borderWidth: 2,
-          shadowColor: 'rgba(52, 211, 153, 0.5)',
+          borderColor: '#a7f3d0',
+          borderWidth: 3,
+          shadowColor: 'rgba(5, 150, 105, 0.25)',
           shadowBlur: 10
         },
         label: {
           show: true,
-          formatter: (params) => {
-            return `{title|${displayAccount}}\n{subtitle|${node.bank_name || 'Bank'}}`;
-          },
+          formatter: () => `{title|${displayAccount}}\n{subtitle|${node.bank_name || 'Bank Account'}}`,
           rich: {
             title: {
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: 'bold',
-              color: '#fff'
+              color: '#172554',
+              lineHeight: 18
             },
             subtitle: {
               fontSize: 11,
-              color: '#94a3b8'
+              color: '#64748B',
+              fontWeight: '500',
+              lineHeight: 16
             }
           },
           position: 'bottom',
@@ -51,7 +56,16 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
         },
         tooltip: {
           formatter: () => {
-            return `<b>Account Number:</b> ${displayAccount}<br/><b>File:</b> ${node.file_name || 'Unknown'}`;
+            return `
+              <div style="font-weight: 800; color: #172554; font-size: 13px; margin-bottom: 6px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px;">
+                ${node.bank_name || 'Bank Statement Account'}
+              </div>
+              <div style="font-size: 12px; color: #475569; line-height: 1.5;">
+                <b>Account:</b> <span style="font-family: monospace; font-weight: 700; color: #059669;">${displayAccount}</span><br/>
+                <b>File:</b> ${node.file_name || 'Statement File'}<br/>
+                <b>Transactions:</b> ${Number(node.matching_transaction_count || 0).toLocaleString('en-IN')}
+              </div>
+            `;
           }
         },
         isStatement: true
@@ -82,9 +96,9 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
               target: String(edgeGrp.target),
               value: tx.amount,
               lineStyle: {
-                width: 1.5,
-                color: tx.debit > 0 ? '#e11d48' : '#10b981',
-                opacity: 0.6,
+                width: 2,
+                color: tx.debit > 0 ? '#e11d48' : '#059669',
+                opacity: 0.75,
                 curveness: curveness
               },
               label: {
@@ -94,16 +108,28 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
                   amt: {
                     fontSize: 10,
                     fontWeight: 'bold',
-                    color: tx.debit > 0 ? '#fda4af' : '#6ee7b7',
-                    backgroundColor: '#0f172a',
-                    padding: [1, 2],
-                    borderRadius: 2
+                    color: tx.debit > 0 ? '#be123c' : '#047857',
+                    backgroundColor: tx.debit > 0 ? '#ffe4e6' : '#d1fae5',
+                    borderColor: tx.debit > 0 ? '#fecdd3' : '#a7f3d0',
+                    borderWidth: 1,
+                    padding: [2, 6],
+                    borderRadius: 4
                   }
                 }
               },
               tooltip: {
                 formatter: () => {
-                  return `<b>Amount:</b> ${formatCurrency(tx.amount)}<br/><b>Mode:</b> ${tx.mode || 'N/A'}<br/><b>Date:</b> ${tx.transaction_date || 'N/A'}<br/><b>Desc:</b> ${tx.description || 'N/A'}`;
+                  return `
+                    <div style="font-weight: 800; color: #172554; font-size: 13px; margin-bottom: 6px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px;">
+                      Direct Relationship
+                    </div>
+                    <div style="font-size: 12px; color: #475569; line-height: 1.5;">
+                      <b>Amount:</b> <span style="font-weight: 800; color: ${tx.debit > 0 ? '#e11d48' : '#059669'};">${formatCurrency(tx.amount)}</span><br/>
+                      <b>Mode:</b> ${tx.mode || 'N/A'}<br/>
+                      <b>Date:</b> ${tx.transaction_date || 'N/A'}<br/>
+                      <b>Description:</b> ${tx.description || 'N/A'}
+                    </div>
+                  `;
                 }
               },
               raw_edge: edgeGrp,
@@ -124,24 +150,36 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
         id: `tx-${tx.id}`,
         name: `Txn ${tx.id}`,
         symbol: 'roundRect',
-        symbolSize: [110, 50],
+        symbolSize: [115, 52],
         itemStyle: {
-          color: tx.debit > 0 ? '#2e1017' : '#0a2217',
-          borderColor: tx.debit > 0 ? '#e11d48' : '#10b981',
-          borderWidth: 1
+          color: tx.debit > 0 ? '#fff1f2' : '#ecfdf5',
+          borderColor: tx.debit > 0 ? '#fecdd3' : '#a7f3d0',
+          borderWidth: 1,
+          shadowColor: 'rgba(15, 23, 42, 0.04)',
+          shadowBlur: 6
         },
         label: {
           show: true,
           position: 'inside',
-          formatter: () => `{amt|${formatCurrency(tx.amount)}}\n{desc|${tx.mode || 'N/A'} | ${tx.debit > 0 ? 'Debit' : 'Credit'}}`,
+          formatter: () => `{amt|${formatCurrency(tx.amount)}}\n{desc|${tx.mode || 'N/A'} • ${tx.debit > 0 ? 'Debit' : 'Credit'}}`,
           rich: {
-            amt: { fontSize: 12, fontWeight: 'bold', color: '#fff' },
-            desc: { fontSize: 9, color: '#94a3b8', padding: [2, 0] }
+            amt: { fontSize: 11, fontWeight: 'bold', color: tx.debit > 0 ? '#e11d48' : '#059669' },
+            desc: { fontSize: 9, color: '#64748B', padding: [2, 0], fontWeight: '600' }
           }
         },
         tooltip: {
           formatter: () => {
-            return `<b>Amount:</b> ${formatCurrency(tx.amount)}<br/><b>Mode:</b> ${tx.mode || 'N/A'}<br/><b>Date:</b> ${tx.transaction_date || 'N/A'}<br/><b>Desc:</b> ${tx.description || 'N/A'}`;
+            return `
+              <div style="font-weight: 800; color: #172554; font-size: 13px; margin-bottom: 6px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px;">
+                ${tx.debit > 0 ? 'Debit Transaction' : 'Credit Transaction'}
+              </div>
+              <div style="font-size: 12px; color: #475569; line-height: 1.5;">
+                <b>Amount:</b> <span style="font-weight: 800; color: ${tx.debit > 0 ? '#e11d48' : '#059669'};">${formatCurrency(tx.amount)}</span><br/>
+                <b>Mode:</b> ${tx.mode || 'N/A'}<br/>
+                <b>Date:</b> ${tx.transaction_date || 'N/A'}<br/>
+                <b>Description:</b> ${tx.description || 'N/A'}
+              </div>
+            `;
           }
         },
         isTransaction: true,
@@ -152,7 +190,7 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
         id: `edge-tx-${tx.id}`,
         source: centralNodeId,
         target: `tx-${tx.id}`,
-        lineStyle: { width: 1.5, color: tx.debit > 0 ? '#e11d48' : '#10b981', type: 'dashed' },
+        lineStyle: { width: 1.5, color: tx.debit > 0 ? '#e11d48' : '#059669', type: 'dashed' },
         label: { show: false }
       });
     });
@@ -162,9 +200,11 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
       tooltip: { 
         show: true, 
         trigger: 'item', 
-        backgroundColor: '#0f172a', 
-        borderColor: '#334155', 
-        textStyle: { color: '#fff' } 
+        backgroundColor: '#ffffff', 
+        borderColor: '#e2e8f0', 
+        borderWidth: 1,
+        extraCssText: 'box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.06); border-radius: 12px; padding: 12px;',
+        textStyle: { color: '#172554', fontFamily: 'inherit' } 
       },
       series: [
         {
@@ -172,7 +212,7 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
           layout: 'force',
           force: {
             repulsion: 2500,
-            edgeLength: nodes.length === 1 ? 150 : 350,
+            edgeLength: nodes.length === 1 ? 160 : 360,
             gravity: 0.1
           },
           roam: true,
@@ -188,7 +228,7 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
           },
           emphasis: {
             focus: 'adjacency',
-            lineStyle: { width: 5 }
+            lineStyle: { width: 4 }
           }
         }
       ]
@@ -222,16 +262,21 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
   const txList = panelData.transactions || [];
 
   return (
-    <div className="relative w-full h-[600px] border border-white/[0.08] bg-[#03100d]/90 rounded-2xl shadow-xl overflow-hidden">
+    <div className="relative w-full h-[650px] border border-slate-200 bg-white rounded-2xl shadow-xs overflow-hidden">
       <div ref={chartRef} className="w-full h-full" />
       
+      {/* Transaction / Relationship Drill-Down Panel */}
       {selectedPanel && (
-        <div className="absolute right-0 top-0 bottom-0 w-[450px] bg-[#061411] border-l border-white/[0.08] p-6 overflow-y-auto z-10 shadow-[-10px_0_30px_rgba(0,0,0,0.5)]">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-emerald-400">{selectedPanel.title}</h3>
+        <div className="absolute right-0 top-0 bottom-0 w-[420px] max-w-full bg-white border-l border-slate-200 p-6 overflow-y-auto z-20 shadow-[-10px_0_30px_rgba(15,23,42,0.08)]">
+          <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
+            <h3 className="text-base font-extrabold text-[#172554] flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              {selectedPanel.title}
+            </h3>
             <button 
               onClick={() => setSelectedPanel(null)}
-              className="text-slate-400 hover:text-white"
+              className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Close Panel"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -239,38 +284,55 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
             </button>
           </div>
 
-          <div className="bg-[#020b09] rounded-xl p-4 mb-6 border border-white/[0.04]">
-            <p className="text-xs text-slate-400 mb-1">Total Volume</p>
-            <p className="text-2xl font-bold text-white">{formatCurrency(panelData.total_amount)}</p>
-            <p className="text-xs text-emerald-500 mt-1">{panelData.transaction_count} Transactions</p>
+          <div className="bg-slate-50/80 rounded-2xl p-4 mb-5 border border-slate-200/80">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Total Volume</p>
+            <p className="text-2xl font-black font-mono text-[#172554]">{formatCurrency(panelData.total_amount)}</p>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 mt-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {panelData.transaction_count} Transaction{panelData.transaction_count === 1 ? '' : 's'}
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-slate-300">Transaction History</h4>
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+              Transaction Details ({txList.length})
+            </h4>
             {txList.map((tx) => (
-              <div key={tx.id} className="bg-[#020b09] rounded-xl p-4 border border-white/[0.04] hover:border-emerald-500/30 transition-colors">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">
+              <div 
+                key={tx.id} 
+                className="bg-white rounded-xl p-3.5 border border-slate-200 hover:border-emerald-300 hover:shadow-2xs transition-all space-y-2"
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                     {tx.mode || 'TRANSFER'}
                   </span>
-                  <span className="text-xs text-slate-500">{tx.transaction_date}</span>
+                  <span className="text-[11px] font-mono text-slate-500 font-medium">
+                    {tx.transaction_date || '-'}
+                  </span>
                 </div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-bold text-white">
+
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-base font-extrabold font-mono text-[#172554]">
                     {formatCurrency(tx.amount)}
                   </span>
-                  <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${tx.debit > 0 ? 'text-rose-400 bg-rose-400/10' : 'text-emerald-400 bg-emerald-400/10'}`}>
+                  <span className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-md border ${
+                    tx.debit > 0 
+                      ? 'text-rose-700 bg-rose-50 border-rose-200' 
+                      : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  }`}>
                     {tx.debit > 0 ? 'Debit' : 'Credit'}
                   </span>
                 </div>
+
                 {tx.reference_number && (
-                  <p className="text-xs text-slate-400 mb-1">
-                    <span className="text-slate-500 font-medium">Ref:</span> {tx.reference_number}
+                  <p className="text-xs text-slate-500 truncate">
+                    <span className="font-semibold text-slate-600">Ref:</span> {tx.reference_number}
                   </p>
                 )}
+
                 {tx.description && (
-                  <p className="text-xs text-slate-400 line-clamp-2" title={tx.description}>
-                    <span className="text-slate-500 font-medium">Desc:</span> {tx.description}
+                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed" title={tx.description}>
+                    <span className="font-semibold text-slate-700">Desc:</span> {tx.description}
                   </p>
                 )}
               </div>
@@ -279,25 +341,28 @@ export default function RelationshipGraph({ nodes = [], edges = [], transactions
         </div>
       )}
       
+      {/* Empty / Zero-Relationship Overlays */}
       {nodes.length === 0 && (
-         <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#020b09]/80 backdrop-blur-sm z-0 pointer-events-none">
-           <svg className="w-16 h-16 text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M13 10V3L4 14h7v7l9-11h-7z" />
-           </svg>
-           <p className="text-slate-400 font-semibold">No Relationships Found</p>
-           <p className="text-xs text-slate-500 mt-2">Try adjusting your filters or selecting different files.</p>
+         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 backdrop-blur-xs z-0 pointer-events-none p-6 text-center">
+           <div className="h-14 w-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mb-3 shadow-2xs">
+             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M13 10V3L4 14h7v7l9-11h-7z" />
+             </svg>
+           </div>
+           <p className="text-base font-bold text-[#172554]">No Relationships Found</p>
+           <p className="text-xs text-slate-500 mt-1 max-w-sm">Try selecting different statement files or adjusting your amount and date filters above.</p>
          </div>
       )}
       
       {nodes.length > 0 && edges.length === 0 && transactions.length === 0 && (
-         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-rose-500/10 border border-rose-500/20 text-rose-400 px-6 py-3 rounded-xl text-sm font-semibold flex items-center gap-3 z-0 pointer-events-none">
+         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-rose-50 border border-rose-200 text-rose-800 px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm z-10 pointer-events-none">
            No transactions match the selected filters.
          </div>
       )}
       
       {nodes.length > 1 && edges.length === 0 && transactions.length > 0 && (
-         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-6 py-3 rounded-xl text-sm font-semibold flex items-center gap-3 z-0 pointer-events-none">
-           No transaction relationships found between the selected statements for the current filters.
+         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-blue-50 border border-blue-200 text-blue-900 px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm z-10 pointer-events-none">
+           No cross-statement transaction relationships found between the selected accounts for the current filters.
          </div>
       )}
     </div>

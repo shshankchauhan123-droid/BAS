@@ -18,6 +18,7 @@ import Login from "../pages/auth/Login";
 ============================================================ */
 
 import SuperAdminDashboard from "../pages/superadmin/SuperAdminDashboard";
+import SuperAdminCaseList from "../pages/superadmin/SuperAdminCaseList";
 import ClientAdminDashboard from "../pages/clientAdmin/ClientAdminDashboard";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import UserDashboard from "../pages/user/UserDashboard";
@@ -124,6 +125,20 @@ function AppRoutes() {
         />
 
         {/* =====================================================
+            SUPER ADMIN CASES MANAGEMENT
+        ====================================================== */}
+        <Route
+          path="/superadmin/cases"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["superadmin", "admin"]}>
+                <SuperAdminCaseList />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
             USER CASE MANAGEMENT
 
             Authentication required
@@ -217,28 +232,6 @@ function AppRoutes() {
           }
         />
 
-        {/* =====================================================
-            CASE DETAILS
-
-            Dynamic case ID.
-
-            Examples:
-
-            /dashboard/cases/1
-            /dashboard/cases/2
-            /dashboard/cases/15
-        ====================================================== */}
-
-        <Route
-          path="/dashboard/cases/:caseId"
-          element={
-            <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "client_admin"]}>
-                <CaseDetails />
-              </RoleRoute>
-            </ProtectedRoute>
-          }
-        />
 
         {/* =====================================================
             CASE REPORTS HUB (Catalog of reports for a case)
@@ -467,15 +460,6 @@ function AppRoutes() {
           }
         />
 
-        {/* =====================================================
-            404
-        ====================================================== */}
-
-        <Route
-          path="*"
-          element={<NotFound />}
-        />
-
         <Route
           path="/dashboard/cases/:caseId/reports/counterparty-intelligence"
           element={
@@ -517,6 +501,14 @@ function AppRoutes() {
               </RoleRoute>
             </ProtectedRoute>
           }
+        />
+
+        {/* =====================================================
+            404 NOT FOUND
+        ====================================================== */}
+        <Route
+          path="*"
+          element={<NotFound />}
         />
       </Routes>
     </BrowserRouter>

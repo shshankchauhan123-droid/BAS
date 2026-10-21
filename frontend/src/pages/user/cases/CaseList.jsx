@@ -1,42 +1,72 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
-import {
-  createCase,
-  getCases,
-} from "../../../services/api/case";
-
+import { createCase, getCases } from "../../../services/api/case";
 import CaseTable from "../../../components/cases/CaseTable";
 import CaseCard from "../../../components/cases/CaseCard";
 import CreateCaseModal from "../../../components/cases/CreateCaseModal";
-
-import BASNavbar from "../../../components/layout/UserNavbar";
-import BASFooter from "../../../components/layout/UserFooter";
+import UserNavbar from "../../../components/layout/UserNavbar";
+import UserFooter from "../../../components/layout/UserFooter";
 import { useAuth } from "../../../context/AuthContext";
+
+const Icon = ({ name, size = 20, className = "" }) => {
+  const paths = {
+    cases: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M8 14h3M8 17h7" /></>,
+    draft: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h5" /></>,
+    progress: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    complete: <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></>,
+    search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
+    refresh: <><path d="M20 7v5h-5" /><path d="M4 17v-5h5" /><path d="M5.6 9A7 7 0 0 1 18 6l2 6M18.4 15A7 7 0 0 1 6 18l-2-6" /></>,
+    plus: <><path d="M12 5v14M5 12h14" /></>,
+    table: <><path d="M4 5h16M4 12h16M4 19h16M8 5v14" /></>,
+    grid: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
+    lock: <><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>,
+    arrow: <><path d="m15 18-6-6 6-6" /></>,
+  };
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{paths[name] || paths.cases}</svg>;
+};
+
+function StatCard({ label, value, note, icon, tone, percentage, loading, delay }) {
+  const tones = {
+    blue: { icon: "bg-blue-50 text-blue-700 ring-blue-100", number: "text-[#172554]", bar: "bg-blue-500", track: "bg-blue-50", top: "bg-blue-500" },
+    amber: { icon: "bg-amber-50 text-amber-600 ring-amber-100", number: "text-amber-600", bar: "bg-amber-400", track: "bg-amber-50", top: "bg-amber-400" },
+    indigo: { icon: "bg-indigo-50 text-indigo-600 ring-indigo-100", number: "text-indigo-600", bar: "bg-indigo-500", track: "bg-indigo-50", top: "bg-indigo-500" },
+    emerald: { icon: "bg-emerald-50 text-emerald-600 ring-emerald-100", number: "text-emerald-600", bar: "bg-emerald-500", track: "bg-emerald-50", top: "bg-emerald-500" },
+  };
+  const t = tones[tone] || tones.blue;
+
+  return (
+    <article className={`arth-case-enter arth-case-card relative overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm sm:p-6 ${delay}`}>
+      <div className={`absolute inset-x-0 top-0 h-1 ${t.top}`} />
+      <div className="flex items-start justify-between gap-3 pt-1">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[#64748B]">{label}</p>
+          <p className={`mt-3 text-3xl font-extrabold tracking-tight ${t.number}`}>
+            {loading ? <span className="inline-block h-9 w-16 animate-pulse rounded-lg bg-slate-100" /> : value.toLocaleString("en-IN")}
+          </p>
+          <p className="mt-2 text-xs text-[#64748B]">{note}</p>
+        </div>
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ${t.icon}`}>
+          <Icon name={icon} size={23} />
+        </div>
+      </div>
+      <div className={`mt-5 h-1.5 overflow-hidden rounded-full ${t.track}`}>
+        <div className={`h-full rounded-full transition-all duration-700 ${t.bar}`} style={{ width: `${Math.max(0, Math.min(percentage, 100))}%` }} />
+      </div>
+    </article>
+  );
+}
 
 function CaseList() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isClientAdmin =
-    String(user?.role || "").toLowerCase() === "client_admin";
-
-  const canViewCases =
-    user?.role === "superadmin" ||
-    isClientAdmin ||
-    user?.permissions?.can_view_cases !== false;
-
-  const canCreateCase =
-    user?.role === "superadmin" ||
-    isClientAdmin ||
-    user?.permissions?.can_create_case !== false;
-
+  const userRole = String(user?.role || "").toLowerCase();
+  const isSuperAdmin = userRole === "superadmin" || userRole === "admin";
+  const isClientAdmin = userRole === "client_admin";
+  const canViewCases = isSuperAdmin || isClientAdmin || user?.permissions?.can_view_cases !== false;
+  const canCreateCase = isSuperAdmin || isClientAdmin || user?.permissions?.can_create_case !== false;
 
   const [cases, setCases] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,1219 +76,474 @@ function CaseList() {
   const [viewMode, setViewMode] = useState("table");
   const [error, setError] = useState("");
 
-  // ============================================================
-  // LOAD CASES
-  // ============================================================
-
   const loadCases = useCallback(async () => {
     if (!canViewCases) {
+      setCases([]);
       setIsLoading(false);
       return;
     }
     try {
       setIsLoading(true);
       setError("");
-
       const response = await getCases();
-
-      const caseList = Array.isArray(response?.data)
-        ? response.data
-        : [];
-
-      setCases(caseList);
+      setCases(Array.isArray(response?.data) ? response.data : []);
     } catch (requestError) {
-      console.error(
-        "Failed to load cases:",
-        requestError
-      );
-
-      const message =
-        requestError?.response?.data?.detail ||
-        requestError?.message ||
-        "Unable to load cases.";
-
-      setError(message);
+      console.error("Failed to load cases:", requestError);
+      const message = requestError?.response?.data?.detail || requestError?.message || "Unable to load investigation cases.";
+      setError(typeof message === "string" ? message : "Unable to load investigation cases.");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [canViewCases]);
 
-  // ============================================================
-  // INITIAL LOAD
-  // ============================================================
-
-  useEffect(() => {
-    loadCases();
-  }, [loadCases]);
-
-  // ============================================================
-  // SEARCH
-  // ============================================================
+  useEffect(() => { loadCases(); }, [loadCases]);
 
   const filteredCases = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
-
-    if (!search) {
-      return cases;
-    }
-
-    return cases.filter((caseData) => {
-      return (
-        String(caseData.case_number || "")
-          .toLowerCase()
-          .includes(search) ||
-        String(caseData.case_name || "")
-          .toLowerCase()
-          .includes(search) ||
-        String(caseData.description || "")
-          .toLowerCase()
-          .includes(search) ||
-        String(caseData.status || "")
-          .toLowerCase()
-          .includes(search) ||
-        String(caseData.io?.officer_name || "")
-          .toLowerCase()
-          .includes(search) ||
-        String(caseData.io?.designation || "")
-          .toLowerCase()
-          .includes(search) ||
-        String(caseData.io?.police_station || "")
-          .toLowerCase()
-          .includes(search)
-      );
-    });
+    if (!search) return cases;
+    return cases.filter((caseData) =>
+      [
+        caseData?.case_number,
+        caseData?.case_name,
+        caseData?.description,
+        caseData?.status,
+        caseData?.io?.officer_name,
+        caseData?.io?.designation,
+        caseData?.io?.police_station,
+        caseData?.creator?.username,
+        caseData?.creator?.email,
+        caseData?.owner_username,
+        caseData?.owner_email,
+      ].some((field) => String(field || "").toLowerCase().includes(search))
+    );
   }, [cases, searchTerm]);
 
-  // ============================================================
-  // STATUS COUNTS
-  // ============================================================
-
   const totalCases = cases.length;
-
-  const draftCases = cases.filter(
-    (item) =>
-      String(item.status || "").toUpperCase() ===
-      "DRAFT"
-  ).length;
-
-  const inProgressCases = cases.filter(
-    (item) =>
-      String(item.status || "").toUpperCase() ===
-      "IN_PROGRESS"
-  ).length;
-
-  const completedCases = cases.filter(
-    (item) =>
-      String(item.status || "").toUpperCase() ===
-      "COMPLETED"
-  ).length;
-
-  // ============================================================
-  // OPEN CASE
-  // ============================================================
-
+  const draftCases = cases.filter((item) => String(item.status || "").toUpperCase() === "DRAFT").length;
+  const inProgressCases = cases.filter((item) => String(item.status || "").toUpperCase() === "IN_PROGRESS").length;
+  const completedCases = cases.filter((item) => String(item.status || "").toUpperCase() === "COMPLETED").length;
 
   function handleOpenCase(caseData) {
-  const caseId = caseData?.id;
-
-  console.log("OPEN CASE DATA:", caseData);
-  console.log("OPEN CASE ID:", caseId);
-  console.log("OPEN CASE ID TYPE:", typeof caseId);
-
-  if (
-    caseId === null ||
-    caseId === undefined ||
-    typeof caseId === "object" ||
-    typeof caseId === "function"
-  ) {
-    console.error("Invalid case ID:", caseId);
-    return;
+    const caseId = caseData?.id;
+    if (caseId === null || caseId === undefined || typeof caseId === "object" || typeof caseId === "function") {
+      console.error("Invalid case ID:", caseId);
+      return;
+    }
+    navigate(`/dashboard/cases/${String(caseId)}`);
   }
-
-  navigate(`/dashboard/cases/${String(caseId)}`);
-}
-
-  // ============================================================
-  // CREATE CASE
-  // ============================================================
 
   async function handleCreateCase(data) {
     try {
       setIsCreating(true);
-
       const response = await createCase(data);
-
       const createdCase = response?.data;
-
       setIsModalOpen(false);
-
       await Swal.fire({
         icon: "success",
         title: "Case Created",
-        text: createdCase?.case_number
-          ? `${createdCase.case_number} has been created successfully.`
-          : "The case has been created successfully.",
-        background: "#07110f",
-        color: "#f8fafc",
-        iconColor: "#34d399",
+        text: createdCase?.case_number ? `${createdCase.case_number} has been created successfully.` : "The case has been created successfully.",
+        background: "#ffffff",
+        color: "#172033",
+        iconColor: "#059669",
         confirmButtonColor: "#059669",
         confirmButtonText: "Continue",
+        customClass: { popup: "border border-slate-200 rounded-2xl shadow-xl" },
       });
-
       await loadCases();
-
-      if (createdCase?.id) {
-        navigate(
-          `/dashboard/cases/${createdCase.id}`
-        );
+      if (createdCase?.id !== null && createdCase?.id !== undefined) {
+        navigate(`/dashboard/cases/${createdCase.id}`);
       }
     } catch (requestError) {
-      console.error(
-        "Failed to create case:",
-        requestError
-      );
-
-      const message =
-        requestError?.response?.data?.detail ||
-        requestError?.message ||
-        "Unable to create the case.";
-
+      console.error("Failed to create case:", requestError);
+      const message = requestError?.response?.data?.detail || requestError?.message || "Unable to create the case.";
       await Swal.fire({
         icon: "error",
         title: "Case Creation Failed",
-        text: message,
-        background: "#07110f",
-        color: "#f8fafc",
-        iconColor: "#f87171",
+        text: typeof message === "string" ? message : "Unable to create the case.",
+        background: "#ffffff",
+        color: "#172033",
+        iconColor: "#dc2626",
         confirmButtonColor: "#dc2626",
         confirmButtonText: "Try Again",
+        customClass: { popup: "border border-slate-200 rounded-2xl shadow-xl" },
       });
     } finally {
       setIsCreating(false);
     }
   }
 
-  // ============================================================
-  // RENDER
-  // ============================================================
-
+  
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#020b09] text-white">
+    <div className="arthbodh-case-page min-h-screen overflow-x-hidden bg-[#F5F8FC] text-[#172033] selection:bg-emerald-100 selection:text-emerald-900">
+      <style>{`
+        @keyframes arthCaseFade {
+          from { opacity: 0; transform: translateY(14px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes arthCaseFloat {
+          0%,100% { transform: translate3d(0,0,0); }
+          50% { transform: translate3d(12px,-10px,0); }
+        }
+        .arth-case-enter {
+          animation: arthCaseFade 520ms cubic-bezier(.16,1,.3,1) both;
+        }
+        .arth-case-stagger-1 { animation-delay: 70ms; }
+        .arth-case-stagger-2 { animation-delay: 140ms; }
+        .arth-case-stagger-3 { animation-delay: 210ms; }
+        .arth-case-stagger-4 { animation-delay: 280ms; }
+        .arth-case-card {
+          transition: transform 220ms cubic-bezier(.16,1,.3,1),
+            box-shadow 220ms ease, border-color 220ms ease;
+        }
+        .arth-case-card:hover {
+          transform: translateY(-3px);
+          border-color: #cbd5e1;
+          box-shadow: 0 14px 28px -12px rgba(23,37,84,.16);
+        }
+        .arth-case-grid {
+          background-image:
+            linear-gradient(rgba(148,163,184,.07) 1px,transparent 1px),
+            linear-gradient(90deg,rgba(148,163,184,.07) 1px,transparent 1px);
+          background-size: 36px 36px;
+        }
+        .arth-case-orb {
+          animation: arthCaseFloat 11s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .arth-case-enter,.arth-case-orb { animation: none !important; }
+          .arth-case-card,.arth-case-card:hover {
+            transition: none !important;
+            transform: none !important;
+          }
+        }
+      `}</style>
 
-      {/* ======================================================
-          BACKGROUND GRID
-      ======================================================= */}
+      <UserNavbar />
 
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.20]"
-        style={{
-          backgroundImage: `
-            linear-gradient(
-              rgba(52, 211, 153, 0.035) 1px,
-              transparent 1px
-            ),
-            linear-gradient(
-              90deg,
-              rgba(52, 211, 153, 0.035) 1px,
-              transparent 1px
-            )
-          `,
-          backgroundSize: "64px 64px",
-        }}
-      />
+      <main className="relative isolate min-h-[calc(100vh-80px)] overflow-hidden">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <div className="arth-case-grid absolute inset-0 opacity-70" />
+          <div className="arth-case-orb absolute -right-32 -top-28 h-96 w-96 rounded-full bg-emerald-200/25 blur-3xl" />
+          <div className="arth-case-orb absolute -left-32 top-80 h-80 w-80 rounded-full bg-blue-200/25 blur-3xl [animation-delay:-4s]" />
+          <div className="absolute bottom-0 right-1/4 h-72 w-72 rounded-full bg-cyan-100/30 blur-3xl" />
+        </div>
 
-      {/* ======================================================
-          BACKGROUND GLOW
-      ======================================================= */}
-
-      <div
-        className="
-          pointer-events-none
-          absolute
-          -top-48
-          left-1/3
-          h-[500px]
-          w-[500px]
-          rounded-full
-          bg-emerald-400/[0.025]
-          blur-3xl
-        "
-      />
-
-      {/* ======================================================
-          PAGE
-      ======================================================= */}
-
-      <div className="relative z-10 flex min-h-screen flex-col">
-
-        {/* ====================================================
-            NAVBAR
-        ===================================================== */}
-
-        <BASNavbar />
-
-        {/* ====================================================
-            MAIN
-        ===================================================== */}
-
-        <main className="flex-1">
+        <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 xl:px-10">
           {!canViewCases ? (
-            <div className="mx-auto max-w-xl px-5 py-24 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-400">
-                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
+            <section className="arth-case-enter mx-auto mt-12 max-w-2xl rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-sm sm:p-12">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+                <Icon name="lock" size={30} />
               </div>
-              <h2 className="mt-5 text-xl font-bold text-white">Access Denied</h2>
-              <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-                You do not have permission to view investigation cases. Please contact your company administrator.
+              <h1 className="mt-5 text-2xl font-bold tracking-tight text-[#172554]">
+                Access Restricted
+              </h1>
+              <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
+                You do not have permission to view investigation cases. Please
+                contact your administrator if you believe this is a mistake.
               </p>
               <button
                 type="button"
                 onClick={() => navigate("/dashboard")}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-xs font-bold text-black hover:bg-emerald-400 transition"
+                className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#059669] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#047857] focus:outline-none focus:ring-4 focus:ring-emerald-100"
               >
-                Return to Dashboard
+                <Icon name="arrow" size={16} />
+                Back to Dashboard
               </button>
-            </div>
-          ) : (
-            <div
-              className="
-                mx-auto
-                max-w-[1700px]
-                px-5
-                py-12
-                sm:px-8
-                lg:px-10
-              "
-            >
-
-            {/* ==================================================
-                HEADER
-            =================================================== */}
-
-            <div
-              className="
-                flex
-                flex-col
-                gap-7
-                lg:flex-row
-                lg:items-center
-                lg:justify-between
-              "
-            >
-
-              {/* LEFT */}
-
-              <div>
-
-                <div className="flex items-center gap-3">
-
-                  <span
-                    className="
-                      h-2
-                      w-2
-                      rounded-full
-                      bg-emerald-400
-                      shadow-[0_0_12px_rgba(52,211,153,0.8)]
-                    "
-                  />
-
-                  <span
-                    className="
-                      text-xs
-                      font-semibold
-                      uppercase
-                      tracking-[0.22em]
-                      text-emerald-400
-                    "
-                  >
-                    BANK ANALYTICAL SYSTEM
-                  </span>
-
-                </div>
-
-                <h1
-                  className="
-                    mt-5
-                    text-4xl
-                    font-semibold
-                    tracking-tight
-                    text-white
-                    md:text-5xl
-                  "
-                >
-                  Case Management
-                </h1>
-
-                <p
-                  className="
-                    mt-3
-                    max-w-2xl
-                    text-sm
-                    leading-6
-                    text-slate-400
-                    md:text-base
-                  "
-                >
-                  Create and manage financial investigation
-                  cases.
-                </p>
-
-              </div>
-
-              {/* ACTIONS: VIEW CASE REPORT & CREATE CASE */}
-              <div className="flex flex-wrap items-center gap-3">
-
-                {/* VIEW CASE REPORT BUTTON */}
-                <button
-                  type="button"
-                  onClick={() => navigate("/reports")}
-                  className="
-                    inline-flex
-                    w-fit
-                    items-center
-                    justify-center
-                    gap-2.5
-                    rounded-xl
-                    border
-                    border-emerald-400/40
-                    bg-[#051c16]
-                    px-5
-                    py-3.5
-                    text-xs
-                    font-bold
-                    uppercase
-                    tracking-[0.12em]
-                    text-emerald-300
-                    shadow-[0_4px_20px_rgba(0,0,0,0.25)]
-                    transition-all
-                    duration-200
-                    hover:border-emerald-400
-                    hover:bg-emerald-400/10
-                    hover:text-emerald-200
-                    active:scale-[0.98]
-                    cursor-pointer
-                  "
-                >
-                  <svg
-                    className="h-4 w-4 text-emerald-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  VIEW CASE REPORT
-                </button>
-
-                {/* CREATE BUTTON */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setIsModalOpen(true)
-                  }
-                  className="
-                    inline-flex
-                    w-fit
-                    items-center
-                    justify-center
-                    gap-3
-                    rounded-xl
-                    bg-emerald-400
-                    px-6
-                    py-3.5
-                    text-xs
-                    font-bold
-                    uppercase
-                    tracking-[0.12em]
-                    text-[#03100d]
-                    shadow-[0_10px_30px_rgba(52,211,153,0.08)]
-                    transition-all
-                    duration-200
-                    hover:bg-emerald-300
-                    hover:shadow-[0_12px_35px_rgba(52,211,153,0.14)]
-                    active:scale-[0.98]
-                    lg:px-7
-                  "
-                >
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      d="M12 5v14"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M5 12h14"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  CREATE NEW CASE
-                </button>
-              </div>
-
-            </div>
-
-            {/* ==================================================
-                CASE OVERVIEW (Hidden for Client Admin to avoid duplicate KPIs)
-            =================================================== */}
-
-            {!isClientAdmin && (
-              <section className="mt-10">
-
-              {/* Section title */}
-
-              <div className="mb-5 flex items-center gap-3">
-
-                <span
-                  className="
-                    h-7
-                    w-1
-                    rounded-full
-                    bg-emerald-400
-                    shadow-[0_0_12px_rgba(52,211,153,0.45)]
-                  "
-                />
-
-                <h2
-                  className="
-                    text-sm
-                    font-semibold
-                    uppercase
-                    tracking-[0.16em]
-                    text-slate-300
-                  "
-                >
-                  Case Overview
-                </h2>
-
-              </div>
-
-              {/* Stats */}
-
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-
-                {/* TOTAL */}
-
-                <div
-                  className="
-                    rounded-[22px]
-                    border
-                    border-white/[0.07]
-                    bg-[#061411]/80
-                    px-7
-                    py-6
-                    backdrop-blur-sm
-                  "
-                >
-
-                  <p
-                    className="
-                      text-[10px]
-                      font-semibold
-                      uppercase
-                      tracking-[0.16em]
-                      text-slate-500
-                    "
-                  >
-                    Total Cases
-                  </p>
-
-                  <p
-                    className="
-                      mt-5
-                      text-4xl
-                      font-semibold
-                      tracking-tight
-                      text-white
-                    "
-                  >
-                    {totalCases}
-                  </p>
-
-                  <p
-                    className="
-                      mt-2
-                      text-xs
-                      text-slate-600
-                    "
-                  >
-                    Total banking cases
-                  </p>
-
-                </div>
-
-                {/* DRAFT */}
-
-                <div
-                  className="
-                    rounded-[22px]
-                    border
-                    border-white/[0.07]
-                    bg-[#061411]/80
-                    px-7
-                    py-6
-                    backdrop-blur-sm
-                  "
-                >
-
-                  <p
-                    className="
-                      text-[10px]
-                      font-semibold
-                      uppercase
-                      tracking-[0.16em]
-                      text-slate-500
-                    "
-                  >
-                    Draft
-                  </p>
-
-                  <p
-                    className="
-                      mt-5
-                      text-4xl
-                      font-semibold
-                      tracking-tight
-                      text-white
-                    "
-                  >
-                    {draftCases}
-                  </p>
-
-                  <p
-                    className="
-                      mt-2
-                      text-xs
-                      text-slate-600
-                    "
-                  >
-                    Cases being prepared
-                  </p>
-
-                </div>
-
-                {/* IN PROGRESS */}
-
-                <div
-                  className="
-                    rounded-[22px]
-                    border
-                    border-white/[0.07]
-                    bg-[#061411]/80
-                    px-7
-                    py-6
-                    backdrop-blur-sm
-                  "
-                >
-
-                  <p
-                    className="
-                      text-[10px]
-                      font-semibold
-                      uppercase
-                      tracking-[0.16em]
-                      text-slate-500
-                    "
-                  >
-                    In Progress
-                  </p>
-
-                  <p
-                    className="
-                      mt-5
-                      text-4xl
-                      font-semibold
-                      tracking-tight
-                      text-cyan-300
-                    "
-                  >
-                    {inProgressCases}
-                  </p>
-
-                  <p
-                    className="
-                      mt-2
-                      text-xs
-                      text-slate-600
-                    "
-                  >
-                    Active investigations
-                  </p>
-
-                </div>
-
-                {/* COMPLETED */}
-
-                <div
-                  className="
-                    rounded-[22px]
-                    border
-                    border-white/[0.07]
-                    bg-[#061411]/80
-                    px-7
-                    py-6
-                    backdrop-blur-sm
-                  "
-                >
-
-                  <p
-                    className="
-                      text-[10px]
-                      font-semibold
-                      uppercase
-                      tracking-[0.16em]
-                      text-slate-500
-                    "
-                  >
-                    Completed
-                  </p>
-
-                  <p
-                    className="
-                      mt-5
-                      text-4xl
-                      font-semibold
-                      tracking-tight
-                      text-emerald-300
-                    "
-                  >
-                    {completedCases}
-                  </p>
-
-                  <p
-                    className="
-                      mt-2
-                      text-xs
-                      text-slate-600
-                    "
-                  >
-                    Completed investigations
-                  </p>
-
-                </div>
-
-              </div>
-
             </section>
-            )}
-
-            {/* ==================================================
-                CASE MANAGEMENT
-            =================================================== */}
-
-            <section className="mt-10">
-
-              {/* SECTION HEADER */}
-
-              <div
-                className="
-                  flex
-                  flex-col
-                  gap-4
-                  sm:flex-row
-                  sm:items-end
-                  sm:justify-between
-                "
-              >
-
-                <div>
-
-                  <div className="flex items-center gap-3">
-
-                    <span
-                      className="
-                        h-7
-                        w-1
-                        rounded-full
-                        bg-emerald-400
-                        shadow-[0_0_12px_rgba(52,211,153,0.45)]
-                      "
-                    />
-
-                    <div>
-
-                      <p
-                        className="
-                          text-xs
-                          font-semibold
-                          uppercase
-                          tracking-[0.18em]
-                          text-emerald-400
-                        "
-                      >
-                        Case Management
-                      </p>
-
-                      <h2
-                        className="
-                          mt-1
-                          text-xl
-                          font-semibold
-                          text-white
-                        "
-                      >
-                        Investigation Cases
-                      </h2>
-
-                    </div>
-
+          ) : (
+            <>
+              <section className="arth-case-enter flex flex-col justify-between gap-6 xl:flex-row xl:items-end">
+                <div className="max-w-3xl">
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/85 px-3.5 py-1.5 shadow-sm backdrop-blur">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-600" />
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-[.17em] text-emerald-700">
+                      ARTHBODH · Investigation Workspace
+                    </span>
                   </div>
 
-                </div>
+                  <h1 className="text-3xl font-extrabold tracking-tight text-[#172554] sm:text-4xl lg:text-[42px]">
+                    Case <span className="text-[#059669]">Management</span>
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base sm:leading-7">
+                    Create, organize, and review investigation cases from one
+                    centralized workspace. Track case progress and quickly
+                    access the details you need.
+                  </p>
 
-                <p
-                  className="
-                    text-xs
-                    text-slate-600
-                  "
-                >
-                  {filteredCases.length}{" "}
-                  {filteredCases.length === 1
-                    ? "case"
-                    : "cases"}
-                </p>
-
-              </div>
-
-              {/* =================================================
-                  TOOLBAR
-              ================================================== */}
-
-              <div
-                className="
-                  mt-5
-                  flex
-                  flex-col
-                  gap-3
-                  rounded-[22px]
-                  border
-                  border-white/[0.07]
-                  bg-[#061411]/60
-                  p-4
-                  sm:flex-row
-                  sm:items-center
-                  sm:justify-between
-                "
-              >
-
-                {/* SEARCH */}
-
-                <div className="relative w-full sm:max-w-md">
-
-                  <div
-                    className="
-                      pointer-events-none
-                      absolute
-                      left-3.5
-                      top-1/2
-                      -translate-y-1/2
-                      text-slate-600
-                    "
-                  >
-
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                    >
-                      <circle
-                        cx="11"
-                        cy="11"
-                        r="7"
-                      />
-
-                      <path d="m20 20-4-4" />
-                    </svg>
-
+                  <div className="mt-5 flex flex-wrap items-center gap-3 text-xs font-medium text-slate-500 sm:text-sm">
+                    <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-2">
+                      <Icon name="cases" size={16} className="text-emerald-600" />
+                      Investigation records
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-2">
+                      <Icon name="progress" size={16} className="text-blue-600" />
+                      Status and progress tracking
+                    </span>
                   </div>
-
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(event) =>
-                      setSearchTerm(
-                        event.target.value
-                      )
-                    }
-                    placeholder="Search cases..."
-                    className="
-                      w-full
-                      rounded-xl
-                      border
-                      border-white/[0.08]
-                      bg-[#020b09]
-                      py-3
-                      pl-10
-                      pr-4
-                      text-xs
-                      text-white
-                      outline-none
-                      placeholder:text-slate-600
-                      focus:border-emerald-400/25
-                      focus:ring-4
-                      focus:ring-emerald-400/[0.04]
-                    "
-                  />
-
                 </div>
 
-                {/* ACTIONS */}
-
-                <div className="flex items-center gap-2">
-
+                <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
                   <button
                     type="button"
                     onClick={loadCases}
                     disabled={isLoading}
-                    className="
-                      rounded-xl
-                      border
-                      border-white/[0.08]
-                      bg-white/[0.02]
-                      px-4
-                      py-2.5
-                      text-[9px]
-                      font-semibold
-                      uppercase
-                      tracking-[0.12em]
-                      text-slate-500
-                      transition
-                      hover:border-emerald-400/20
-                      hover:text-emerald-300
-                      disabled:cursor-not-allowed
-                      disabled:opacity-40
-                    "
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/60 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
+                    <Icon name="refresh" size={16} className={isLoading ? "animate-spin" : ""} />
                     Refresh
                   </button>
 
-                  <div
-                    className="
-                      flex
-                      rounded-xl
-                      border
-                      border-white/[0.08]
-                      bg-[#020b09]
-                      p-1
-                    "
-                  >
-
+                  {canCreateCase && (
                     <button
                       type="button"
-                      onClick={() =>
-                        setViewMode("table")
-                      }
-                      className={`
-                        rounded-lg
-                        px-3
-                        py-2
-                        text-[9px]
-                        font-semibold
-                        uppercase
-                        tracking-[0.12em]
-                        transition
-                        ${
-                          viewMode === "table"
-                            ? "bg-emerald-400/10 text-emerald-300"
-                            : "text-slate-600 hover:text-slate-300"
-                        }
-                      `}
+                      onClick={() => setIsModalOpen(true)}
+                      disabled={isCreating}
+                      className="group inline-flex items-center justify-center gap-2.5 rounded-xl bg-[#059669] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-700/15 transition duration-200 hover:-translate-y-0.5 hover:bg-[#047857] hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Table
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/15 transition group-hover:bg-white/20">
+                        <Icon name="plus" size={16} />
+                      </span>
+                      Create New Case
                     </button>
+                  )}
+                </div>
+              </section>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setViewMode("card")
-                      }
-                      className={`
-                        rounded-lg
-                        px-3
-                        py-2
-                        text-[9px]
-                        font-semibold
-                        uppercase
-                        tracking-[0.12em]
-                        transition
-                        ${
-                          viewMode === "card"
-                            ? "bg-emerald-400/10 text-emerald-300"
-                            : "text-slate-600 hover:text-slate-300"
-                        }
-                      `}
-                    >
-                      Cards
-                    </button>
-
+              <section className="arth-case-enter arth-case-stagger-1 mt-8">
+                <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold tracking-tight text-[#172554] sm:text-xl">
+                      Case Overview
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      A quick summary of your investigation workload.
+                    </p>
                   </div>
-
+                  <span className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Live case data
+                  </span>
                 </div>
 
-              </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <StatCard label="Total Cases" value={totalCases} note="All accessible investigations" icon="cases" tone="blue" percentage={totalCases ? 100 : 0} loading={isLoading} delay="arth-case-stagger-1" />
+                  <StatCard label="Draft Cases" value={draftCases} note="Cases awaiting further action" icon="draft" tone="amber" percentage={totalCases ? draftCases / totalCases * 100 : 0} loading={isLoading} delay="arth-case-stagger-2" />
+                  <StatCard label="In Progress" value={inProgressCases} note="Investigations in progress" icon="progress" tone="indigo" percentage={totalCases ? inProgressCases / totalCases * 100 : 0} loading={isLoading} delay="arth-case-stagger-3" />
+                  <StatCard label="Completed Cases" value={completedCases} note="Investigations marked completed" icon="complete" tone="emerald" percentage={totalCases ? completedCases / totalCases * 100 : 0} loading={isLoading} delay="arth-case-stagger-4" />
+                </div>
+              </section>
 
-              {/* =================================================
-                  ERROR
-              ================================================== */}
 
-              {error && (
-                <div
-                  className="
-                    mt-4
-                    rounded-xl
-                    border
-                    border-red-400/20
-                    bg-red-400/[0.04]
-                    px-4
-                    py-3
-                  "
-                >
-
-                  <div
-                    className="
-                      flex
-                      items-center
-                      justify-between
-                      gap-4
-                    "
-                  >
-
+              <section className="arth-case-enter arth-case-stagger-2 mt-8 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+                <div className="border-b border-slate-100 px-5 py-6 sm:px-7">
+                  <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                     <div>
-
-                      <p className="text-xs font-semibold text-red-300">
-                        Unable to load cases
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h2 className="text-xl font-bold tracking-tight text-[#172554] sm:text-2xl">
+                          Investigation Cases
+                        </h2>
+                        <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                          {filteredCases.length} {filteredCases.length === 1 ? "case" : "cases"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">
+                        Search your records and open a case to review its details,
+                        documents, and investigation progress.
                       </p>
-
-                      <p className="mt-1 text-[10px] text-red-300/60">
-                        {error}
-                      </p>
-
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={loadCases}
-                      className="
-                        rounded-lg
-                        border
-                        border-red-400/20
-                        px-3
-                        py-2
-                        text-[9px]
-                        font-semibold
-                        uppercase
-                        tracking-wider
-                        text-red-300
-                        transition
-                        hover:bg-red-400/[0.05]
-                      "
-                    >
-                      Retry
-                    </button>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="relative w-full sm:w-80">
+                        <Icon name="search" size={19} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="search"
+                          value={searchTerm}
+                          onChange={(event) => setSearchTerm(event.target.value)}
+                          placeholder="Search cases..."
+                          aria-label="Search investigation cases"
+                          className="w-full rounded-xl border border-slate-200 bg-[#F8FAFC] py-3 pl-11 pr-10 text-sm text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-50"
+                        />
+                        {searchTerm && (
+                          <button
+                            type="button"
+                            onClick={() => setSearchTerm("")}
+                            aria-label="Clear search"
+                            className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
 
-                  </div>
-
-                </div>
-              )}
-
-              {/* =================================================
-                  CONTENT
-              ================================================== */}
-
-              <div className="mt-4">
-
-                {isLoading ? (
-
-                  <div
-                    className="
-                      rounded-[22px]
-                      border
-                      border-white/[0.07]
-                      bg-[#061411]/70
-                      p-12
-                      text-center
-                    "
-                  >
-
-                    <div
-                      className="
-                        mx-auto
-                        h-8
-                        w-8
-                        animate-spin
-                        rounded-full
-                        border-2
-                        border-emerald-400/20
-                        border-t-emerald-400
-                      "
-                    />
-
-                    <p className="mt-4 text-xs text-slate-500">
-                      Loading cases...
-                    </p>
-
-                  </div>
-
-                ) : filteredCases.length === 0 ? (
-
-                  <div
-                    className="
-                      rounded-[22px]
-                      border
-                      border-white/[0.07]
-                      bg-[#061411]/70
-                      px-6
-                      py-14
-                      text-center
-                    "
-                  >
-
-                    <div
-                      className="
-                        mx-auto
-                        flex
-                        h-12
-                        w-12
-                        items-center
-                        justify-center
-                        rounded-xl
-                        border
-                        border-emerald-400/15
-                        bg-emerald-400/[0.04]
-                      "
-                    >
-
-                      <svg
-                        className="h-5 w-5 text-emerald-300"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      >
-                        <path d="M6 3h9l4 4v14H6z" />
-
-                        <path d="M14 3v5h5" />
-                      </svg>
-
+                      <div className="inline-flex shrink-0 items-center rounded-xl border border-slate-200 bg-[#F8FAFC] p-1" aria-label="Choose case display">
+                        <button
+                          type="button"
+                          onClick={() => setViewMode("table")}
+                          aria-pressed={viewMode === "table"}
+                          title="Table view"
+                          className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${viewMode === "table" ? "bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200/70" : "text-slate-500 hover:text-slate-800"}`}
+                        >
+                          <Icon name="table" size={16} />
+                          <span className="hidden sm:inline">Table</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setViewMode("grid")}
+                          aria-pressed={viewMode === "grid"}
+                          title="Card view"
+                          className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${viewMode === "grid" ? "bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200/70" : "text-slate-500 hover:text-slate-800"}`}
+                        >
+                          <Icon name="grid" size={16} />
+                          <span className="hidden sm:inline">Cards</span>
+                        </button>
+                      </div>
                     </div>
+                  </div>
 
-                    <p className="mt-5 text-sm font-medium text-slate-300">
-                      {searchTerm
-                        ? "No matching cases"
-                        : "No cases available"}
-                    </p>
-
-                    <p className="mt-2 text-xs text-slate-600">
-                      {searchTerm
-                        ? "Try another search term."
-                        : "Create your first investigation case."}
-                    </p>
-
-                    {!searchTerm && (
+                  {searchTerm.trim() && (
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3">
+                      <p className="text-sm text-blue-800">
+                        Showing <span className="font-bold">{filteredCases.length}</span> matching{" "}
+                        {filteredCases.length === 1 ? "case" : "cases"} for{" "}
+                        <span className="font-bold">“{searchTerm.trim()}”</span>
+                      </p>
                       <button
                         type="button"
-                        onClick={() =>
-                          setIsModalOpen(true)
-                        }
-                        className="
-                          mt-5
-                          rounded-xl
-                          bg-emerald-400
-                          px-4
-                          py-2.5
-                          text-xs
-                          font-semibold
-                          text-slate-950
-                          transition
-                          hover:bg-emerald-300
-                        "
+                        onClick={() => setSearchTerm("")}
+                        className="text-xs font-bold text-blue-700 underline decoration-blue-300 underline-offset-4 transition hover:text-blue-900"
                       >
-                        Create First Case
+                        Clear filters
                       </button>
-                    )}
+                    </div>
+                  )}
+                </div>
 
-                  </div>
-
-                ) : viewMode === "table" ? (
-
-                  <CaseTable
-                    cases={filteredCases}
-                    onOpen={handleOpenCase}
-                    isClientAdmin={isClientAdmin}
-                  />
-
-                ) : (
-
-                  <div
-                    className="
-                      grid
-                      gap-4
-                      md:grid-cols-2
-                      xl:grid-cols-3
-                    "
-                  >
-
-                    {filteredCases.map(
-                      (caseData) => (
+                <div className="p-4 sm:p-6">
+                  {isLoading ? (
+                    <div className="space-y-4 py-3" aria-live="polite">
+                      <div className="flex items-center gap-3">
+                        <span className="h-9 w-9 animate-pulse rounded-xl bg-emerald-50" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 w-40 animate-pulse rounded bg-slate-100" />
+                          <div className="h-3 w-64 max-w-full animate-pulse rounded bg-slate-100" />
+                        </div>
+                      </div>
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <div key={index} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-100 p-4 sm:grid-cols-4">
+                          <div className="h-4 animate-pulse rounded bg-slate-100" />
+                          <div className="h-4 animate-pulse rounded bg-slate-100" />
+                          <div className="h-4 animate-pulse rounded bg-slate-100" />
+                          <div className="h-4 animate-pulse rounded bg-slate-100" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : error ? (
+                    <div className="mx-auto max-w-xl py-10 text-center sm:py-14" role="alert">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 ring-1 ring-rose-100">
+                        <span className="text-2xl">!</span>
+                      </div>
+                      <h3 className="mt-4 text-lg font-bold text-[#172033]">
+                        Unable to Load Cases
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">{error}</p>
+                      <button
+                        type="button"
+                        onClick={loadCases}
+                        className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-[#059669] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#047857] focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                      >
+                        <Icon name="refresh" size={16} />
+                        Try Again
+                      </button>
+                    </div>
+                  ) : filteredCases.length === 0 ? (
+                    <div className="mx-auto max-w-xl py-12 text-center sm:py-16">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500">
+                        <Icon name={searchTerm.trim() ? "search" : "cases"} size={28} />
+                      </div>
+                      <h3 className="mt-5 text-lg font-bold text-[#172033]">
+                        {searchTerm.trim() ? "No Matching Cases" : "No Investigation Cases Yet"}
+                      </h3>
+                      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                        {searchTerm.trim()
+                          ? "Try a different case number, case name, status, or investigating officer."
+                          : "Create your first investigation case to start organizing statements, documents, and transaction analysis."}
+                      </p>
+                      {searchTerm.trim() ? (
+                        <button
+                          type="button"
+                          onClick={() => setSearchTerm("")}
+                          className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                        >
+                          Clear Search
+                        </button>
+                      ) : canCreateCase ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsModalOpen(true)}
+                          className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#059669] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#047857]"
+                        >
+                          <Icon name="plus" size={16} />
+                          Create Your First Case
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : viewMode === "table" ? (
+                    <div className="overflow-x-auto">
+                      <CaseTable
+                        cases={filteredCases}
+                        onOpenCase={handleOpenCase}
+                        isClientAdmin={isClientAdmin || isSuperAdmin}
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                      {filteredCases.map((caseData) => (
                         <CaseCard
                           key={caseData.id}
                           caseData={caseData}
                           onOpen={handleOpenCase}
-                          isClientAdmin={isClientAdmin}
+                          isClientAdmin={isClientAdmin || isSuperAdmin}
                         />
-                      )
-                    )}
+                      ))}
+                    </div>
+                  )}
+                </div>
 
+                {!isLoading && !error && filteredCases.length > 0 && (
+                  <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                    <p>
+                      Displaying{" "}
+                      <span className="font-semibold text-slate-700">{filteredCases.length}</span> of{" "}
+                      <span className="font-semibold text-slate-700">{totalCases}</span> cases
+                    </p>
+                    <p className="inline-flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Select a case to open its investigation workspace
+                    </p>
                   </div>
-
                 )}
-
-              </div>
-
-            </section>
-
-          </div>
-        )}
+              </section>
+            </>
+          )}
+        </div>
       </main>
 
-        {/* ====================================================
-            FOOTER
-        ===================================================== */}
+      <UserFooter />
 
-        <BASFooter />
-
-      </div>
-
-      {/* ======================================================
-          CREATE CASE MODAL
-      ======================================================= */}
-
-      <CreateCaseModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          if (!isCreating) {
-            setIsModalOpen(false);
-          }
-        }}
-        onSubmit={handleCreateCase}
-        isSubmitting={isCreating}
-        isClientAdmin={isClientAdmin}
-      />
-
-
+      {canViewCases && canCreateCase && (
+        <CreateCaseModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            if (!isCreating) setIsModalOpen(false);
+          }}
+          onSubmit={handleCreateCase}
+          isSubmitting={isCreating}
+          isClientAdmin={isClientAdmin}
+        />
+      )}
     </div>
   );
 }

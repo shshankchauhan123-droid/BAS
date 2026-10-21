@@ -185,6 +185,14 @@ def upload_file(
     # --------------------------------------------------------
     if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
         case = get_case_by_id(db=db, case_id=case_id)
+    elif user_role == CLIENT_ADMIN_ROLE:
+        case = get_case_by_id(db=db, case_id=case_id)
+        if not case or not (
+            case.client_id == user.client_id
+            or (case.creator and case.creator.client_id == user.client_id)
+            or (case.assignee and case.assignee.client_id == user.client_id)
+        ):
+            case = None
     else:
         case = get_case_by_id_and_user(
             db=db,
@@ -343,8 +351,18 @@ def get_case_files(
         return get_files_by_case(db=db, case_id=case_id, include_superseded=include_superseded)
     elif user_role == CLIENT_ADMIN_ROLE:
         case = get_case_by_id(db=db, case_id=case_id)
-        if not case or case.client_id != user.client_id:
+        if not case or not (
+            case.client_id == user.client_id
+            or (case.creator and case.creator.client_id == user.client_id)
+            or (case.assignee and case.assignee.client_id == user.client_id)
+        ):
             raise ValueError("Case not found or permission denied")
+        if case.client_id is None and user.client_id is not None:
+            case.client_id = user.client_id
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
         return get_files_by_case(db=db, case_id=case_id, include_superseded=include_superseded)
     else:
         case = get_case_by_id_and_user(
@@ -381,7 +399,11 @@ def get_file_for_view(
         file = get_file_by_id(db=db, file_id=file_id)
         if file:
             case = get_case_by_id(db=db, case_id=file.case_id)
-            if not case or case.client_id != user.client_id:
+            if not case or not (
+                case.client_id == user.client_id
+                or (case.creator and case.creator.client_id == user.client_id)
+                or (case.assignee and case.assignee.client_id == user.client_id)
+            ):
                 file = None
     else:
         file = get_file_by_id_and_user(
@@ -442,11 +464,24 @@ def update_uploaded_file(
         if perms and not perms.can_upload_files:
             raise PermissionError("You do not have permission to update files. Contact your company administrator.")
 
-    file = get_file_by_id_and_user(
-        db=db,
-        file_id=file_id,
-        user_id=user_id,
-    )
+    if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        file = get_file_by_id(db=db, file_id=file_id)
+    elif user_role == CLIENT_ADMIN_ROLE:
+        file = get_file_by_id(db=db, file_id=file_id)
+        if file:
+            case = get_case_by_id(db=db, case_id=file.case_id)
+            if not case or not (
+                case.client_id == user.client_id
+                or (case.creator and case.creator.client_id == user.client_id)
+                or (case.assignee and case.assignee.client_id == user.client_id)
+            ):
+                file = None
+    else:
+        file = get_file_by_id_and_user(
+            db=db,
+            file_id=file_id,
+            user_id=user_id,
+        )
 
     if not file:
         raise ValueError("File not found")
@@ -536,7 +571,11 @@ def delete_uploaded_file(
         file = get_file_by_id(db=db, file_id=file_id)
         if file:
             case = get_case_by_id(db=db, case_id=file.case_id)
-            if not case or case.client_id != user.client_id:
+            if not case or not (
+                case.client_id == user.client_id
+                or (case.creator and case.creator.client_id == user.client_id)
+                or (case.assignee and case.assignee.client_id == user.client_id)
+            ):
                 file = None
     else:
         file = get_file_by_id_and_user(
@@ -680,7 +719,11 @@ def merge_case_files(
         case = get_case_by_id(db=db, case_id=case_id)
     elif user_role == CLIENT_ADMIN_ROLE:
         case = get_case_by_id(db=db, case_id=case_id)
-        if case and case.client_id != user.client_id:
+        if case and not (
+            case.client_id == user.client_id
+            or (case.creator and case.creator.client_id == user.client_id)
+            or (case.assignee and case.assignee.client_id == user.client_id)
+        ):
             case = None
     else:
         case = get_case_by_id_and_user(db=db, case_id=case_id, user_id=user_id)

@@ -28,6 +28,11 @@ class CaseCreateRequest(BaseModel):
         description="ID of the user to whom this case is assigned",
     )
 
+    client_id: Optional[int] = Field(
+        default=None,
+        description="ID of the client company (SuperAdmin)",
+    )
+
 
 class CaseUpdateRequest(BaseModel):
     case_name: Optional[str] = Field(
@@ -48,12 +53,22 @@ class CaseUpdateRequest(BaseModel):
     assigned_to: Optional[int] = None
 
 
+class CaseClientData(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    company_code: str
+
+
 class CaseCreatorData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     username: str
     email: str
     role: str
+    client_id: Optional[int] = None
+    client: Optional[CaseClientData] = None
+
 
 class CaseData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -63,11 +78,21 @@ class CaseData(BaseModel):
     case_name: str
     description: Optional[str]
     status: str
+    client_id: Optional[int] = None
     created_by: Optional[int] = None
     assigned_to: Optional[int] = None
     io_id: Optional[int] = None
     io: Optional[IOMasterData] = None
     creator: Optional[CaseCreatorData] = None
+    client: Optional[CaseClientData] = None
+    client_name: Optional[str] = None
+    company_code: Optional[str] = None
+    owner_username: Optional[str] = None
+    owner_email: Optional[str] = None
+    owner_client_id: Optional[int] = None
+    owner_client_name: Optional[str] = None
+    owner_company_code: Optional[str] = None
+    owner_client: Optional[CaseClientData] = None
     created_at: datetime
     updated_at: datetime
 

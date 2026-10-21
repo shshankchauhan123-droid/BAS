@@ -7,7 +7,7 @@ import { apiRequest } from "./client";
  * We intentionally do NOT send created_by.
  * The backend gets the logged-in user's ID from the JWT token.
  */
-export function createCase({ case_name, description, io_id, assigned_to }) {
+export function createCase({ case_name, description, io_id, assigned_to, client_id }) {
   const body = {
     case_name: case_name.trim(),
     description: description?.trim() || null,
@@ -19,6 +19,10 @@ export function createCase({ case_name, description, io_id, assigned_to }) {
 
   if (assigned_to !== undefined && assigned_to !== null && assigned_to !== "") {
     body.assigned_to = Number(assigned_to);
+  }
+
+  if (client_id !== undefined && client_id !== null && client_id !== "") {
+    body.client_id = Number(client_id);
   }
 
   return apiRequest("/api/v1/cases/", {
