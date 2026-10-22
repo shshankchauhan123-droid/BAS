@@ -2,51 +2,58 @@
 
 > **Forensic Bank Statement Intelligence, Transaction Flow Analytics & Investigation Platform**
 
-BAS (Bank Analysis System) is an enterprise financial forensic investigation and bank statement intelligence platform designed for law enforcement, cyber crime cells, financial forensic auditors, and investigative agencies. The system ingests heterogeneous bank statements across diverse formats (**scanned PDFs, native digital PDFs, Excel spreadsheets, CSV files, and TXT ledgers**), reconstructs distorted tables through computer vision and rule-based parsing, normalizes raw transactions into canonical forensic schemas, extracts counterparty identities using zero-shot Named Entity Recognition (**GLiNER**) and local Large Language Models (**Qwen / Ollama**), and generates multi-dimensional intelligence reports featuring interactive network money-trail graphs, transaction mode breakdowns, anomaly detection, and automated forensic PDF/CSV export.
+BAS (Bank Analysis System / ArthBodh) is an enterprise financial forensic investigation and bank statement intelligence platform engineered for law enforcement, cybercrime units, financial forensic auditors, and investigative agencies. The system ingests heterogeneous bank statements across diverse formats (**scanned PDFs, native digital PDFs, Excel spreadsheets, CSV files, and TXT ledgers**), reconstructs distorted tables through computer vision and rule-based parsing, normalizes raw transactions into canonical forensic schemas, extracts counterparty identities using zero-shot Named Entity Recognition (**GLiNER**) and local Large Language Models (**Qwen / Ollama**), and generates multi-dimensional intelligence reports featuring interactive network money-trail graphs, transaction mode breakdowns, forensic anomaly detection, and automated forensic PDF/CSV export.
 
 ---
 
 ## Table of Contents
 
-1. [Executive Architecture & Pipeline](#1-executive-architecture--pipeline)
-2. [Verified Technology Stack & Versions](#2-verified-technology-stack--versions)
-3. [Repository Directory Structure](#3-repository-directory-structure)
-4. [Prerequisites & System Requirements](#4-prerequisites--system-requirements)
-5. [Step-by-Step Installation Guide](#5-step-by-step-installation-guide)
-   - [A. Clone the Repository](#a-clone-the-repository)
-   - [B. Backend Setup (Python Virtual Environment)](#b-backend-setup-python-virtual-environment)
-   - [C. Frontend Setup (React & Vite)](#c-frontend-setup-react--vite)
-   - [D. Environment Variables Configuration](#d-environment-variables-configuration)
-   - [E. Database Setup & Alembic Migrations](#e-database-setup--alembic-migrations)
-   - [F. RabbitMQ Message Broker Setup](#f-rabbitmq-message-broker-setup)
-   - [G. OCR, NLP & LLM Model Provisioning](#g-ocr-nlp--llm-model-provisioning)
-6. [How to Run the Entire System](#6-how-to-run-the-entire-system)
-   - [A. Startup Sequence (Multi-Terminal)](#a-startup-sequence-multi-terminal)
-   - [B. Verification & Health Checks](#b-verification--health-checks)
-   - [C. Safe Shutdown Sequence](#c-safe-shutdown-sequence)
-7. [Core Application Features & Investigation Workflows](#7-core-application-features--investigation-workflows)
-   - [A. Role-Based Access Control (RBAC)](#a-role-based-access-control-rbac)
-   - [B. Case Management & IO Master](#b-case-management--io-master)
-   - [C. The 9-Stage Document Processing Pipeline](#c-the-9-stage-document-processing-pipeline)
-   - [D. The 5 Core Forensic Intelligence Reports](#d-the-5-core-forensic-intelligence-reports)
-8. [Comprehensive API Endpoints Reference](#8-comprehensive-api-endpoints-reference)
-9. [Troubleshooting & Diagnostics Guide](#9-troubleshooting--diagnostics-guide)
-10. [Testing, Linting & Verification](#10-testing-linting--verification)
-11. [Production Deployment & Operational Considerations](#11-production-deployment--operational-considerations)
+1. [BAS Overview](#1-bas-overview)
+2. [Architecture and Project Structure](#2-architecture-and-project-structure)
+3. [System Requirements](#3-system-requirements)
+4. [Verified Software Versions](#4-verified-software-versions)
+5. [Clone the Repository](#5-clone-the-repository)
+6. [Backend Setup](#6-backend-setup)
+7. [Frontend Setup](#7-frontend-setup)
+8. [Environment Configuration](#8-environment-configuration)
+9. [PostgreSQL Database Setup Using `bas_full_backup.dump`](#9-postgresql-database-setup-using-bas_full_backupdump)
+10. [Starting FastAPI and Celery with `start.py`](#10-starting-fastapi-and-celery-with-startpy)
+11. [Starting the Frontend](#11-starting-the-frontend)
+12. [Complete Local Run Procedure](#12-complete-local-run-procedure)
+13. [Database and Application Verification](#13-database-and-application-verification)
+14. [Production Deployment](#14-production-deployment)
+15. [Troubleshooting Guide](#15-troubleshooting-guide)
+16. [Backup and Data Security](#16-backup-and-data-security)
+17. [Known Limitations and Unverified Requirements](#17-known-limitations-and-unverified-requirements)
 
 ---
 
-## 1. Executive Architecture & Pipeline
+## 1. BAS Overview
 
-BAS operates on a decoupled, asynchronous, event-driven microservices architecture:
-- **Frontend SPA**: React 19 single-page application built with Vite, styled with Tailwind CSS, utilizing Apache ECharts for high-performance canvas/SVG visualizations, and `html2pdf.js` for forensic client-side document rendering.
-- **FastAPI Core API Gateway**: High-throughput asynchronous ASGI server managing authentication, session tokens, audit trails, case records, statement metadata, and transaction querying.
+### 1.1 Purpose and Forensic Capabilities
+Investigating financial crime, money laundering, and digital fraud requires analyzing dozens of bank statements from different financial institutions, each with proprietary statement layouts, varying column headers, multi-line narrations, and distorted scanned images. 
+
+BAS solves this challenge by providing an automated, end-to-end forensic processing and analytical pipeline:
+- **Universal Statement Ingestion**: Ingests native vector PDFs, scanned image PDFs, Excel spreadsheets (`.xlsx`, `.xls`), delimited text (`.csv`), and legacy ASCII bank ledgers (`.txt`).
+- **Computer Vision & Table Extraction**: Uses a tiered extraction approach combining `pdfplumber`, `camelot`, and `PyMuPDF` with an automatic fallback to OpenCV image preprocessing and `pytesseract` OCR for scanned physical documents.
+- **Header Classification & Normalization**: Automatically identifies header rows using banking keyword heuristics, standardizes aliases (e.g., `Txn Dt`, `Value Date`, `Dr/Cr`, `Withdrawal`, `Balance`), and invokes local LLM inference (**Qwen 3.5:0.8b via Ollama**) to dynamically classify non-standard header formats.
+- **Zero-Shot Named Entity Recognition (GLiNER)**: Evaluates raw, messy transaction narrations out-of-band using `urchade/gliner_multi-v2.1` to isolate counterparties, classifying them into `PERSON`, `ORGANIZATION`, `MERCHANT`, `BANK`, `FINANCIAL_INSTITUTION`, `UPI_ID`, and `ACCOUNT_NUMBER`.
+- **Multi-Account Relationship Mapping**: Aggregates transactions across multiple accounts and cases, rendering interactive force-directed network graphs (Apache ECharts) to trace money trails, circular fund routing, and layered transactions.
+- **Forensic Financial Intelligence**: Automatically computes transaction channel distributions (UPI, NEFT, RTGS, IMPS, Cash, Cheque), flags statistical outliers ($Q_3 + 1.5 \times \text{IQR}$), identifies round-sum cash structuring clusters (smurfing/hawala indicators), tracks velocity spikes, and exports courtroom-ready forensic audit PDFs via `html2pdf.js` and Excel-compatible RFC 4180 CSVs.
+
+---
+
+## 2. Architecture and Project Structure
+
+### 2.1 Architectural Overview
+BAS operates on a decoupled, asynchronous, event-driven architecture:
+- **Frontend SPA**: React 19 single-page application built with Vite and Tailwind CSS. Employs Apache ECharts for high-performance canvas/SVG graph visualizations and `html2pdf.js` for forensic client-side document rendering.
+- **FastAPI Core API Gateway**: High-throughput asynchronous ASGI server managing authentication, session tokens, RBAC permissions, audit trails, case records, statement metadata, and transaction querying.
 - **Broker & Task Queue**: RabbitMQ message broker coordinating with Celery background workers to execute compute-intensive document extraction, OCR, NER, and database ingestion out-of-band.
-- **Computer Vision & Parsing Engine**: Dual-engine extraction utilizing `pdfplumber` / `camelot` / `PyMuPDF` for digital PDFs, cascading automatically to OpenCV preprocessing and `pytesseract` for scanned or low-resolution image statements.
-- **AI Intelligence Layer**: Zero-shot Named Entity Recognition via `GLiNER` (`urchade/gliner_multi-v2.1`) to isolate entities (Person, Organization, Merchant, Bank, UPI ID, Reference) from unstructured transaction narrations, paired with local `Ollama` (`Qwen 3.5:0.8b`) for semantic header inference.
 - **Relational Storage**: PostgreSQL database with SQLAlchemy 2.0 ORM, indexed for fast transaction filtering, date-range bounding, and counterparty aggregation.
+- **Storage Subsystem**: File system storage partitioned by case ID (`backend/storage/cases/{case_id}/`), holding uploaded statements and intermediate normalized spreadsheets.
 
-### Architectural Flowchart
+### 2.2 System Architecture Diagram
 
 ```mermaid
 flowchart TD
@@ -60,28 +67,28 @@ flowchart TD
     subgraph Gateway ["FastAPI ASGI Application (Port 8000)"]
         AuthRouter["/api/v1/auth (JWT Authentication)"]
         CaseRouter["/api/v1/cases & /api/v1/io-master"]
-        FileRouter["/api/v1/files (Upload & Dispatch)"]
+        FileRouter["/api/v1/files (Upload & Celery Dispatch)"]
         TxRouter["/api/v1/bank-transactions (Search, Relations, Intelligence)"]
         DashRouter["/api/v1/dashboard (Dynamic KPIs)"]
         AuditRouter["/api/v1/audit-logs (Security Trails)"]
         WSRouter["/api/v1/ws (WebSocket Notifications)"]
     end
 
-    subgraph StorageBroker ["Storage & Message Broker"]
-        DiskStorage["Physical Storage (storage/cases/{case_id}/)"]
+    subgraph BrokerStorage ["Storage & Message Broker"]
+        DiskStorage["Physical Storage (backend/storage/cases/{case_id}/)"]
         RabbitMQ["RabbitMQ Broker (amqp://localhost:5672//)"]
     end
 
     subgraph WorkerEngine ["Celery Background Worker (app.tasks.process_bank_statement)"]
         Stage0["Stage 0: File Validation & Metadata Extraction"]
-        Stage1["Stage 1: PDF Table Extraction / OCR Fallback / Excel-CSV Bypass"]
-        Stage2["Stage 2: Raw Excel Intermediate Normalization"]
-        Stage3["Stage 3 & 4: Header Detection & Concept Normalization"]
-        Stage5["Stage 5: Qwen / Deterministic Header Mapping"]
-        Stage6["Stage 6: Standard DataFrame Transformation"]
+        Stage1["Stage 1: PDF Extraction / OCR Fallback / Excel-CSV Bypass"]
+        Stage2["Stage 2: Save Intermediate Raw Excel Checkpoint"]
+        Stage3["Stage 3 & 4: Header Detection & Normalization"]
+        Stage5["Stage 5: Deterministic Header Mapping / Qwen LLM Fallback"]
+        Stage6["Stage 6: Canonical DataFrame Transformation"]
         Stage7["Stage 7: Transaction Validation (Dates, Amounts, Balances)"]
-        Stage75["Stage 7.5: GLiNER NLP Counterparty Extraction"]
-        Stage8["Stage 8: Batch Persistence & Status Update (COMPLETED)"]
+        Stage75["Stage 7.5: GLiNER NLP Counterparty Entity Resolution"]
+        Stage8["Stage 8: PostgreSQL Batch Persistence (bank_transactions)"]
     end
 
     subgraph Database ["PostgreSQL Relational Storage (Port 5432)"]
@@ -89,7 +96,7 @@ flowchart TD
     end
 
     UI -->|HTTPS / REST API| Gateway
-    Gateway -->|Store File Stream| DiskStorage
+    Gateway -->|Save Statement File| DiskStorage
     Gateway -->|Enqueue file_id| RabbitMQ
     RabbitMQ -->|Deliver Task| WorkerEngine
     WorkerEngine -->|Read Stored Document| DiskStorage
@@ -99,97 +106,34 @@ flowchart TD
     ExportEngine -->|Client Download| UI
 ```
 
----
-
-## 2. Verified Technology Stack & Versions
-
-All versions documented below have been physically verified directly from `backend/requirements.txt`, `backend/venv` runtime, `frontend/package.json`, and local system binaries.
-
-### Frontend Technologies
-
-| Package / Tool | Verified Version | Purpose |
-| :--- | :--- | :--- |
-| **Node.js** | `v24.14.1` (or `>= 18.x`) | JavaScript runtime |
-| **npm** | `11.11.0` (or `>= 9.x`) | Node package manager |
-| **React** | `19.2.8` | Core UI component framework |
-| **React DOM** | `19.2.8` | DOM rendering for React |
-| **Vite** | `8.2.2` | Lightning-fast development server & bundler |
-| **Tailwind CSS** | `3.4.19` | Utility-first styling & responsive dark themes |
-| **React Router DOM**| `7.18.3` | Client-side routing, protected routes, role guards |
-| **Apache ECharts** | `6.1.0` | Force-directed graphs, money trails, timeline charts |
-| **html2pdf.js** | `0.14.0` | Client-side PDF generation for forensic reports |
-| **SweetAlert2** | `11.26.25` | Modal dialogs, operation alerts, progress bars |
-| **XLSX (SheetJS)** | `0.18.5` | Client-side tabular spreadsheet generation |
-| **PostCSS** | `8.5.28` | CSS transformation pipeline |
-| **Autoprefixer** | `10.5.5` | Vendor prefix parsing |
-
-### Backend Technologies
-
-| Package / Tool | Verified Version | Purpose |
-| :--- | :--- | :--- |
-| **Python** | `3.14.3` (compatible with `3.10`–`3.14`) | Core backend language |
-| **FastAPI** | `0.141.1` | High-performance ASGI REST API framework |
-| **Uvicorn** | `0.52.4` | ASGI production server |
-| **SQLAlchemy** | `2.0.52` | Python SQL toolkit and Object Relational Mapper |
-| **Alembic** | `1.19.2` | Database schema migrations (Head: `00d93c533932`) |
-| **psycopg / psycopg-binary** | `3.3.5` | Modern PostgreSQL database adapter for Python |
-| **Celery** | `5.6.3` | Distributed background task queue |
-| **kombu** | `5.6.2` | AMQP messaging framework for Celery |
-| **pika** | `1.4.4` | AMQP client library |
-| **Pydantic** | `2.13.5` | Data validation and schema enforcement |
-| **pwdlib** / **argon2-cffi** | `0.3.1` / `25.1.0` | Cryptographically secure password hashing (Argon2) |
-| **python-jose** | `3.5.0` | JWT token generation, verification, and decoding |
-| **python-multipart**| `0.0.32` | Multi-part form/file upload streaming |
-| **pandas** | `3.0.6` | Data manipulation, column restructuring, analytics |
-| **openpyxl** | `3.1.5` | Native Excel (.xlsx) workbook reader and writer |
-| **pdfplumber** | `0.11.10` | PDF text and table coordinate extraction |
-| **PyMuPDF (fitz)** | `1.28.2` | High-speed PDF rendering and rasterization |
-| **camelot-py** | `2.0.0` | PDF table extraction library |
-| **opencv-python-headless** | `5.0.0.93` | Computer vision image preprocessing for OCR |
-| **pytesseract** | `0.3.13` | Optical Character Recognition wrapper for Tesseract |
-| **Pillow (PIL)** | `12.3.0` | Image manipulation library |
-| **gliner** | `0.2.29` | Zero-shot Named Entity Recognition model runner |
-| **torch (PyTorch)**| `2.14.1` | Deep learning framework powering GLiNER |
-| **transformers** | `5.16.1` | Hugging Face model architecture support |
-| **python-dotenv** | `1.2.3` | Configuration loading from `.env` files |
-
-### Infrastructure & External Services
-
-| Service | Tested Version / Path | Requirement Level | Purpose |
-| :--- | :--- | :--- | :--- |
-| **PostgreSQL** | `18.6` (or `>= 14.x`) | **Mandatory** | Primary relational database for all app entities |
-| **RabbitMQ** | Port `5672` | **Mandatory** for background parsing | Message broker queueing bank statement processing tasks |
-| **Tesseract OCR**| `C:\Program Files\Tesseract-OCR\tesseract.exe` or `PATH` | **Mandatory** for scanned PDFs | Optical character recognition fallback when standard extraction yields no text |
-| **Ollama (Qwen)**| `qwen3.5:0.8b` on `http://localhost:11434` | **Optional / Fallback** | Semantic header inference for non-standard bank statements |
-| **Storage Directory** | `backend/storage/cases/{case_id}/` | **Mandatory** | File system persistence for uploaded and raw Excel files |
-
----
-
-## 3. Repository Directory Structure
+### 2.3 Repository Directory Structure
 
 ```text
 BAS/
-├── README.md                           # Comprehensive project documentation (this file)
-├── .gitignore                          # Repository ignore rules
+├── README.md                           # Master project documentation (this file)
+├── .gitignore                          # Git ignore specifications
+├── database/                           # Database Backups & Artifacts
+│   └── bas_full_backup.dump            # Complete PostgreSQL custom-format dump (schema + data)
 ├── backend/                            # FastAPI Application Root
 │   ├── .env                            # Backend environment configuration (gitignored)
-│   ├── alembic.ini                     # Alembic migration configuration
-│   ├── requirements.txt                # Pinned Python package dependencies
+│   ├── alembic.ini                     # Alembic database migration configuration
+│   ├── requirements.txt                # Pinned Python package dependencies (UTF-16 encoded)
+│   ├── start.py                        # Development startup script for FastAPI + Celery
 │   ├── note.txt                        # Architectural pipeline reference & flow diagram
-│   ├── storage/                        # Physical storage for cases and uploaded bank statements
-│   │   └── cases/                      # Subfolders per case ID containing uploaded files
-│   ├── venv/                           # Python virtual environment (gitignored)
+│   ├── storage/                        # Application file storage root
+│   │   └── cases/                      # Subfolders per case_id containing statements and raw excels
+│   ├── venv312/                        # Python virtual environment (gitignored)
 │   ├── alembic/                        # Database migration scripts
-│   │   ├── env.py                      # Alembic execution environment
+│   │   ├── env.py                      # Alembic runtime environment
 │   │   ├── script.py.mako              # Migration generation template
-│   │   └── versions/                   # 17 Migration revisions (Head: 00d93c533932)
+│   │   └── versions/                   # 18 Migration revisions (Current Head: c8940e2f5b61)
 │   └── app/                            # Backend Source Package
 │       ├── __init__.py
 │       ├── main.py                     # FastAPI application entry point, CORS & route registrations
 │       ├── celery_app.py               # Celery app initialization, broker URL, serialization settings
-│       ├── audit/                      # Audit trail module (Controller, Model, Repo, Route, Service)
+│       ├── audit/                      # Audit logging module (Controller, Model, Repo, Route, Service)
 │       ├── authentication/             # JWT auth endpoints (Login, Refresh, First-login password)
-│       ├── bank_transactions/          # Core transaction query, search, export & financial intelligence
+│       ├── bank_transactions/          # Core transaction querying, search, export & financial intelligence
 │       │   ├── bank_transaction_model.py       # BankTransaction ORM model
 │       │   ├── bank_transaction_repository.py  # Filtered queries, aggregations, relationship graph
 │       │   ├── bank_transaction_routes.py      # REST endpoints for transaction reporting & CSV streaming
@@ -206,6 +150,12 @@ BAS/
 │       ├── dashboard/                  # Dashboard statistics route (/api/v1/dashboard/statistics)
 │       ├── dependencies/               # FastAPI route dependencies (get_current_user, get_db)
 │       ├── files/                      # File upload, validation, physical persistence, and task trigger
+│       │   ├── file_controller.py
+│       │   ├── file_model.py
+│       │   ├── file_repository.py
+│       │   ├── file_route.py
+│       │   ├── file_schema.py
+│       │   └── file_service.py         # File persistence & UPLOAD_ROOT = Path("storage")
 │       ├── io_master/                  # Investigating Officer directory & CRUD management
 │       ├── processing/                 # Document Ingestion & Reconstruction Engine
 │       │   ├── processing_service.py   # Master 9-stage orchestrator for bank statements
@@ -235,188 +185,258 @@ BAS/
     ├── postcss.config.js               # PostCSS configuration
     ├── index.html                      # HTML5 root document
     ├── .env.development                # Development API URL (VITE_API_BASE_URL=http://127.0.0.1:8000)
-    ├── .env.production                 # Production API URL template
+    ├── .env.production                 # Production API URL template (VITE_API_BASE_URL=)
     └── src/                            # Frontend Application Source Code
         ├── main.jsx                    # React application bootstrapper
         ├── App.jsx                     # Root component wrapper
         ├── index.css                   # Global styles & Tailwind directives
-        ├── context/                    # React Context providers
-        │   ├── AuthContext.jsx         # User session, JWT tokens, login/logout state
-        │   └── ThemeContext.jsx        # Global Dark/Light theme switching
-        ├── routes/                     # Application routing & route guards
-        │   ├── AppRoutes.jsx           # All route definitions & path mapping
-        │   ├── ProtectedRoute.jsx      # Authentication guard
-        │   ├── PublicRoute.jsx         # Redirection guard for logged-in users
-        │   └── RoleRoute.jsx           # Role-based authorization guard
-        ├── services/api/               # Modular API services
-        │   ├── client.js               # Central apiRequest fetch client with JWT auto-refresh
-        │   ├── auth.js                 # Authentication service
-        │   ├── bankTransaction.js      # Transactions, search, graph, mode-wise, summary
-        │   ├── case.js                 # Case CRUD operations
-        │   ├── dashboard.js            # Dashboard dynamic statistics service
-        │   ├── file.js                 # File upload & case files service
-        │   └── ioMaster.js             # Investigating Officer API service
-        ├── pages/                      # Page components
-        │   ├── auth/                   # Login & Signup screens
-        │   ├── user/                   # Investigator workspace
-        │   │   ├── UserDashboard.jsx   # Primary dashboard with 5 dynamic KPI cards
-        │   │   ├── cases/              # CaseList, CreateCase, CaseDetails
-        │   │   ├── io_master/          # IOMasterList
-        │   │   ├── analysis/           # DynamicReportDashboard (Mode Wise & Timelines)
-        │   │   └── reports/            # The 5 Core Analytical Reports
-        │   │       ├── CaseReportsHub.jsx                      # Catalog hub of case reports
-        │   │       ├── CaseFileReport.jsx                      # Report 01: Statement & Transaction Ledger
-        │   │       ├── TransactionRelationshipReport.jsx       # Report 03: Relationship & Flow Graph
-        │   │       ├── CounterpartyIntelligenceReport.jsx      # Report 04: Counterparty Intelligence
-        │   │       └── FinancialTransactionIntelligenceReport.jsx # Report 05: Financial Intelligence & PDF Export
-        │   ├── clientAdmin/            # Organization Admin Dashboard
-        │   └── superadmin/             # System SuperAdmin Dashboard
-        └── components/                 # Reusable UI widgets
-            ├── layout/                 # UserNavbar (Dark/Light toggle, Navigation), UserFooter
-            ├── reports/                # RelationshipGraph (Apache ECharts force graph)
-            └── dynamicReport/          # DynamicModeWiseChart, KpiCards, ExportControls
+        ├── context/                    # React Context providers (AuthContext, ThemeContext)
+        ├── routes/                     # Application routing & route guards (ProtectedRoute, RoleRoute)
+        ├── services/api/               # Modular API clients (client.js, auth.js, case.js, etc.)
+        ├── pages/                      # Application views (auth, user, clientAdmin, superadmin)
+        │   └── user/
+        │       ├── UserDashboard.jsx   # Primary investigator dashboard
+        │       ├── cases/              # Case listing, creation, and detail views
+        │       └── reports/            # The 5 Core Analytical Forensic Reports
+        │           ├── CaseFileReport.jsx                      # Report 01: Statement & Transaction Ledger
+        │           ├── DynamicReportDashboard.jsx              # Report 02: Transaction Mode Wise Report
+        │           ├── TransactionRelationshipReport.jsx       # Report 03: Relationship & Flow Graph
+        │           ├── CounterpartyIntelligenceReport.jsx      # Report 04: Counterparty Intelligence
+        │           └── FinancialTransactionIntelligenceReport.jsx # Report 05: Financial Intelligence & PDF Export
+        └── components/                 # Reusable UI widgets (cards, modals, charts, tables)
 ```
 
 ---
 
-## 4. Prerequisites & System Requirements
+## 3. System Requirements
 
-Before installing the project, verify that the following system dependencies are installed on the host machine:
+### 3.1 Operating System Compatibility
+- **Windows**: Windows 10 (64-bit), Windows 11 (64-bit), or Windows Server 2022.
+- **Linux**: Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, Debian 12, or RHEL 9.
 
-### 1. Operating System
-- **Windows**: Windows 10 / 11 (64-bit) or Windows Server 2022.
-- **Linux**: Ubuntu 22.04 LTS / 24.04 LTS, Debian 12, or RHEL 9.
+### 3.2 Hardware Specifications
+- **CPU**: 4 physical cores minimum (8 cores recommended for concurrent OCR and NLP tokenization).
+- **RAM**: 8 GB minimum (16 GB recommended when hosting GLiNER and local Ollama models).
+- **Disk Space**: 20 GB free space (to store uploaded case statements, intermediate Excel spreadsheets, model weights, and PostgreSQL relational data).
 
-### 2. Required Runtimes & Compilers
-- **Python**: Version `3.14.3` (or any stable Python `>= 3.10` up to `3.14`). Confirm with `python --version`.
-- **Node.js**: Version `24.14.1` (or Node `>= 18.x`). Confirm with `node --version`.
-- **npm**: Version `11.11.0` (or npm `>= 9.x`). Confirm with `npm --version`.
-- **PostgreSQL**: Version `18.6` (or `>= 14.x`). Confirm with `psql --version`.
-- **RabbitMQ**: Version `3.12.x` or `3.13.x` with Erlang runtime.
-
-### 3. External Binaries (OCR & AI)
-- **Tesseract OCR (Mandatory for Scanned Statements)**:
-  - *Windows*: Download and run the official 64-bit installer from [UB-Mannheim Tesseract](https://github.com/UB-Mannheim/tesseract/wiki). Install to default path: `C:\Program Files\Tesseract-OCR\tesseract.exe`.
-  - *Linux*: Install via package manager:
-    ```bash
-    sudo apt-get update && sudo apt-get install -y tesseract-ocr libtesseract-dev tesseract-ocr-eng
-    ```
-- **Ollama (Optional for LLM Header Mapping)**:
-  - Download and install Ollama from [ollama.ai](https://ollama.ai/).
-  - Pull the lightweight model:
-    ```bash
-    ollama pull qwen3.5:0.8b
-    ```
+### 3.3 Core External Services
+1. **PostgreSQL Server**: Version `14.x` to `18.x` (Remote source tested on `16.15`; Windows client tested on `18.6`).
+2. **RabbitMQ Server**: Version `3.12.x` or `3.13.x` with Erlang runtime (listening on standard port `5672`).
+3. **Tesseract OCR Binary**: UB-Mannheim 64-bit package for Windows or `tesseract-ocr` package for Linux. Required for scanned image PDF processing.
+4. **Ollama (Optional / Fallback)**: For semantic header classification using `qwen3.5:0.8b` (listening on `http://localhost:11434`).
 
 ---
 
-## 5. Step-by-Step Installation Guide
+## 4. Verified Software Versions
 
-Follow these sequential steps on a clean environment.
+All versions listed below have been verified directly against `backend/requirements.txt`, `backend/venv312` runtime, `frontend/package.json`, and local development environment binaries.
 
-### A. Clone the Repository
+### 4.1 Backend Runtime & Libraries
 
-Clone the project from your repository hosting provider (e.g., GitHub) into your local workspace:
+| Software / Package | Pinned Version in Codebase | Observed Environment Version | Recommended Version | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **Python** | `>=3.10, <=3.14` | `3.12.10` (`venv312`) / `3.14.3` (`venv`) | `3.12.x` | Backend runtime (Python 3.12 provides best wheel compatibility for PyTorch/OpenCV) |
+| **FastAPI** | `0.141.1` | `0.141.1` | `0.141.1` | Asynchronous REST API framework |
+| **Uvicorn** | `0.52.4` | `0.52.4` | `0.52.4` | High-performance ASGI web server |
+| **SQLAlchemy** | `2.0.52` | `2.0.52` | `2.0.52` | Relational database ORM |
+| **Alembic** | `1.19.2` | `1.19.2` | `1.19.2` | Schema migration manager (Current head: `c8940e2f5b61`) |
+| **psycopg / psycopg-binary** | `3.3.5` | `3.3.5` | `3.3.5` | Modern PostgreSQL database adapter for Python |
+| **Celery** | `5.6.3` | `5.6.3` | `5.6.3` | Asynchronous background task queue |
+| **kombu** | `5.6.2` | `5.6.2` | `5.6.2` | AMQP messaging library powering Celery |
+| **pika** | `1.4.4` | `1.4.4` | `1.4.4` | RabbitMQ communication client |
+| **Pydantic** | `2.13.5` | `2.13.5` | `2.13.5` | Request validation & schema serialization |
+| **pwdlib** / **argon2-cffi** | `0.3.1` / `25.1.0` | `0.3.1` / `25.1.0` | `0.3.1` / `25.1.0` | Cryptographic Argon2 password hashing |
+| **python-jose** | `3.5.0` | `3.5.0` | `3.5.0` | JWT authentication encode/decode |
+| **pandas** | `3.0.6` | `3.0.6` | `3.0.6` | Tabular data manipulation and validation |
+| **openpyxl** | `3.1.5` | `3.1.5` | `3.1.5` | Excel workbook reader and raw generator |
+| **pdfplumber** | `0.11.10` | `0.11.10` | `0.11.10` | PDF coordinate and table extraction |
+| **PyMuPDF (fitz)** | `1.28.2` | `1.28.2` | `1.28.2` | High-speed PDF rendering and rasterization |
+| **camelot-py** | `2.0.0` | `2.0.0` | `2.0.0` | Lattice and stream PDF table parser |
+| **opencv-python-headless** | `5.0.0.93` | `5.0.0.93` | `5.0.0.93` | Image preprocessing (binarization, deskewing) |
+| **pytesseract** | `0.3.13` | `0.3.13` | `0.3.13` | OCR Python wrapper |
+| **gliner** | `0.2.29` | `0.2.29` | `0.2.29` | Zero-shot Named Entity Recognition |
+| **torch (PyTorch)** | `2.14.1` | `2.14.1` | `2.14.1` | Deep learning execution engine for GLiNER |
+| **transformers** | `5.16.1` | `5.16.1` | `5.16.1` | Hugging Face transformer models |
+| **python-dotenv** | `1.2.3` | `1.2.3` | `1.2.3` | Environment variable loader |
+
+### 4.2 Frontend Runtime & Libraries
+
+| Package | Declared Version in `package.json` | Observed Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Node.js** | `>= 18.x` | `v24.14.1` | JavaScript runtime environment |
+| **npm** | `>= 9.x` | `11.11.0` | Package manager |
+| **React** | `^19.2.8` | `19.2.8` | Core UI library |
+| **React DOM** | `^19.2.8` | `19.2.8` | DOM renderer for React |
+| **Vite** | `^8.2.2` | `8.2.2` | Frontend build tool and development server |
+| **Tailwind CSS** | `^3.4.19` | `3.4.19` | Utility-first CSS styling framework |
+| **React Router DOM** | `^7.18.3` | `7.18.3` | Client-side routing & route guards |
+| **Apache ECharts** | `^6.1.0` | `6.1.0` | Force-directed graphs and financial charts |
+| **html2pdf.js** | `^0.14.0` | `0.14.0` | Direct client-side forensic PDF generation |
+| **SweetAlert2** | `^11.26.25` | `11.26.25` | Modal dialogs and progress feedback |
+| **XLSX (SheetJS)** | `^0.18.5` | `0.18.5` | Tabular data export |
+| **PostCSS** | `^8.5.28` | `8.5.28` | CSS post-processing |
+| **Autoprefixer** | `^10.5.5` | `10.5.5` | Vendor prefix parser |
+| **ESLint** | `^10.9.0` | `10.9.0` | Code quality and linting |
+
+### 4.3 Database and External Binaries
+
+| Utility / Service | Pinned / Required | Observed Version | Verification Command |
+| :--- | :--- | :--- | :--- |
+| **PostgreSQL Server** | `>= 14.x` | `16.15` (Remote) | `psql -U YOUR_DB_USER -c "SELECT version();"` |
+| **PostgreSQL Client (psql)** | `>= 14.x` | `18.6` (Windows) | `psql --version` |
+| **pg_restore** | `>= 14.x` | `18.6` (Windows) | `pg_restore --version` |
+| **RabbitMQ Server** | `>= 3.12.x` | `3.12+` (Port 5672) | `Test-NetConnection -Port 5672 localhost` |
+| **Tesseract OCR** | `>= 5.0.0` | `v5.5.0` (Windows) | `& "C:\Program Files\Tesseract-OCR\tesseract.exe" --version` |
+
+---
+
+## 5. Clone the Repository
+
+Clone the project from your repository hosting provider into your local development workspace.
+
+### Windows (PowerShell)
+```powershell
+# Clone the repository using your repository URL
+git clone <YOUR_REPOSITORY_URL> BAS
+
+# Enter the repository root
+Set-Location -Path "BAS"
+
+# Verify repository structure
+Get-ChildItem -Force
+```
+
+### Ubuntu / Linux
+```bash
+# Clone the repository using your repository URL
+git clone <YOUR_REPOSITORY_URL> BAS
+
+# Enter the repository root
+cd BAS
+
+# Verify repository structure
+ls -la
+```
+
+---
+
+## 6. Backend Setup
+
+The backend requires Python (Python 3.12 recommended), a virtual environment, and specific system binaries for OCR and document handling.
+
+### 6.1 Create and Activate Virtual Environment
+
+#### Windows (PowerShell)
+```powershell
+# Navigate to the backend directory
+Set-Location -Path "backend"
+
+# Create a clean virtual environment (named venv312 to match project conventions)
+python -m venv venv312
+
+# Enable script execution if restricted
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Activate the virtual environment
+.\venv312\Scripts\Activate.ps1
+```
+
+#### Ubuntu / Linux
+```bash
+# Navigate to the backend directory
+cd backend
+
+# Ensure Python 3 venv module is installed
+sudo apt-get update && sudo apt-get install -y python3-venv python3-pip
+
+# Create the virtual environment
+python3 -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate
+```
+
+### 6.2 Upgrade Pip and Install Dependencies
+> [!IMPORTANT]
+> The `requirements.txt` file in this repository is encoded in **UTF-16LE with BOM** (standard for Windows PowerShell output redirection). Modern `pip` automatically detects this encoding. If you experience an encoding error on older pip versions, upgrade pip first.
 
 ```bash
-git clone <YOUR_REPOSITORY_URL> BAS
-cd BAS
+# Upgrade packaging tools
+python -m pip install --upgrade pip setuptools wheel
+
+# Install pinned backend dependencies
+pip install -r requirements.txt
 ```
 
-*(If you are working from a local extraction, ensure your active working directory is `BAS`).*
+### 6.3 Verify Backend Dependencies
+Run the following verification command to ensure all critical modules compile and import cleanly:
+```bash
+python -c "import fastapi, uvicorn, celery, sqlalchemy, psycopg, pydantic, pandas, pdfplumber, openpyxl, gliner; print('Core backend dependencies verified successfully.')"
+```
 
 ---
 
-### B. Backend Setup (Python Virtual Environment)
+## 7. Frontend Setup
 
-1. Open a terminal and navigate to the `backend` directory:
-   ```bash
-   cd backend
-   ```
+The frontend is built with React 19 and Vite.
 
-2. Create a clean Python virtual environment:
-   - **Windows (PowerShell)**:
-     ```powershell
-     python -m venv venv
-     ```
-   - **Linux / macOS**:
-     ```bash
-     python3 -m venv venv
-     ```
+### 7.1 Install Node Dependencies
+Open a separate terminal and navigate to `frontend/`:
 
-3. Activate the virtual environment:
-   - **Windows (PowerShell)**:
-     ```powershell
-     .\venv\Scripts\Activate.ps1
-     ```
-     *(If script execution is disabled on Windows, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once).*
-   - **Linux / macOS**:
-     ```bash
-     source venv/bin/activate
-     ```
+#### Windows (PowerShell) & Ubuntu / Linux
+```bash
+# Navigate to the frontend directory
+cd frontend
 
-4. Upgrade `pip` to the latest version:
-   ```bash
-   python -m pip install --upgrade pip setuptools wheel
-   ```
+# Install dependencies strictly according to package-lock.json
+npm ci
+# (Or run 'npm install' if npm ci is unavailable)
+```
 
-5. Install the pinned Python requirements:
-   ```bash
-   pip install -r requirements.txt
-   ```
-   > **Note on Encoding**: `requirements.txt` in this repository is encoded in UTF-16LE. Modern versions of `pip` automatically detect this encoding. If you experience an error reading requirements on older pip versions, install using `pip install --upgrade pip` first.
+### 7.2 Verify Frontend Compilation and Linting
+Verify that the frontend builds cleanly without JSX syntax or bundling errors:
+
+```bash
+# Test the production build
+npm run build
+
+# Run ESLint validation
+npm run lint
+```
+A successful build generates compiled static assets in `frontend/dist/`.
 
 ---
 
-### C. Frontend Setup (React & Vite)
+## 8. Environment Configuration
 
-1. Open a separate terminal and navigate to the `frontend` directory:
-   ```bash
-   cd frontend
-   ```
+The application relies on environment variables for backend security, database connectivity, and frontend API routing.
 
-2. Install all npm dependencies:
-   ```bash
-   npm install
-   ```
-   *(Or run `npm ci` for a deterministic build based strictly on `package-lock.json`).*
+### 8.1 Backend Environment Configuration (`backend/.env`)
+Create or edit `backend/.env` with the following variables.
 
-3. Verify the frontend builds cleanly:
-   ```bash
-   npm run build
-   ```
-   A successful build outputs compiled assets into `frontend/dist/` without errors.
-
----
-
-### D. Environment Variables Configuration
-
-The application requires specific environment variables for backend database authentication and frontend API routing.
-
-#### 1. Backend Environment Configuration (`backend/.env`)
-
-Create a `.env` file inside the `backend/` directory (i.e., `backend/.env`):
+> [!CAUTION]
+> Never commit real credentials, database passwords, or secret keys to version control. Use the safe placeholders below and supply your local or production credentials.
 
 ```dotenv
 # ============================================================
-# DATABASE CONFIGURATION
+# DATABASE CONFIGURATION (PostgreSQL + psycopg v3)
 # ============================================================
-# Format: postgresql+psycopg://<username>:<password>@<host>:<port>/<database_name>
-# Note: Reserved special characters in passwords must be URL-encoded (e.g. @ -> %40)
-DATABASE_URL=postgresql+psycopg://postgres:YourSecurePassword%40123@localhost:5432/BAS
+# Format: postgresql+psycopg://<user>:<password>@<host>:<port>/<database_name>
+# IMPORTANT: Special characters in passwords must be URL-encoded (e.g. '@' -> '%40', '#' -> '%23')
+DATABASE_URL=postgresql+psycopg://YOUR_DB_USER:YOUR_DB_PASSWORD@YOUR_DB_HOST:5432/YOUR_DB_NAME
 
 # ============================================================
-# JWT SECURITY CONFIGURATION
+# JWT SECURITY & AUTHENTICATION CONFIGURATION
 # ============================================================
 # Generate a cryptographically secure 64-character secret using:
 # python -c "import secrets; print(secrets.token_urlsafe(48))"
-JWT_SECRET_KEY=replace-with-a-secure-random-secret-key-of-at-least-32-chars
+JWT_SECRET_KEY=YOUR_SECURE_RANDOM_SECRET_KEY_AT_LEAST_32_CHARS
 JWT_ALGORITHM=HS256
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 
 # ============================================================
-# GLiNER NAMED ENTITY RECOGNITION (COUNTERPARTY INTELLIGENCE)
+# GLiNER NAMED ENTITY RECOGNITION (COUNTERPARTY EXTRACTION)
 # ============================================================
 GLINER_ENABLED=true
 GLINER_MODEL_NAME=urchade/gliner_multi-v2.1
@@ -424,500 +444,582 @@ GLINER_THRESHOLD=0.20
 GLINER_BATCH_SIZE=32
 
 # ============================================================
-# OLLAMA / QWEN HEADER MAPPING (OPTIONAL / FALLBACK)
+# OLLAMA / QWEN HEADER MAPPING & COUNTERPARTY INFERENCE (OPTIONAL)
 # ============================================================
-QWEN_MODEL=qwen3.5:0.8b
 OLLAMA_BASE_URL=http://localhost:11434
+QWEN_MODEL=qwen3.5:0.8b
 QWEN_HEADER_CONFIDENCE_THRESHOLD=0.80
+
+COUNTERPARTY_OLLAMA_MODEL=qwen3.5:0.8b
+COUNTERPARTY_OLLAMA_BATCH_SIZE=1
+COUNTERPARTY_OLLAMA_TIMEOUT=180
+COUNTERPARTY_OLLAMA_ENABLED=true
+COUNTERPARTY_OLLAMA_MAX_RETRIES=2
 ```
 
-#### Environment Variables Reference Table
+### 8.2 Celery Message Broker Configuration Note
+> [!NOTE]
+> In the current codebase, the Celery broker URL is configured in `backend/app/celery_app.py` as:
+> `broker="amqp://guest:guest@localhost:5672//"`
+> If running RabbitMQ on a non-default host, port, or user credentials, update the `broker` argument directly in `backend/app/celery_app.py` or modify it to read an environment variable `CELERY_BROKER_URL`.
 
-| Variable | Scope | Required? | Default in Code | Purpose |
-| :--- | :--- | :--- | :--- | :--- |
-| `DATABASE_URL` | Backend | **Yes** | *None (raises error)* | PostgreSQL connection URI using the modern `psycopg` driver. |
-| `JWT_SECRET_KEY` | Backend | **Yes** | *None (raises error)* | Symmetric secret key used to sign and verify HMAC-SHA256 JWT tokens. |
-| `JWT_ALGORITHM` | Backend | Optional | `HS256` | Cryptographic algorithm for JWT tokens. |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | Backend | Optional | `30` | Access token lifetime in minutes before auto-refresh is triggered. |
-| `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | Backend | Optional | `7` | Refresh token lifetime in days. |
-| `GLINER_ENABLED` | Backend | Optional | `true` | Toggles zero-shot Named Entity Recognition for counterparties. |
-| `GLINER_MODEL_NAME` | Backend | Optional | `urchade/gliner_multi-v2.1` | Hugging Face pretrained GLiNER model tag. |
-| `GLINER_THRESHOLD` | Backend | Optional | `0.50` (`0.20` in .env) | Confidence threshold for entity acceptance. |
-| `GLINER_BATCH_SIZE` | Backend | Optional | `32` | Batch size for GPU/CPU inference. |
-| `QWEN_MODEL` | Backend | Optional | `qwen3.5:0.8b` | Model tag for Ollama fallback header mapping. |
-| `OLLAMA_BASE_URL` | Backend | Optional | `http://localhost:11434`| HTTP endpoint where Ollama model server is listening. |
-| `VITE_API_BASE_URL`| Frontend| **Yes** | *None (throws error)* | Base URL where the React client sends REST requests. |
-
-#### 2. Frontend Environment Configuration (`frontend/.env.development`)
-
-Ensure `frontend/.env.development` contains:
+### 8.3 Frontend Environment Configuration
+Ensure `frontend/.env.development` contains the development API URL:
 ```dotenv
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-For production builds, set `frontend/.env.production`:
+For production deployments behind an Nginx reverse proxy on the same origin, configure `frontend/.env.production`:
 ```dotenv
-VITE_API_BASE_URL=http://localhost:8000
+VITE_API_BASE_URL=
 ```
-*(Or leave empty if serving frontend behind an Nginx reverse proxy on the same origin).*
+*(An empty value causes API requests to use relative paths, e.g. `/api/v1/...`).*
+
+### 8.4 Environment Variables Reference Table
+
+| Variable | Location | Required? | Default in Code | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| `DATABASE_URL` | `backend/.env` | **Yes** | *None (raises RuntimeError)* | PostgreSQL connection URI using modern `psycopg` driver |
+| `JWT_SECRET_KEY` | `backend/.env` | **Yes** | *None (raises ValueError on token sign)* | Symmetric secret key for signing HMAC-SHA256 JWT tokens |
+| `JWT_ALGORITHM` | `backend/.env` | Optional | `HS256` | Cryptographic algorithm for JWT generation |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `backend/.env` | Optional | `30` | Access token lifespan before auto-refresh |
+| `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | `backend/.env` | Optional | `7` | Refresh token lifespan |
+| `GLINER_ENABLED` | `backend/.env` | Optional | `true` | Enables/disables GLiNER zero-shot counterparty extraction |
+| `GLINER_MODEL_NAME` | `backend/.env` | Optional | `urchade/gliner_multi-v2.1` | Hugging Face pretrained GLiNER model repository |
+| `GLINER_THRESHOLD` | `backend/.env` | Optional | `0.50` (`0.20` in `.env`) | Entity detection confidence acceptance threshold |
+| `GLINER_BATCH_SIZE` | `backend/.env` | Optional | `32` | Batch size for GLiNER inference |
+| `OLLAMA_BASE_URL` | `backend/.env` | Optional | `http://localhost:11434` | Base URL for Ollama local LLM service |
+| `QWEN_MODEL` | `backend/.env` | Optional | `qwen3.5:0.8b` | Model identifier for header classification |
+| `QWEN_HEADER_CONFIDENCE_THRESHOLD`| `backend/.env` | Optional | `0.80` | Minimum confidence to accept LLM header mapping |
+| `COUNTERPARTY_OLLAMA_ENABLED` | `backend/.env` | Optional | `true` | Toggles LLM fallback for counterparty resolution |
+| `VITE_API_BASE_URL` | `frontend/.env*`| **Yes** | *None (throws Error in client.js)* | Base HTTP URL where frontend sends API requests |
 
 ---
 
-### E. Database Setup & Alembic Migrations
+## 9. PostgreSQL Database Setup Using `bas_full_backup.dump`
 
-1. Ensure the PostgreSQL service is active:
-   - **Windows**: Check Services (`services.msc`) for `postgresql-x64-18` or run `Get-Service *postgres*`.
-   - **Linux**: Run `sudo systemctl status postgresql`.
+### 9.1 Critical Rule: Use `pg_restore`, NOT `alembic upgrade head`
+> [!CRITICAL]
+> **Do NOT run `alembic upgrade head` to initialize a clean database from scratch.**
+>
+> The repository includes a complete database backup located at:
+> `database/bas_full_backup.dump` (4,292,924 bytes, ~4.1 MB).
+>
+> This dump is a PostgreSQL custom-format archive (`pg_dump -Fc`) containing:
+> 1. Complete schema definitions, table DDL, primary keys, foreign keys, constraints, and performance indexes.
+> 2. Full relational table data across all **13 database tables**.
+> 3. Initial system users, roles, permissions, Investigating Officers, cases, files, and transaction mode mappings.
+> 4. The `alembic_version` table already stamped at revision `c8940e2f5b61` (current repository head).
+>
+> Running `alembic upgrade head` on an empty database would fail to populate essential seed data and default records. Initial setup must be performed strictly by restoring `database/bas_full_backup.dump` using `pg_restore`.
 
-2. Create the application database and user:
-   Connect to PostgreSQL via `psql`:
-   ```bash
-   psql -U postgres -h localhost -p 5432
-   ```
-   Execute the following SQL commands:
-   ```sql
-   CREATE DATABASE "BAS";
-   -- Optional: Create a dedicated user
-   -- CREATE USER bas_user WITH ENCRYPTED PASSWORD 'YourPassword123';
-   -- GRANT ALL PRIVILEGES ON DATABASE "BAS" TO bas_user;
-   \q
-   ```
+### 9.2 Verified Tables in `bas_full_backup.dump`
+Inspecting the dump with `pg_restore -l "database/bas_full_backup.dump"` confirms the presence of all 13 core tables, sequences, and data blocks:
 
-3. Apply Alembic migrations:
-   From the `backend` directory (with your virtual environment active):
-   ```bash
-   # Check migration heads (Verified head: 00d93c533932)
-   python -m alembic heads
+| Table Name | Type | Description |
+| :--- | :--- | :--- |
+| `alembic_version` | Migration Tracker | Records current schema revision (`c8940e2f5b61`) |
+| `users` | Core Entity | User accounts, credentials (Argon2 hashes), roles, and client associations |
+| `user_permissions` | RBAC Matrix | Granular permissions mapped per user |
+| `clients` | Multi-Tenant | Organization and client tenant records |
+| `cases` | Portfolio | Investigative cases, case numbers, and client linkages |
+| `io_master` | Directory | Investigating Officers, police stations, and contact credentials |
+| `files` | Document Registry | Uploaded bank statements, processing status, metadata, and merge flags |
+| `merged_file_sources` | Audit Linkage | Tracks source statements combined into merged statements |
+| `bank_transactions` | Master Ledger | Normalized transaction records, GLiNER counterparty entities, dates, amounts |
+| `transaction_mode` | Channel Master | Payment channels (UPI, NEFT, RTGS, IMPS, Cash, Cheque, etc.) |
+| `statement_format_mappings` | Parser Cache | Cached statement layout fingerprints for instant parsing |
+| `audit_logs` | Security Trail | Immutable audit logs tracking user operations and data access |
+| `upload_charges_sample_20261021162931` | Ad-hoc / Metabase | Upload table created during Metabase analysis |
 
-   # Apply all migrations to the latest revision
-   python -m alembic upgrade head
-   ```
+### 9.3 Step-by-Step Database Restoration Workflow
 
-4. Verify database tables:
-   ```bash
-   psql -U postgres -d BAS -c "\dt"
-   ```
-   You should see all 10 core tables: `users`, `user_permissions`, `clients`, `cases`, `io_master`, `files`, `bank_transactions`, `transaction_modes`, `audit_logs`, and `statement_format_mappings`.
+#### Step 1: Verify PostgreSQL Client Tools
+Ensure `pg_restore` and `psql` are accessible in your system path:
+```bash
+pg_restore --version
+psql --version
+```
 
----
+#### Step 2: Safe Inspection of Dump Table of Contents
+Inspect the dump contents without modifying any database:
+```bash
+pg_restore -l "database/bas_full_backup.dump"
+```
 
-### F. RabbitMQ Message Broker Setup
+#### Step 3: Create Target Database and Role
+Connect to PostgreSQL as a superuser (e.g., `postgres`):
+```sql
+-- Connect via psql
+psql -h YOUR_DB_HOST -p 5432 -U postgres
 
-RabbitMQ handles asynchronous queuing for uploaded bank statement processing tasks.
+-- Create application database user (if not already created)
+CREATE USER YOUR_DB_USER WITH ENCRYPTED PASSWORD 'YOUR_DB_PASSWORD';
 
-1. Ensure RabbitMQ is running:
-   - **Windows**: Run `Get-Service *rabbit*` in PowerShell. If stopped, start via `Start-Service RabbitMQ`.
-   - **Linux**: Run `sudo systemctl start rabbitmq-server && sudo systemctl status rabbitmq-server`.
+-- Create clean application database owned by the user
+CREATE DATABASE "YOUR_DB_NAME" OWNER YOUR_DB_USER;
 
-2. Default Connection:
-   The backend connects to RabbitMQ via AMQP at:
-   ```text
-   amqp://guest:guest@localhost:5672//
-   ```
-   Verify port `5672` is listening:
-   ```powershell
-   Test-NetConnection -ComputerName localhost -Port 5672
-   ```
+-- Grant database privileges
+GRANT ALL PRIVILEGES ON DATABASE "YOUR_DB_NAME" TO YOUR_DB_USER;
 
----
+\q
+```
 
-### G. OCR, NLP & LLM Model Provisioning
+#### Step 4: Execute `pg_restore`
+Restore the backup into your newly created target database.
 
-1. **Tesseract OCR (Windows Check)**:
-   Verify Tesseract is installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`.
-   ```powershell
-   & "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
-   ```
-   If installed in another directory, ensure that directory is added to your system `PATH`.
+> [!WARNING]
+> The source backup was originally owned by role `bas`. Always include `--no-owner` and `--no-privileges` so that restored tables are assigned to `YOUR_DB_USER` rather than failing on missing source roles.
+> Never use `--clean` or `--create` against an existing shared or production database.
 
-2. **GLiNER Pre-trained Models (First Run)**:
-   On first execution, the Celery worker automatically downloads the `urchade/gliner_multi-v2.1` model weights (~1.4 GB) from Hugging Face into your local cache (`~/.cache/huggingface/hub/`). Ensure an active internet connection exists during initial statement processing.
-
-3. **Ollama / Qwen (Optional)**:
-   If running Ollama locally for fallback header mapping:
-   ```bash
-   ollama serve
-   ollama pull qwen3.5:0.8b
-   ```
-
----
-
-## 6. How to Run the Entire System
-
-To run the complete system in a development environment, start each service in the following exact order across separate terminal windows.
-
-### A. Startup Sequence (Multi-Terminal)
-
-#### Terminal 1: PostgreSQL & RabbitMQ Services
-Ensure background daemon services are running:
+##### Windows (PowerShell)
 ```powershell
-# Windows PowerShell (Elevated / Standard)
-Start-Service *postgres*
-Start-Service *rabbit*
+$env:PGPASSWORD = "YOUR_DB_PASSWORD"
+pg_restore -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -d YOUR_DB_NAME --no-owner --no-privileges --exit-on-error "database/bas_full_backup.dump"
+$env:PGPASSWORD = $null
 ```
-*(On Linux: `sudo systemctl start postgresql && sudo systemctl start rabbitmq-server`)*
 
-#### Terminal 2: Celery Background Worker
-Open a terminal in `backend/`:
-- **Windows (PowerShell)**:
-  > [!IMPORTANT]
-  > On Windows, Celery **must** be executed with `--pool=solo` (or `-P solo`) because Windows does not support POSIX `fork()`.
-  ```powershell
-  cd "c:\final bas\BAS_YASH_2_ZIP\BAS\backend"
-  .\venv\Scripts\Activate.ps1
-  python -m celery -A app.celery_app.celery_app worker --loglevel=INFO --pool=solo
-  ```
-- **Linux**:
+##### Ubuntu / Linux
+```bash
+PGPASSWORD="YOUR_DB_PASSWORD" pg_restore -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -d YOUR_DB_NAME --no-owner --no-privileges --exit-on-error "database/bas_full_backup.dump"
+```
+
+#### Step 5: Grant Object Permissions
+Because `--no-privileges` strips permission grants from the dump, explicitly ensure `YOUR_DB_USER` owns all objects in the `public` schema:
+
+```sql
+psql -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -d YOUR_DB_NAME -c "GRANT ALL ON SCHEMA public TO YOUR_DB_USER;"
+psql -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -d YOUR_DB_NAME -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO YOUR_DB_USER;"
+psql -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -d YOUR_DB_NAME -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO YOUR_DB_USER;"
+psql -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -d YOUR_DB_NAME -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO YOUR_DB_USER;"
+psql -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -d YOUR_DB_NAME -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO YOUR_DB_USER;"
+```
+
+#### Step 6: Verify Restored Schema & Tables
+Verify that all 13 tables exist and contain records:
+```sql
+psql -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -d YOUR_DB_NAME -c "\dt"
+```
+Run a sample record count verification query:
+```sql
+psql -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -d YOUR_DB_NAME -c "SELECT 'users' AS table_name, count(*) AS total_rows FROM users UNION ALL SELECT 'cases', count(*) FROM cases UNION ALL SELECT 'bank_transactions', count(*) FROM bank_transactions UNION ALL SELECT 'alembic_version', count(*) FROM alembic_version;"
+```
+
+### 9.4 Alembic Migration History Reconciliation
+- The restored `alembic_version` table contains the revision hash `c8940e2f5b61`.
+- The codebase at `backend/alembic/versions/` contains 18 migration files, with head `c8940e2f5b61` (`c8940e2f5b61_add_superseded_status_to_files.py`).
+- Because the restored database version matches the codebase migration head, running `python -m alembic current` will output `c8940e2f5b61 (head)`.
+- **Do not blindly delete `alembic_version` or run `alembic stamp`**. Doing so would desynchronize Alembic from the actual database state. If new migration files are added in future code updates, running `python -m alembic upgrade head` will then properly apply only the incremental changes.
+
+---
+
+## 10. Starting FastAPI and Celery with `start.py`
+
+### 10.1 Audit of `backend/start.py`
+The project provides `backend/start.py` to launch the FastAPI ASGI server and Celery background worker together for local development.
+
+```python
+# Startup commands executed by backend/start.py:
+BACKEND_COMMAND = [sys.executable, "-m", "uvicorn", "app.main:app", "--reload"]
+CELERY_COMMAND  = [sys.executable, "-m", "celery", "-A", "app.celery_app.celery_app", "worker", "--loglevel=INFO", "--pool=solo", "--concurrency=1"]
+```
+
+#### Verified Behavioral Characteristics & Limitations:
+1. **Python Interpreter Resolution**: Uses `sys.executable`. When launched from an activated virtual environment (`venv312` or `venv`), both child processes automatically inherit that exact interpreter.
+2. **Working Directory Anchoring**: Computes `BASE_DIR = Path(__file__).resolve().parent` and sets `cwd=str(BASE_DIR)` in both `subprocess.Popen` calls. The script can be executed safely either from repository root (`python backend/start.py`) or from within `backend/` (`python start.py`).
+3. **Storage Alignment**: Because both Uvicorn and Celery run with `cwd=backend/`, relative file paths like `UPLOAD_ROOT = Path("storage")` resolve consistently to `backend/storage/cases/{case_id}/`.
+4. **Celery Solo Pool on Windows**: The `--pool=solo` parameter is mandatory on Windows OS because Windows lacks POSIX `fork()`. Running Celery with default prefork on Windows causes immediate startup crashes (`ValueError: not enough values to unpack`).
+5. **Process Lifecycle & Exit Detection**: A 1-second polling loop checks `process.poll()`. If either process terminates, `start.py` prints a warning with the exit code and invokes `stop_processes()`.
+6. **Graceful Shutdown**: Intercepts `KeyboardInterrupt` (`Ctrl + C`), calls `process.terminate()`, waits up to 10 seconds, and escalates to `process.kill()` if a process hangs.
+7. **Windows Reload Limitation**: When Uvicorn runs with `--reload`, it spawns an inner child worker. On Windows, terminating the parent Uvicorn process does not always terminate the child process tree, which can leave port 8000 locked. If port 8000 remains occupied after exit, kill the orphaned process manually (see [Troubleshooting](#15-troubleshooting-guide)).
+8. **Readiness vs Launch Indicator**: The console messages printed upon execution (`FastAPI process started`, `http://127.0.0.1:8000`) indicate that the processes were spawned by the OS. They do **not** confirm that Uvicorn has finished binding to port 8000, that RabbitMQ has accepted the Celery connection, or that PostgreSQL is reachable. Health probes must be verified independently.
+9. **Development-Only Tool**: `start.py` is designed strictly for local development. It is not a compiled executable or production service supervisor.
+
+### 10.2 How to Run `start.py`
+
+#### Windows (PowerShell)
+```powershell
+# Navigate to backend directory
+Set-Location -Path "backend"
+
+# Activate the virtual environment
+.\venv312\Scripts\Activate.ps1
+
+# Launch FastAPI and Celery
+python start.py
+```
+
+#### Ubuntu / Linux
+```bash
+# Navigate to backend directory
+cd backend
+
+# Activate the virtual environment
+source venv/bin/activate
+
+# Launch FastAPI and Celery
+python start.py
+```
+
+### 10.3 Alternative: Running Services in Separate Terminals
+For isolated log inspection during debugging, run the services in dedicated terminals:
+
+- **Terminal 1 (FastAPI Server)**:
   ```bash
   cd backend
-  source venv/bin/activate
-  celery -A app.celery_app.celery_app worker --loglevel=INFO
-  ```
-*Expected output: Celery registers `app.tasks.process_bank_statement` and connects to `amqp://guest:guest@localhost:5672//`.*
-
-#### Terminal 3: FastAPI Backend Server
-Open a terminal in `backend/`:
-- **Windows (PowerShell)**:
-  ```powershell
-  cd "c:\final bas\BAS_YASH_2_ZIP\BAS\backend"
-  .\venv\Scripts\Activate.ps1
+  # Activate venv
   python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
   ```
-- **Linux**:
-  ```bash
-  cd backend
-  source venv/bin/activate
-  uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-  ```
-*Expected output: `Application startup complete. Uvicorn running on http://127.0.0.1:8000`.*
+- **Terminal 2 (Celery Worker)**:
+  - Windows:
+    ```powershell
+    cd backend
+    .\venv312\Scripts\Activate.ps1
+    python -m celery -A app.celery_app.celery_app worker --loglevel=INFO --pool=solo --concurrency=1
+    ```
+  - Linux:
+    ```bash
+    cd backend
+    source venv/bin/activate
+    celery -A app.celery_app.celery_app worker --loglevel=INFO --concurrency=4
+    ```
 
-#### Terminal 4: React Vite Frontend Dev Server
-Open a terminal in `frontend/`:
-```powershell
-cd "c:\final bas\BAS_YASH_2_ZIP\BAS\frontend"
+---
+
+## 11. Starting the Frontend
+
+### 11.1 Development Server
+Start the Vite development server in a separate terminal:
+
+```bash
+cd frontend
 npm run dev
 ```
-*Expected output: `VITE v8.2.2 ready in XXX ms. Local: http://localhost:5173/`.*
+
+*Expected output:*
+```text
+  VITE v8.2.2  ready in 350 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+```
+
+Open `http://localhost:5173` in your browser. The application will render the login interface.
+
+### 11.2 Frontend Production Preview
+To test the compiled production build locally:
+```bash
+cd frontend
+npm run build
+npm run preview
+```
 
 ---
 
-### B. Verification & Health Checks
+## 12. Complete Local Run Procedure
 
-Once all terminals are running, verify each endpoint in your browser or via curl:
-
-| Service | Target URL | Expected Response |
-| :--- | :--- | :--- |
-| **API Root** | `http://127.0.0.1:8000/` | `{"message": "BAS Backend is running"}` |
-| **Health Check** | `http://127.0.0.1:8000/health` | `{"status": "healthy"}` |
-| **Swagger UI** | `http://127.0.0.1:8000/docs` | Interactive OpenAPI documentation interface |
-| **ReDoc** | `http://127.0.0.1:8000/redoc` | Alternative OpenAPI documentation interface |
-| **Frontend UI** | `http://localhost:5173/` | Redirects to login page (`/login`) |
-
----
-
-### C. Safe Shutdown Sequence
-
-To terminate the running services gracefully without corrupting database transactions or queued tasks:
-1. **Frontend**: Press `Ctrl + C` in Terminal 4.
-2. **FastAPI**: Press `Ctrl + C` in Terminal 3.
-3. **Celery Worker**: Press `Ctrl + C` in Terminal 2 (allows active statement extraction tasks to finish or acknowledge rejection).
-4. **RabbitMQ / Postgres**: Stop services if no longer needed:
-   ```powershell
-   Stop-Service *rabbit*
-   Stop-Service *postgres*
-   ```
-
----
-
-## 7. Core Application Features & Investigation Workflows
-
-### A. Role-Based Access Control (RBAC)
-
-The system enforces 4 granular user roles:
-1. **`superadmin`**: Unrestricted system governance, client/tenant provisioning, global audit log oversight, and platform telemetry.
-2. **`client_admin`**: Organization / agency-level administrator. Manages user accounts within their client group and inspects organization-wide case portfolios.
-3. **`user`**: Primary Forensic Investigator / Analyst. Manages assigned cases, registers Investigating Officers (IOs), uploads statements, and performs analytical reporting.
-4. **`admin`**: Backward-compatibility administrative role.
-
-All protected pages are secured via `ProtectedRoute` and `RoleRoute` in `frontend/src/routes/AppRoutes.jsx`. First-time logins require a password change enforced by `FirstLoginModal.jsx`.
-
----
-
-### B. Case Management & IO Master
-
-- **Investigating Officer (IO) Master**: Central directory tracking police stations, districts, officers, ranks, and contact credentials (`/dashboard/io-master`).
-- **Case Portfolio**: Investigators create case records with unique case numbers, descriptions, and assign IOs (`/dashboard/cases`).
-- **Case Details & Statement Attachment**: Inside each case (`/dashboard/cases/:caseId`), multiple bank statement files across different bank accounts can be uploaded and managed simultaneously.
-
----
-
-### C. The 9-Stage Document Processing Pipeline
-
-When an investigator uploads a bank statement document, it executes through a strictly monitored 9-stage pipeline managed by `backend/app/processing/processing_service.py`:
+Follow this sequential procedure to boot the entire platform from a cold system state:
 
 ```mermaid
-flowchart TD
-    A["File Uploaded (.pdf, .xlsx, .csv, .txt)"] --> B["Stage 0: Account Metadata Extractor (IFSC, AccNo, Holder)"]
-    B --> C{"Format Type?"}
-    C -->|PDF| D["Stage 1: PDF Table Extraction (pdfplumber / camelot)"]
-    D -->|Empty or Image| E["OCR Fallback (pytesseract + OpenCV)"]
-    C -->|Excel / CSV / TXT| F["Stage 1: Bypass Parser (read_csv / read_excel / txt_processor)"]
-    E --> G["Stage 2: Save Intermediate Raw Excel"]
-    D --> G
-    F --> G
-    G --> H["Stage 3: Header Row Detection (Keyword Pattern Matching)"]
-    H --> I["Stage 4: Header Normalization (Whitespace, Casing, Aliases)"]
-    I --> J["Stage 5: Column Mapping (Deterministic Aliases + Qwen LLM Fallback)"]
-    J --> K["Stage 6: Standard DataFrame Construction"]
-    K --> L["Stage 7: Transaction Validation (Dates, Signs, Balance Continuity)"]
-    L --> M["Stage 7.5: GLiNER Zero-Shot Named Entity Extraction"]
-    M --> N["Stage 8: PostgreSQL Batch Persistence (bank_transactions)"]
-    N --> O["Status: COMPLETED (Progress: 100%)"]
+flowchart LR
+    Step1["1. Start PostgreSQL (Port 5432)"] --> Step2["2. Start RabbitMQ (Port 5672)"]
+    Step2 --> Step3["3. Restore DB Dump (pg_restore)"]
+    Step3 --> Step4["4. Start Backend (start.py)"]
+    Step4 --> Step5["5. Start Frontend (npm run dev)"]
+    Step5 --> Step6["6. Open UI (http://localhost:5173)"]
 ```
 
-1. **Account Metadata Extraction**: Scans document headers and stamps for Account Number, Account Holder Name, Bank Name, Branch, IFSC, MICR, Account Type, and Statement Date Range. Masks account numbers for privacy in logs.
-2. **Stage 1 — Primary Extraction & OCR Fallback**:
-   - Digital PDFs are extracted using `pdfplumber` and `camelot`.
-   - If tables are unparsed or image-based, execution seamlessly falls back to `extract_tables_from_scanned_pdf_ocr` using Otsu binarization and `pytesseract`.
-   - Spreadsheets (.xlsx, .xls) and CSVs bypass directly to DataFrame readers.
-3. **Stage 2 — Raw Excel Intermediate**: Saves extracted tabular data into `storage/cases/{case_id}/{stem}_raw.xlsx` to establish an immutable checkpoint.
-4. **Stage 3 — Header Detection**: Locates header coordinates by evaluating confidence against banking keywords (`date`, `narration`, `withdrawal`, `deposit`, `balance`, `chq`).
-5. **Stage 4 — Header Normalization**: Removes non-alphanumeric noise, line breaks, and standardizes spacing.
-6. **Stage 5 — Qwen / Deterministic Mapping**:
-   - Fast deterministic mapping resolves standard aliases (`txn date` -> `transaction_date`, `dr` -> `debit`, `cr` -> `credit`, `bal` -> `balance`).
-   - Any unknown headers are dynamically classified by the local Qwen LLM via Ollama.
-7. **Stage 6 — Standard DataFrame**: Unifies diverse bank schemas into canonical database columns.
-8. **Stage 7 — Transaction Validation**: Sanitizes date formats, coerces numeric strings to signed 2-decimal floats, validates balance integrity, and discards empty spacer rows.
-9. **Stage 7.5 — GLiNER NLP Counterparty Extraction**:
-   - Evaluates unstructured transaction descriptions with `urchade/gliner_multi-v2.1`.
-   - Identifies: `PERSON`, `ORGANIZATION`, `MERCHANT`, `BANK`, `FINANCIAL_INSTITUTION`, `UPI_ID`, `ACCOUNT_NUMBER`.
-   - Stores `counterparty_name`, `counterparty_type`, `counterparty_identifier`, `counterparty_confidence`, and `counterparty_source`.
-10. **Stage 8 — Database Persistence**: Performs batch insertion into `bank_transactions` table, links records to `case_id` and `file_id`, and marks the file status as `COMPLETED` (100%).
+### Sequential Startup Execution
 
----
+1. **Start Database and Broker Daemons**:
+   - **Windows**:
+     ```powershell
+     Start-Service *postgres*
+     Start-Service *rabbit*
+     ```
+   - **Linux**:
+     ```bash
+     sudo systemctl start postgresql
+     sudo systemctl start rabbitmq-server
+     ```
 
-### D. The 5 Core Forensic Intelligence Reports
+2. **Verify Port Availability**:
+   Ensure ports `5432` (Postgres) and `5672` (RabbitMQ) are listening:
+   - **Windows**:
+     ```powershell
+     Test-NetConnection -ComputerName localhost -Port 5432
+     Test-NetConnection -ComputerName localhost -Port 5672
+     ```
+   - **Linux**:
+     ```bash
+     nc -zv localhost 5432
+     nc -zv localhost 5672
+     ```
 
-BAS delivers five specialized investigation reports accessible through the Case Reports Hub (`/dashboard/cases/:caseId/reports`):
+3. **Verify Database Restoration**:
+   Confirm that the database has been restored from `database/bas_full_backup.dump` (see [Section 9](#9-postgresql-database-setup-using-bas_full_backupdump)).
 
-#### 1. Bank Statement & Transaction Report (`CaseFileReport.jsx`)
-- **Route**: `/dashboard/cases/:caseId/reports/file-statement`
-- **Features**:
-  - Compact case and statement file multi-select checkbox dropdown.
-  - Dual presentation modes: **Filtered Transactions Ledger (Grid View)** and **Graph View**.
-  - Advanced filtering: Transaction Date ranges, Minimum/Maximum Amount, Transaction Mode (UPI, NEFT, RTGS, CASH, CHEQUE), Debit/Credit, Keyword search, and Narration exclusion.
-  - **Full-Dataset Export CSV**: Exports all filtered transactions across all pagination pages with RFC 4180 compliance, quotation escaping, UTF-8 BOM (`\uFEFF`) for Microsoft Excel compatibility, and counterparty fields (`Counter Party`, `Counterparty Type`, `Counterparty Source`).
-
-#### 2. Transaction Mode Wise Report (`DynamicReportDashboard.jsx`)
-- **Route**: `/analysis` or `/dashboard/cases/:caseId/reports/timeline`
-- **Features**:
-  - Volume and value breakdowns grouped by transaction channel (UPI, NEFT, RTGS, IMPS, Cash, Cheque, NetBanking).
-  - Mode-specific filtering and interactive bar/donut distributions powered by Apache ECharts.
-
-#### 3. Transaction Relationship / Flow Report (`TransactionRelationshipReport.jsx`)
-- **Route**: `/dashboard/cases/:caseId/reports/transaction-relationships`
-- **Features**:
-  - Interactive force-directed network money trail graph rendered with Apache ECharts.
-  - Visual nodes represent the primary account holder and all transacting counterparties.
-  - Directed edges depict flow direction (Debit vs Credit) with stroke width proportional to transaction volume.
-  - Multi-file aggregation: Trace cross-account fund movements within a multi-bank investigation.
-
-#### 4. Counterparty Intelligence Report (`CounterpartyIntelligenceReport.jsx`)
-- **Route**: `/dashboard/cases/:caseId/reports/counterparty-intelligence`
-- **Features**:
-  - Aggregated ledger of all unique counterparties extracted by the GLiNER NLP engine.
-  - Entity classification tags: Person, Merchant, Financial Institution, Organization, or UPI Handle.
-  - Frequency analysis: Identifies top transactors by transaction count and aggregate monetary volume.
-  - Drill-down drawer: Clicking any counterparty exposes their complete transaction history across the case.
-
-#### 5. Financial Transaction Intelligence Report (`FinancialTransactionIntelligenceReport.jsx`)
-- **Route**: `/dashboard/cases/:caseId/reports/financial-transaction-intelligence`
-- **Features**:
-  - Executive financial summary: Net turnover, average/median transaction size, credit-to-debit ratio.
-  - Forensic Anomaly Detection:
-    - **Outliers**: Statistical anomaly detection via Interquartile Range ($Q_3 + 1.5 \times \text{IQR}$).
-    - **Round-Amount Structuring**: Identifies round-sum clusters (multiples of ₹1,000, ₹10,000, ₹50,000) indicative of cash structuring, smurfing, or hawala channels.
-    - **Balance Velocity & Spikes**: Daily high-activity dates and balance trend trajectories.
-  - **Direct PDF Export**: Clicking **Export PDF** generates a formatted forensic report directly via `html2pdf.js` with progress modals, downloading automatically without opening browser print dialogs.
-
----
-
-## 8. Comprehensive API Endpoints Reference
-
-All endpoints are registered on the FastAPI backend with the `/api/v1` namespace. Authentication requires an `Authorization: Bearer <access_token>` header unless marked Public.
-
-### Authentication (`/api/v1/auth`)
-
-| Method | Endpoint | Auth | Purpose | Request Body / Params |
-| :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/auth/signup` | Public | Create new user account | `UserCreateRequest` (username, email, password, role) |
-| `POST` | `/api/v1/auth/login` | Public | Authenticate user & receive tokens | `UserLoginRequest` (username, password) |
-| `POST` | `/api/v1/auth/refresh` | Public | Refresh expired access token | `{"refresh_token": "..."}` |
-| `POST` | `/api/v1/auth/first-login-password` | Bearer | Set password on initial login | `FirstLoginPasswordRequest` (current, new password) |
-| `POST` | `/api/v1/auth/dismiss-first-login` | Bearer | Dismiss first-login banner | None |
-
-### Dashboard & Telemetry (`/api/v1/dashboard`)
-
-| Method | Endpoint | Auth | Purpose | Query Parameters |
-| :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/dashboard/statistics` | Bearer | Dynamic KPI metrics for dashboard cards | Role-scoped automatically (Cases, IOs, Files, Txns) |
-
-### Case Management (`/api/v1/cases`)
-
-| Method | Endpoint | Auth | Purpose | Query / Body |
-| :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/cases/` | Bearer | Create a new case file | `CaseCreateRequest` (case_number, case_title, io_id) |
-| `GET` | `/api/v1/cases/` | Bearer | List cases accessible to user | Pagination, status |
-| `GET` | `/api/v1/cases/{case_id}` | Bearer | Retrieve specific case details | `case_id` path param |
-| `PUT` | `/api/v1/cases/{case_id}` | Bearer | Update case metadata | `CaseUpdateRequest` |
-| `DELETE`| `/api/v1/cases/{case_id}` | Bearer | Delete case record | `case_id` path param |
-
-### Investigating Officer Master (`/api/v1/io-master`)
-
-| Method | Endpoint | Auth | Purpose | Query / Body |
-| :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/io-master/` | Bearer | Register an Investigating Officer | `IOMasterCreateRequest` (name, designation, station) |
-| `GET` | `/api/v1/io-master/` | Bearer | List all registered IOs | Search query, pagination |
-| `GET` | `/api/v1/io-master/{io_id}` | Bearer | Retrieve specific IO profile | `io_id` path param |
-| `PUT` | `/api/v1/io-master/{io_id}` | Bearer | Update IO details | `IOMasterUpdateRequest` |
-| `DELETE`| `/api/v1/io-master/{io_id}` | Bearer | Remove IO record | `io_id` path param |
-
-### File & Statement Management (`/api/v1/files`)
-
-| Method | Endpoint | Auth | Purpose | Query / Body |
-| :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/files/{case_id}/upload` | Bearer | Upload statement & trigger Celery | `multipart/form-data` (`file`) |
-| `GET` | `/api/v1/files/case/{case_id}` | Bearer | List all statement files for a case | `case_id` path param |
-| `GET` | `/api/v1/files/{file_id}/view` | Bearer | View file metadata & processing stage | `file_id` path param |
-| `PATCH`| `/api/v1/files/{file_id}` | Bearer | Update account metadata manually | `FileUpdateRequest` |
-| `DELETE`| `/api/v1/files/{file_id}` | Bearer | Delete uploaded file & transactions | `file_id` path param |
-
-### Bank Transactions & Forensic Intelligence (`/api/v1/bank-transactions`)
-
-| Method | Endpoint | Auth | Purpose | Important Query Parameters |
-| :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/bank-transactions/case/{case_id}/search` | Bearer | Paginated search & multi-field filter | `file_ids`, `search`, `date_from`, `date_to`, `transaction_type`, `min_amount`, `max_amount`, `mode`, `has_cheque_only`, `page`, `page_size` |
-| `GET` | `/api/v1/bank-transactions/case/{case_id}/summary` | Bearer | Aggregate metrics (debit, credit, counts) | `case_id`, `file_ids`, `mode` |
-| `GET` | `/api/v1/bank-transactions/case/{case_id}/mode-wise` | Bearer | Transaction volume by channel | `case_id`, `file_ids` |
-| `GET` | `/api/v1/bank-transactions/case/{case_id}/transaction-relationships` | Bearer | Node-link graph for money trail | `file_ids` (comma-separated), `min_amount`, `start_date`, `end_date` |
-| `GET` | `/api/v1/bank-transactions/case/{case_id}/counterparty-analysis` | Bearer | Grouped counterparties & volume | `file_ids` (comma-separated) |
-| `GET` | `/api/v1/bank-transactions/case/{case_id}/financial-analysis` | Bearer | Statistical forensics, outliers, round-sums | `file_ids`, `date_from`, `date_to`, `transaction_type`, `min_amount`, `max_amount` |
-| `GET` | `/api/v1/bank-transactions/case/{case_id}/export` | Bearer | Server-side CSV streaming export | Filter params + `file_ids` |
-| `GET` | `/api/v1/bank-transactions/transaction-modes` | Bearer | List canonical payment channels | None |
-
-### Multi-Tenant Clients (`/api/v1/clients`) & Users (`/api/v1/users`)
-
-| Method | Endpoint | Auth | Purpose |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/clients` | SuperAdmin | Register new tenant / client organization |
-| `GET` | `/api/v1/clients` | SuperAdmin | List registered organizations |
-| `GET` | `/api/v1/users` | Admin / SuperAdmin | List users with filtering by status/client |
-| `POST` | `/api/v1/users` | Admin / SuperAdmin | Create user in client organization |
-| `PUT` | `/api/v1/users/{user_id}/permissions` | Admin | Update user granular permissions |
-
-### System & Real-Time
-
-| Method | Endpoint | Auth | Purpose |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Public | Service liveness probe returning `{"status": "healthy"}` |
-| `GET` | `/` | Public | Gateway ping probe |
-| `WS` | `/api/v1/ws/admin-dashboard` | Public/Bearer | WebSocket broadcast channel for live processing progress |
-
----
-
-## 9. Troubleshooting & Diagnostics Guide
-
-| Symptom / Error | Likely Root Cause | Diagnostic Command / Check | Safe Resolution Steps |
-| :--- | :--- | :--- | :--- |
-| `ImportError: DLL load failed while importing encodingdb: An Application Control policy has blocked this file` | Windows Defender Application Control (WDAC) or AppLocker blocked native `.pyd` libraries in Camelot/Playa. | Run in venv: `python -c "import camelot"` | 1. If using Windows with AppLocker, unblock files via PowerShell: `Get-ChildItem -Path .\backend\venv -Recurse \| Unblock-File`.<br>2. Alternatively, run using Linux/WSL2 where WDAC policies do not restrict python shared objects. |
-| `DATABASE_URL is not configured` | Missing or misnamed `.env` file in `backend/` directory. | Check `Test-Path .\backend\.env` | Ensure `.env` is situated directly in `backend/` and defines `DATABASE_URL=postgresql+psycopg://...`. |
-| `connection to server at "localhost", port 5432 failed: Connection refused` | PostgreSQL Windows Service is not running or port 5432 is blocked. | Run `Get-Service *postgres*` or `Test-NetConnection -Port 5432 localhost` | Start the PostgreSQL service via `Start-Service postgresql*` or through Windows `services.msc`. |
-| `password authentication failed for user "postgres"` | Incorrect username or password in `DATABASE_URL`, or password contains unescaped special characters. | Connect via CLI: `psql -U postgres -h localhost` | URL-encode special characters in `DATABASE_URL` (e.g., `@` becomes `%40`, `#` becomes `%23`). |
-| `[API Network Error] Request to http://127.0.0.1:8000/... failed` | FastAPI backend is not running, or crashed during startup. | Check backend terminal or run `curl http://127.0.0.1:8000/health` | Start Uvicorn in `backend/` via `python -m uvicorn app.main:app --reload --port 8000`. |
-| `VITE_API_BASE_URL is not configured` | Missing `.env.development` or `.env.production` in `frontend/`. | Check `frontend/.env.development` | Create `frontend/.env.development` with `VITE_API_BASE_URL=http://127.0.0.1:8000` and restart Vite dev server. |
-| Celery tasks stuck in `QUEUED` status; never transition to `PROCESSING` | RabbitMQ broker is down, or Celery worker process is not active. | Check RabbitMQ service (`Get-Service *rabbit*`) and check Celery terminal | 1. Start RabbitMQ: `Start-Service RabbitMQ`.<br>2. Start worker: `python -m celery -A app.celery_app.celery_app worker --loglevel=INFO -P solo`. |
-| Celery throws `ValueError: not enough values to unpack` on Windows | Celery worker was launched with default prefork pool on Windows. | Check Celery terminal command | Always append `--pool=solo` (or `-P solo`) when launching Celery on Windows OS. |
-| `tesseract is not installed or it's not in your PATH` | Tesseract OCR binary missing during scanned PDF processing. | Run `where.exe tesseract` in PowerShell | Install UB-Mannheim Tesseract OCR to `C:\Program Files\Tesseract-OCR\` and add this path to your System Environment `PATH`. |
-| `Failed to load GLiNER model 'urchade/gliner_multi-v2.1'` | No internet connection on first run, or Hugging Face Hub timed out. | Check Celery terminal output | Ensure internet connectivity is active during first model download. If offline, copy cached weights into `~/.cache/huggingface/hub/`. |
-| `404 Not Found` on API requests from Frontend | Route prefix mismatch (e.g. omitting `/api/v1/`). | Inspect browser network tab | All API endpoints require the `/api/v1` prefix (e.g., `/api/v1/dashboard/statistics`). |
-| `CORS error: No 'Access-Control-Allow-Origin' header` | Frontend is running on a port not listed in `backend/app/main.py`. | Check frontend port in browser URL | `main.py` explicitly allows `5173`, `5174`, `3000`, and regex matching `localhost:[0-9]+`. Verify frontend origin matches `localhost` or `127.0.0.1`. |
-
----
-
-## 10. Testing, Linting & Verification
-
-### A. Frontend Verification
-1. **Production Build Validation**:
-   ```powershell
-   cd frontend
-   npm run build
-   ```
-   Ensures all JSX syntax, CSS directives, and module imports bundle cleanly without errors.
-2. **ESLint Linting**:
-   ```powershell
-   npm run lint
-   ```
-
-### B. Backend Verification
-1. **Module Compilation & Syntax Validation**:
+4. **Launch Backend Services (Terminal 1)**:
    ```powershell
    cd backend
-   .\venv\Scripts\python.exe -m compileall app
+   .\venv312\Scripts\Activate.ps1
+   python start.py
    ```
-2. **Import Verification**:
-   ```powershell
-   .\venv\Scripts\python.exe -c "import app.main; print('FastAPI App and Routers Loaded Successfully')"
-   .\venv\Scripts\python.exe -c "import app.celery_app; print('Celery Configuration Loaded Successfully')"
+
+5. **Launch Frontend Dev Server (Terminal 2)**:
+   ```bash
+   cd frontend
+   npm run dev
    ```
-3. **Database Migration State Check**:
-   ```powershell
-   .\venv\Scripts\python.exe -m alembic current
+
+6. **Access Platform**:
+   Navigate to `http://localhost:5173` in your web browser.
+
+---
+
+## 13. Database and Application Verification
+
+Perform these multi-tier health checks to verify that the application is fully operational.
+
+### 13.1 Service Process & Port Verification
+
+| Service | Port | Process Check (Windows PowerShell) | Process Check (Linux) |
+| :--- | :--- | :--- | :--- |
+| **PostgreSQL** | `5432` | `Get-Process -Name postgres -ErrorAction SilentlyContinue` | `pgrep -l postgres` |
+| **RabbitMQ** | `5672` | `Get-Service *rabbit*` | `systemctl is-active rabbitmq-server` |
+| **FastAPI** | `8000` | `Get-NetTCPConnection -LocalPort 8000 -State Listen` | `ss -tulpn \| grep 8000` |
+| **Frontend** | `5173` | `Get-NetTCPConnection -LocalPort 5173 -State Listen` | `ss -tulpn \| grep 5173` |
+
+### 13.2 HTTP API Health Probes
+
+```bash
+# 1. Gateway root ping probe
+curl -s http://127.0.0.1:8000/
+# Expected: {"message": "BAS Backend is running"}
+
+# 2. Service liveness health probe
+curl -s http://127.0.0.1:8000/health
+# Expected: {"status": "healthy"}
+
+# 3. Interactive OpenAPI documentation
+# Open http://127.0.0.1:8000/docs in your browser
+```
+
+### 13.3 Database Connectivity Smoke Test
+Test database connectivity by executing a login authentication request:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/v1/auth/login" \
+     -H "Content-Type: application/json" \
+     -d "{\"username\": \"test_user\", \"password\": \"test_password\"}"
+```
+*Expected response:*
+- If credentials exist and match: `200 OK` with `access_token` and `refresh_token`.
+- If credentials do not match: `401 Unauthorized` with `{"detail": "Incorrect username or password"}`.
+- If database connection fails: `500 Internal Server Error` with `{"detail": "Internal Server Error: could not connect to server"}`.
+
+### 13.4 Celery Worker & Task Verification
+Inspect the Celery worker terminal logs. Verify that:
+1. Celery connected to the broker: `connected to amqp://guest:**@localhost:5672//`
+2. The bank statement processing task is registered:
+   ```text
+   [tasks]
+     . app.tasks.bank_statement_task.process_bank_statement
    ```
 
 ---
 
-## 11. Production Deployment & Operational Considerations
+## 14. Production Deployment
 
-When preparing BAS for an enterprise forensic or law enforcement production deployment:
+### 14.1 Key Architecture Differences: Development vs Production
 
-### 1. Reverse Proxy & SSL Termination (Nginx)
-Deploy Nginx in front of Uvicorn and Vite static assets. Configure Nginx to:
-- Terminate TLS/SSL (HTTPS on port 443).
-- Route `/api/` and `/ws/` requests to Uvicorn upstream on `127.0.0.1:8000`.
-- Serve compiled frontend static files from `frontend/dist/`.
-- Set client maximum body size to `100M` (`client_max_body_size 100M;`) to accommodate large high-resolution PDF statements.
+| Component | Development Environment | Production Deployment |
+| :--- | :--- | :--- |
+| **FastAPI Runner** | `python start.py` (single Uvicorn process with `--reload`) | Gunicorn supervisor with multiple Uvicorn worker processes (`uvicorn.workers.UvicornWorker`) |
+| **Celery Worker** | Single process (`--pool=solo --concurrency=1` on Windows) | Multi-worker daemon managed via `systemd` or `supervisor` (`--concurrency=4+`) |
+| **Frontend** | Vite development server (`npm run dev`) on port 5173 | Pre-compiled static assets (`npm run build`) served via Nginx |
+| **Reverse Proxy** | Direct browser-to-port connections | Nginx terminating SSL/TLS, routing `/api/` to backend, serving static files |
+| **File Storage** | Local directory (`backend/storage/cases/`) | Persistent, snapshot-backed block storage (EBS / RAID 10) |
 
-### 2. Multi-Worker ASGI Production Runner
-In production Linux environments, run Uvicorn behind Gunicorn with multiple worker processes:
+### 14.2 Frontend Production Build
+Generate optimized static production assets:
 ```bash
-gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --timeout 120
+cd frontend
+npm run build
+```
+Output directory: `frontend/dist/`.
+
+### 14.3 Backend Production Runner (Linux)
+In production on Linux, run Uvicorn under Gunicorn:
+```bash
+cd backend
+source venv/bin/activate
+gunicorn app.main:app \
+    --workers 4 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --bind 127.0.0.1:8000 \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile -
 ```
 
-### 3. Celery Daemonization (Systemd / Supervisor)
-Run Celery as a managed `systemd` service with automatic restarts on crash:
+### 14.4 Celery Production Service (`systemd`)
+Create a `systemd` service unit at `/etc/systemd/system/bas-celery.service`:
+
 ```ini
 [Unit]
-Description=BAS Celery Worker
-After=network.target rabbitmq-server.service
+Description=BAS Celery Background Worker
+After=network.target rabbitmq-server.service postgresql.service
 
 [Service]
 Type=simple
 User=bas_user
+Group=bas_user
 WorkingDirectory=/opt/bas/backend
+EnvironmentFile=/opt/bas/backend/.env
 ExecStart=/opt/bas/backend/venv/bin/celery -A app.celery_app.celery_app worker --loglevel=INFO --concurrency=4
 Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-### 4. Storage Persistence & Backups
-- **Persistent Storage**: Ensure `backend/storage/cases/` is backed by redundant storage (e.g., RAID 10 or AWS EBS) with daily snapshots.
-- **PostgreSQL Backups**: Schedule automated daily logical dumps via `pg_dump`:
+Enable and start the service:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable bas-celery
+sudo systemctl start bas-celery
+```
+
+### 14.5 Reverse Proxy & SSL Configuration (Nginx)
+Create an Nginx server block at `/etc/nginx/sites-available/bas.conf`:
+
+```nginx
+server {
+    listen 80;
+    server_name bas.yourdomain.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name bas.yourdomain.com;
+
+    ssl_certificate     /etc/letsencrypt/live/bas.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/bas.yourdomain.com/privkey.pem;
+
+    # Allow large bank statement PDF uploads (up to 100MB)
+    client_max_body_size 100M;
+
+    # Serve compiled frontend static files
+    root /opt/bas/frontend/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy REST API requests to FastAPI
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    # Proxy WebSocket connections
+    location /api/v1/ws/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+}
+```
+
+---
+
+## 15. Troubleshooting Guide
+
+| Symptom / Error | Likely Root Cause | Diagnostic Command | Safe Resolution Steps |
+| :--- | :--- | :--- | :--- |
+| `DATABASE_URL is not configured` | Missing or misnamed `.env` file in `backend/` directory. | `Test-Path .\backend\.env` | Ensure `.env` is situated in `backend/` and defines `DATABASE_URL=postgresql+psycopg://...`. |
+| `connection to server at "localhost", port 5432 failed: Connection refused` | PostgreSQL service is stopped or port 5432 is blocked. | `Get-Service *postgres*` or `Test-NetConnection -Port 5432 localhost` | Start PostgreSQL service via `Start-Service *postgres*` or `sudo systemctl start postgresql`. |
+| `password authentication failed for user "..."` | Incorrect username/password, or special characters in password are not URL-encoded. | Connect manually: `psql -U YOUR_DB_USER -h localhost` | URL-encode reserved characters in `DATABASE_URL` (e.g., `@` becomes `%40`, `#` becomes `%23`). |
+| `pg_restore: error: could not execute query: ERROR: role "bas" does not exist` | Dump restored without stripping source role ownership. | Inspect restore command flags | Always add `--no-owner --no-privileges` to `pg_restore`. |
+| `pg_restore: error: relation "users" already exists` | Attempting to restore dump into a database that already contains tables. | `psql -U YOUR_DB_USER -d YOUR_DB_NAME -c "\dt"` | Restore into a clean, empty target database. Never restore over existing data. |
+| `alembic: error: Can't locate revision identified by '...'` | Restored database has an `alembic_version` not present in codebase migration files. | `python -m alembic heads` vs `python -m alembic current` | Verify that the migration tree in `backend/alembic/versions/` matches the restored database head (`c8940e2f5b61`). |
+| Celery tasks stuck in `QUEUED`; never transition to `PROCESSING` | RabbitMQ broker is down, or Celery worker process is not running. | `Get-Service *rabbit*` and check Celery logs | 1. Start RabbitMQ (`Start-Service RabbitMQ`).<br>2. Start worker: `python -m celery -A app.celery_app.celery_app worker --loglevel=INFO -P solo`. |
+| Celery worker crashes on Windows with `ValueError: not enough values to unpack` | Celery started without `--pool=solo` on Windows OS. | Inspect Celery startup command | Celery on Windows requires `-P solo` or `--pool=solo` because POSIX fork is unsupported. |
+| `tesseract is not installed or it's not in your PATH` | Tesseract OCR binary missing during scanned PDF table extraction. | Windows: `where.exe tesseract`<br>Linux: `which tesseract` | Install UB-Mannheim Tesseract OCR to `C:\Program Files\Tesseract-OCR\` and add it to system `PATH`. |
+| `Failed to load GLiNER model 'urchade/gliner_multi-v2.1'` | No internet access during first-run model download from Hugging Face. | Check Celery worker terminal logs | Connect to internet for first run to allow weights (~1.4 GB) to download to `~/.cache/huggingface/hub/`. For offline use, pre-populate this cache. |
+| Port `8000` is already in use (`Errno 10048` or `EADDRINUSE`) | An orphaned Uvicorn process is still running in the background. | `netstat -ano \| findstr 8000` | Terminate process: Windows: `taskkill /F /PID <PID>`<br>Linux: `kill -9 <PID>`. |
+| `VITE_API_BASE_URL is not configured` | Missing `.env.development` or `.env.production` in `frontend/`. | Check `frontend/.env.development` | Create `frontend/.env.development` with `VITE_API_BASE_URL=http://127.0.0.1:8000` and restart Vite. |
+| `CORS error: No 'Access-Control-Allow-Origin' header present` | Frontend running on an origin not permitted by `backend/app/main.py`. | Inspect browser Console / Network tab | Ensure frontend runs on `localhost` or `127.0.0.1` on allowed ports (`5173`, `5174`, `3000`), or serve via reverse proxy under identical origin. |
+| `413 Request Entity Too Large` on upload | Statement file exceeds upload size limit (100 MB in code, or Nginx client limit). | Inspect HTTP status in browser Network tab | If using Nginx, configure `client_max_body_size 100M;`. In development, ensure file is $\le$ 100 MB. |
+| `ImportError: DLL load failed while importing encodingdb: An Application Control policy has blocked this file` | Windows Defender Application Control (WDAC) or AppLocker blocked native `.pyd` libraries in Camelot/Playa. | Run: `python -c "import camelot"` | Unblock DLLs in PowerShell: `Get-ChildItem -Path .\backend\venv312 -Recurse \| Unblock-File` or execute under Linux/WSL2. |
+
+---
+
+## 16. Backup and Data Security
+
+### 16.1 Automated Logical Database Backups
+To take a logical backup of the BAS database using custom-format compression:
+
+#### Windows (PowerShell)
+```powershell
+$backupDate = Get-Date -Format "yyyyMMdd_HHmmss"
+$backupFile = "bas_backup_$backupDate.dump"
+$env:PGPASSWORD = "YOUR_DB_PASSWORD"
+pg_dump -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -Fc -f $backupFile YOUR_DB_NAME
+$env:PGPASSWORD = $null
+Write-Host "Database backup saved to $backupFile"
+```
+
+#### Ubuntu / Linux
+```bash
+BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+PGPASSWORD="YOUR_DB_PASSWORD" pg_dump -h YOUR_DB_HOST -p 5432 -U YOUR_DB_USER -Fc -f "bas_backup_${BACKUP_DATE}.dump" YOUR_DB_NAME
+```
+
+### 16.2 Physical File Storage Backups
+Case statement uploads and normalized Excel files are stored on disk in `backend/storage/cases/{case_id}/`.
+- Ensure this directory is included in regular file system backups or mounted on persistent redundant block storage (e.g., AWS EBS, Azure Managed Disk).
+- Exclude ephemeral temp files (`*.tmp`, lock files) when creating archives.
+
+### 16.3 Data Security Best Practices
+- **Restrict Environment Permissions**: On Linux, set restrictive file permissions on the backend environment configuration:
   ```bash
-  pg_dump -U postgres -Fc BAS > /backup/bas_db_$(date +%Y%m%d).dump
+  chmod 600 backend/.env
   ```
-- **Secret Rotation**: Never use default secrets. Generate a high-entropy `JWT_SECRET_KEY` and restrict file permissions on `backend/.env` (`chmod 600 backend/.env`).
+- **Secret Key Rotation**: Use high-entropy keys for `JWT_SECRET_KEY`. Never use placeholder strings in production.
+- **Privacy & PII Protection**: Account numbers are masked in application logs. Exported CSV files and forensic PDFs should be stored in encrypted folders in accordance with investigative data governance regulations.
+- **Version Control Hygiene**: Never commit `*.dump` files or `.env` files containing real production data to public version control.
+
+---
+
+## 17. Known Limitations and Unverified Requirements
+
+To ensure technical transparency, the following characteristics, constraints, and unverified assumptions are explicitly documented:
+
+1. **`backend/start.py` Process Management**:
+   - `start.py` is a convenience script for development only. It does not provide production process supervision, daemonization, automatic worker scaling, or clustering.
+   - On Windows, Uvicorn running with `--reload` spawns a child worker that may not terminate when `start.py` exits, occasionally leaving port 8000 occupied.
+   - Console startup banners indicate that processes have launched, not that health checks or database handshakes have completed.
+2. **Celery Worker Concurrency on Windows**:
+   - Due to the absence of POSIX `fork()` on Windows, Celery must run with `--pool=solo` and `--concurrency=1`. This means document processing tasks execute sequentially on Windows. Multi-threaded or multi-worker concurrency requires Linux or Docker.
+3. **Hardcoded Broker URL in Celery App**:
+   - `backend/app/celery_app.py` directly defines `broker="amqp://guest:guest@localhost:5672//"`. While suitable for default local installations, pointing to a remote RabbitMQ server requires modifying this file or updating it to read `CELERY_BROKER_URL` from the environment.
+4. **Ad-Hoc Metabase Table in Database Dump**:
+   - The backup dump `bas_full_backup.dump` contains the table `upload_charges_sample_20261021162931` (13 columns, row-level sequence `_mb_row_id`). This table was generated during ad-hoc Metabase exploratory analysis and is not mapped to any active SQLAlchemy ORM model or backend endpoint. It is harmless to leave intact or can be dropped if not needed.
+5. **GLiNER Model Cold-Start**:
+   - GLiNER (`urchade/gliner_multi-v2.1`) requires an initial download of approximately 1.4 GB of model weights from Hugging Face on its first invocation. Systems in air-gapped or restricted offline forensic environments must have this model pre-cached in `~/.cache/huggingface/hub/`.
+6. **Alembic History Synchronization**:
+   - The dump is stamped at migration revision `c8940e2f5b61`. Do not run `alembic upgrade head` on an empty database during initial setup, as Alembic migrations do not contain seed data or full schema history for all ad-hoc objects. Always restore using `pg_restore`.
 
 ---
 
