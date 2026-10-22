@@ -47,6 +47,7 @@ function Login() {
     setErrors((previous) => ({
       ...previous,
       [name]: "",
+      general: "",
     }));
   }
 
@@ -283,24 +284,87 @@ function Login() {
        */
       logout();
 
-      const message =
-        error?.response?.data?.detail ||
+      const status = error?.status || error?.response?.status;
+      const rawDetail = error?.response?.data?.detail;
+      const code =
+        error?.code ||
+        (typeof rawDetail === "object" ? rawDetail?.code : null) ||
+        error?.response?.data?.code ||
+        null;
+
+      const detailMsg =
+        typeof rawDetail === "string"
+          ? rawDetail
+          : rawDetail?.message || null;
+
+      let userTitle = "Authentication Failed";
+      let userMessage =
+        detailMsg ||
         error?.message ||
         "Unable to authenticate your account. Please try again.";
+
+      const fieldErrors = {};
+
+      if (code === "USER_NOT_FOUND") {
+        userTitle = "Invalid Username";
+        userMessage = "Invalid username or email. Please check your credentials.";
+        fieldErrors.username = userMessage;
+      } else if (code === "INVALID_PASSWORD") {
+        userTitle = "Incorrect Password";
+        userMessage = "Incorrect password. Please try again.";
+        fieldErrors.password = userMessage;
+      } else if (code === "INVALID_COMPANY_CODE") {
+        userTitle = "Invalid Company Code";
+        userMessage = "Invalid company code. Please check your credentials.";
+      } else if (code === "COMPANY_CODE_REQUIRED") {
+        userTitle = "Company Code Required";
+        userMessage =
+          "Multiple company accounts found with this username. Please enter your Company Code.";
+      } else if (code === "ACCOUNT_INACTIVE") {
+        userTitle = "Account Inactive";
+        userMessage = "User account is inactive. Please contact your administrator.";
+      } else if (code === "COMPANY_DEACTIVATED") {
+        userTitle = "Company Inactive";
+        userMessage =
+          "Access denied. Your company account has been deactivated by administrator.";
+      } else if (code === "SESSION_EXPIRED") {
+        userTitle = "Session Expired";
+        userMessage = "Session expired. Please log in again.";
+      } else if (status === 400 || status === 422) {
+        userTitle = "Validation Error";
+        userMessage = detailMsg || "Please check your credentials and try again.";
+      } else if (status === 401) {
+        userTitle = "Authentication Failed";
+        userMessage = detailMsg || "Invalid credentials. Please check your username and password.";
+      } else if (status === 403) {
+        userTitle = "Access Denied";
+        userMessage = detailMsg || "You do not have permission to access this system.";
+      } else if (status >= 500) {
+        userTitle = "Server Error";
+        userMessage = "A server error occurred. Please try again later or contact support.";
+      } else if (!status && error?.message?.includes("connect to the backend server")) {
+        userTitle = "Connection Error";
+        userMessage = error.message;
+      }
+
+      setErrors({
+        ...fieldErrors,
+        general: userMessage,
+      });
 
       /*
        * ERROR MESSAGE
        */
       await Swal.fire({
         icon: "error",
-        title: "Authentication Failed",
+        title: userTitle,
         html: `
           <div style="
             color: #475569;
             font-size: 14px;
             line-height: 1.6;
           ">
-            ${message}
+            ${userMessage}
           </div>
 
           <div style="
@@ -764,6 +828,24 @@ function Login() {
                   noValidate
                   className="space-y-4.5"
                 >
+                  {/* GENERAL ERROR BANNER */}
+                  {errors.general && (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50/90 p-3 text-xs font-semibold text-red-800 shadow-2xs animate-in fade-in duration-200">
+                      <svg
+                        className="h-4 w-4 shrink-0 text-red-600 mt-0.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span>{errors.general}</span>
+                    </div>
+                  )}
+
                   {/* USERNAME FIELD */}
                   <div>
                     <label

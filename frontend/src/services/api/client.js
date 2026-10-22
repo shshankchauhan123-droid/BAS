@@ -212,12 +212,21 @@ export async function apiRequest(
 
 
   // ==========================================================
-  // Access token expired
+  // Access token expired (Protected endpoints only)
   // ==========================================================
+
+  const isAuthEndpoint =
+    endpoint.includes("/api/v1/auth/login") ||
+    endpoint.includes("/api/v1/auth/signup") ||
+    endpoint.includes("/api/v1/auth/refresh");
+
+  const existingRefreshToken = getRefreshToken();
 
   if (
     response.status === 401 &&
-    !skipAuthRefresh
+    !skipAuthRefresh &&
+    !isAuthEndpoint &&
+    Boolean(existingRefreshToken)
   ) {
 
     try {
@@ -254,9 +263,22 @@ export async function apiRequest(
 
       clearTokens();
 
-      throw new Error(
+      const sessionError = new Error(
         "Your session has expired. Please login again."
       );
+      sessionError.status = 401;
+      sessionError.code = "SESSION_EXPIRED";
+      sessionError.response = {
+        status: 401,
+        data: {
+          detail: {
+            code: "SESSION_EXPIRED",
+            message: "Your session has expired. Please login again.",
+          },
+        },
+      };
+
+      throw sessionError;
     }
   }
 
@@ -279,9 +301,13 @@ export async function apiRequest(
 
 
     let message = `Request failed with status ${response.status}`;
+    let code = null;
 
     if (typeof data?.detail === "string") {
       message = data.detail;
+    } else if (data?.detail && typeof data.detail === "object" && !Array.isArray(data.detail)) {
+      code = data.detail.code || data.detail.error_code || null;
+      message = data.detail.message || data.detail.detail || JSON.stringify(data.detail);
     } else if (Array.isArray(data?.detail)) {
       message = data.detail
         .map((item) => {
@@ -291,11 +317,19 @@ export async function apiRequest(
         .join(" | ");
     } else if (typeof data?.message === "string") {
       message = data.message;
-    } else if (data?.detail && typeof data.detail === "object") {
-      message = JSON.stringify(data.detail);
     }
 
-    throw new Error(message);
+    if (data?.code) {
+      code = data.code;
+    }
+
+    const error = new Error(message);
+    error.status = response.status;
+    error.code = code;
+    error.response = { status: response.status, data };
+    error.data = data;
+
+    throw error;
   }
 
 

@@ -13,6 +13,7 @@ from app.authentication.auth_controller import (
     refresh_access_token,
     signup,
 )
+from app.authentication.auth_service import AuthException
 from app.authentication.auth_schema import (
     FirstLoginPasswordRequest,
     FirstLoginResponse,
@@ -89,10 +90,21 @@ def login_route(
 
         return response
 
+    except AuthException as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail={
+                "code": error.code,
+                "message": error.message,
+            },
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(error),
+            detail={
+                "code": "INVALID_CREDENTIALS",
+                "message": str(error),
+            },
         )
 
 
@@ -118,7 +130,10 @@ def refresh_route(
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(error),
+            detail={
+                "code": "SESSION_EXPIRED",
+                "message": str(error),
+            },
         )
 
 

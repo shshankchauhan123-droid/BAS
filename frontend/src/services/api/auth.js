@@ -12,6 +12,7 @@ export function signupUser({
       email,
       password,
     }),
+    skipAuthRefresh: true,
   });
 }
 
@@ -27,6 +28,7 @@ export function loginUser({
       password,
       company_code: company_code ? String(company_code).trim() : null,
     }),
+    skipAuthRefresh: true,
   });
 }
 
