@@ -18,6 +18,8 @@ function CreateIOModal({
   onSubmit,
   isSubmitting = false,
   isClientAdmin = false,
+  isSuperAdmin = false,
+  availableUsers = null,
   editingOfficer = null,
 }) {
   const isEditMode = Boolean(editingOfficer);
@@ -80,14 +82,17 @@ function CreateIOModal({
         custom_designation: "",
         police_station: "",
       });
-      if (isClientAdmin) {
+      if (Array.isArray(availableUsers) && availableUsers.length > 0) {
+        setCompanyUsers(availableUsers);
+        setSelectedUserId(String(availableUsers[0].id));
+      } else if (isClientAdmin || isSuperAdmin) {
         loadCompanyUsers();
       } else {
         setCompanyUsers([]);
         setSelectedUserId("");
       }
     }
-  }, [isOpen, editingOfficer, isClientAdmin]);
+  }, [isOpen, editingOfficer, isClientAdmin, isSuperAdmin, availableUsers]);
 
   if (!isOpen) {
     return null;
@@ -263,8 +268,8 @@ function CreateIOModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          {/* Assigned Investigator for Client Admin */}
-          {isClientAdmin && (
+          {/* Assigned Investigator for Client Admin / Super Admin */}
+          {(isClientAdmin || isSuperAdmin) && (
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#64748B] mb-1.5">
                 Assigned Investigator {!isEditMode && <span className="text-[#059669]">*</span>}

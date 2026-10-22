@@ -8,6 +8,9 @@ import BASFooter from "../../../components/layout/UserFooter";
 
 import { getCase, getCases } from "../../../services/api/case";
 import { getCaseFiles } from "../../../services/api/file";
+import { getClients } from "../../../services/api/clients";
+import { getUsers } from "../../../services/api/user";
+import { useAuth } from "../../../context/AuthContext";
 import {
   searchCaseTransactions,
   getCaseTransactionSummary,
@@ -91,7 +94,7 @@ function getDisplayAccountNumber(file) {
   if (match && match[1]) {
     return match[1];
   }
-  return file?.original_filename || `Account ${file?.id || ""}`;
+  return "Account number unavailable";
 }
 
 function getDisplayBankSubtitle(file) {
@@ -99,8 +102,11 @@ function getDisplayBankSubtitle(file) {
   if (file?.bank_name && String(file.bank_name).trim()) {
     parts.push(String(file.bank_name).trim());
   }
-  if (file?.original_filename) {
-    parts.push(file.original_filename);
+  if (file?.account_name && String(file.account_name).trim()) {
+    parts.push(String(file.account_name).trim());
+  }
+  if (file?.original_filename && String(file.original_filename).trim()) {
+    parts.push(String(file.original_filename).trim());
   }
   if (file?.file_size) {
     parts.push(formatFileSize(file.file_size));
@@ -108,10 +114,821 @@ function getDisplayBankSubtitle(file) {
   return parts.length > 0 ? parts.join(" • ") : "Bank Statement";
 }
 
+/**
+ * Searchable Single-Select Dropdown Component
+ * Follows BAS Light Theme tokens (#F5F8FC bg, #172554 navy, #059669 emerald, #E2E8F0 borders)
+ */
+function SearchableDropdown({
+  label,
+  stepNumber,
+  value,
+  options = [],
+  onSelect,
+  placeholder = "Choose an option",
+  searchPlaceholder = "Search...",
+  disabled = false,
+  loading = false,
+  emptyMessage = "No options available",
+  badgeColor = "emerald",
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [openUpwards, setOpenUpwards] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const checkPlacement = useCallback(() => {
+    if (!dropdownRef.current) return;
+    const rect = dropdownRef.current.getBoundingClientRect();
+    const viewportHeight =
+      window.innerHeight || document.documentElement.clientHeight;
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const estimatedHeight = 280;
+
+    if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
+      setOpenUpwards(true);
+    } else {
+      setOpenUpwards(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      checkPlacement();
+      document.addEventListener("mousedown", handleClickOutside);
+      window.addEventListener("resize", checkPlacement);
+      window.addEventListener("scroll", checkPlacement, true);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("resize", checkPlacement);
+      window.removeEventListener("scroll", checkPlacement, true);
+    };
+  }, [isOpen, checkPlacement]);
+
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+    } else {
+      setSearchTerm("");
+      setHighlightedIndex(0);
+    }
+  }, [isOpen]);
+
+  const selectedItem = useMemo(() => {
+    return options.find((opt) => String(opt.id) === String(value));
+  }, [options, value]);
+
+  const filteredOptions = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return options;
+    return options.filter((opt) => {
+      const matchLabel = opt.label?.toLowerCase().includes(query);
+      const matchSubtitle = opt.subtitle?.toLowerCase().includes(query);
+      const matchBadge = opt.badge?.toLowerCase().includes(query);
+      const matchSearchKey = opt.searchKey?.toLowerCase().includes(query);
+      return matchLabel || matchSubtitle || matchBadge || matchSearchKey;
+    });
+  }, [options, searchTerm]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [filteredOptions]);
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Escape") {
+      setIsOpen(false);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+      } else if (filteredOptions.length > 0) {
+        setHighlightedIndex((prev) => (prev + 1) % filteredOptions.length);
+      }
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+      } else if (filteredOptions.length > 0) {
+        setHighlightedIndex(
+          (prev) => (prev - 1 + filteredOptions.length) % filteredOptions.length
+        );
+      }
+    } else if (event.key === "Enter") {
+      if (isOpen && filteredOptions[highlightedIndex]) {
+        event.preventDefault();
+        onSelect(filteredOptions[highlightedIndex].id);
+        setIsOpen(false);
+      }
+    }
+  };
+
+  return (
+    <div
+      className={`relative flex flex-col gap-1.5 ${isOpen ? "z-40" : "z-10"}`}
+      ref={dropdownRef}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+          <span
+            className={`flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-extrabold ${
+              badgeColor === "emerald"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-blue-50 text-[#172554]"
+            }`}
+          >
+            {stepNumber}
+          </span>
+          {label}
+        </label>
+        {selectedItem && (
+          <span className="text-[10px] font-bold text-emerald-700">Selected</span>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen((prev) => !prev)}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        className={`group flex min-h-[46px] w-full items-center justify-between rounded-xl border px-3.5 py-2 text-left transition-all outline-none ${
+          disabled
+            ? "cursor-not-allowed border-slate-200 bg-slate-50/70 text-slate-400"
+            : isOpen
+            ? "border-emerald-500 bg-white ring-2 ring-emerald-500/20 shadow-sm"
+            : selectedItem
+            ? "border-emerald-300 bg-emerald-50/40 hover:border-emerald-400 hover:bg-emerald-50/70 shadow-2xs cursor-pointer"
+            : "border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white text-slate-600 shadow-2xs cursor-pointer"
+        }`}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          {loading ? (
+            <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border border-emerald-500 border-t-transparent" />
+              <span>Loading options...</span>
+            </div>
+          ) : selectedItem ? (
+            <>
+              {selectedItem.avatar && (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-[11px] font-bold text-emerald-800">
+                  {selectedItem.avatar}
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold text-[#172554]">
+                  {selectedItem.label}
+                </p>
+                {selectedItem.subtitle && (
+                  <p className="truncate text-[10px] text-[#64748B]">
+                    {selectedItem.subtitle}
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <span className="truncate text-xs font-medium text-slate-400">
+              {placeholder}
+            </span>
+          )}
+        </div>
+
+        <svg
+          className={`ml-2 h-4 w-4 shrink-0 text-[#64748B] transition-transform duration-200 ${
+            isOpen ? "rotate-180 text-emerald-600" : "group-hover:text-[#172554]"
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </button>
+
+      {/* Dropdown panel */}
+      {isOpen && !disabled && (
+        <div
+          className={`absolute left-0 z-50 w-full min-w-[280px] rounded-2xl border border-[#E2E8F0] bg-white p-2.5 shadow-[0_20px_45px_rgba(23,37,84,0.16)] animate-in fade-in zoom-in-95 duration-150 ${
+            openUpwards ? "bottom-full mb-2" : "top-full mt-2"
+          }`}
+        >
+          {/* Search bar */}
+          <div className="relative mb-2 px-0.5">
+            <svg
+              className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94A3B8]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="w-full rounded-xl border border-[#DCE5EF] bg-[#F8FAFC] py-1.5 pl-8 pr-3 text-xs text-[#172033] outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500/20"
+            />
+          </div>
+
+          {/* Options list */}
+          <div className="max-h-56 overflow-y-auto px-0.5 py-0.5 space-y-1">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt, idx) => {
+                const isSelected = String(opt.id) === String(value);
+                const isHighlighted = idx === highlightedIndex;
+
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(opt.id);
+                      setIsOpen(false);
+                    }}
+                    onMouseEnter={() => setHighlightedIndex(idx)}
+                    className={`flex w-full items-center justify-between gap-2.5 rounded-xl px-2.5 py-2 text-left text-xs transition outline-none cursor-pointer ${
+                      isSelected
+                        ? "bg-emerald-50 text-emerald-900 font-semibold border border-emerald-200"
+                        : isHighlighted
+                        ? "bg-slate-100 text-[#172554]"
+                        : "text-[#334155] hover:bg-slate-50 hover:text-[#172554]"
+                    }`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      {opt.avatar && (
+                        <span
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold ${
+                            isSelected
+                              ? "bg-emerald-600 text-white"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {opt.avatar}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">{opt.label}</p>
+                        {opt.subtitle && (
+                          <p className="truncate text-[10px] text-[#64748B]">
+                            {opt.subtitle}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 pl-1">
+                      {opt.badge && (
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                            opt.badgeColor === "emerald"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : opt.badgeColor === "red"
+                              ? "bg-rose-100 text-rose-800"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {opt.badge}
+                        </span>
+                      )}
+                      {isSelected && (
+                        <svg
+                          className="h-4 w-4 text-emerald-600 shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2.5"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="py-6 text-center text-xs text-[#94A3B8]">
+                {emptyMessage}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Searchable Multi-Select Account Files Component
+ * Features:
+ * - Bank account number as primary label
+ * - Original filename, bank, and size as secondary info
+ * - Fully reversible checkboxes (checking/unchecking immediately updates selection)
+ * - Select All / Clear All buttons and master checkbox
+ * - Selected count display e.g. "Select Accounts (1 of 2 selected)"
+ * - Done button to close without losing selection
+ * - Click propagation prevented so toggling accounts never closes dropdown unexpectedly
+ */
+function SearchableAccountMultiSelect({
+  label = "Select Accounts",
+  stepNumber = 4,
+  files = [],
+  selectedFileIds = [],
+  onToggle,
+  onSelectAll,
+  onClearAll,
+  disabled = false,
+  loading = false,
+  getDisplayAccountNumber,
+  getDisplayAccountSubtitle,
+  accountSearchQuery,
+  setAccountSearchQuery,
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [localSearch, setLocalSearch] = useState("");
+  const [openUpwards, setOpenUpwards] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const searchValue =
+    accountSearchQuery !== undefined ? accountSearchQuery : localSearch;
+  const setSearchValue =
+    setAccountSearchQuery !== undefined ? setAccountSearchQuery : setLocalSearch;
+
+  const selectedCount = selectedFileIds.length;
+  const isAllSelected = files.length > 0 && selectedCount === files.length;
+
+  const checkPlacement = useCallback(() => {
+    if (!dropdownRef.current) return;
+    const rect = dropdownRef.current.getBoundingClientRect();
+    const viewportHeight =
+      window.innerHeight || document.documentElement.clientHeight;
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const estimatedHeight = 350;
+
+    if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
+      setOpenUpwards(true);
+    } else {
+      setOpenUpwards(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      checkPlacement();
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscape);
+      window.addEventListener("resize", checkPlacement);
+      window.addEventListener("scroll", checkPlacement, true);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", checkPlacement);
+      window.removeEventListener("scroll", checkPlacement, true);
+    };
+  }, [isOpen, checkPlacement]);
+
+  const filteredFiles = useMemo(() => {
+    if (!searchValue || !searchValue.trim()) return files;
+    const q = searchValue.trim().toLowerCase();
+    return files.filter((f) => {
+      const acc = (
+        getDisplayAccountNumber
+          ? getDisplayAccountNumber(f)
+          : String(f?.account_number || "")
+      ).toLowerCase();
+      const sub = (
+        getDisplayAccountSubtitle ? getDisplayAccountSubtitle(f) : ""
+      ).toLowerCase();
+      const orig = String(f?.original_filename || "").toLowerCase();
+      const bank = String(f?.bank_name || "").toLowerCase();
+      return (
+        acc.includes(q) ||
+        sub.includes(q) ||
+        orig.includes(q) ||
+        bank.includes(q)
+      );
+    });
+  }, [files, searchValue, getDisplayAccountNumber, getDisplayAccountSubtitle]);
+
+  return (
+    <div
+      className={`relative flex flex-col gap-1.5 ${isOpen ? "z-40" : "z-10"}`}
+      ref={dropdownRef}
+    >
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-50 text-[11px] font-extrabold text-emerald-700">
+            {stepNumber}
+          </span>
+          {label}
+        </label>
+        {files.length > 0 && (
+          <span className="text-[11px] font-semibold text-slate-500">
+            {selectedCount} of {files.length}
+          </span>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen((prev) => !prev)}
+        disabled={disabled}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+        className={`group flex min-h-[46px] w-full items-center justify-between rounded-xl border px-3.5 py-2 text-left transition-all outline-none ${
+          disabled
+            ? "cursor-not-allowed border-slate-200 bg-slate-50/70 text-slate-400"
+            : isOpen
+            ? "border-emerald-500 bg-white ring-2 ring-emerald-500/20 shadow-sm"
+            : selectedCount > 0
+            ? "border-emerald-300 bg-emerald-50/40 hover:border-emerald-400 hover:bg-emerald-50/70 text-[#172554] shadow-2xs cursor-pointer"
+            : "border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white text-slate-600 shadow-2xs cursor-pointer"
+        }`}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <div
+            className={`flex h-6 w-6 items-center justify-center rounded-lg shrink-0 ${
+              selectedCount > 0
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-slate-200/70 text-slate-500"
+            }`}
+          >
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+              />
+            </svg>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-bold text-[#172554]">
+              {loading
+                ? "Loading statement accounts..."
+                : files.length === 0
+                ? "No accounts available"
+                : selectedCount === 0
+                ? "Select Accounts (0 selected)"
+                : selectedCount === files.length
+                ? `All Accounts Selected (${files.length})`
+                : `Select Accounts (${selectedCount} of ${files.length} selected)`}
+            </p>
+            {files.length > 0 && !loading && (
+              <p className="truncate text-[10px] text-slate-500">
+                {selectedCount === 0
+                  ? "Click to choose account files"
+                  : `${selectedCount} account statement(s) active`}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {selectedCount > 0 && (
+            <span className="inline-flex items-center justify-center rounded-full bg-emerald-100 border border-emerald-200 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
+              {selectedCount}
+            </span>
+          )}
+          <svg
+            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+              isOpen ? "rotate-180 text-emerald-600" : ""
+            }`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
+      </button>
+
+      {/* Dropdown Menu Popover */}
+      {isOpen && !disabled && (
+        <div
+          className={`absolute left-0 z-50 w-full sm:w-[420px] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl shadow-slate-900/15 animate-in fade-in zoom-in-95 duration-150 select-none ${
+            openUpwards ? "bottom-full mb-2" : "top-full mt-2"
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2 px-0.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold text-[#172554] tracking-wide">
+                Bank Accounts
+              </span>
+              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                {files.length} {files.length === 1 ? "account" : "accounts"}
+              </span>
+            </div>
+            <span className="text-xs font-bold text-emerald-700">
+              {selectedCount} of {files.length} selected
+            </span>
+          </div>
+
+          {/* Search Bar */}
+          <div className="mb-2">
+            <div className="relative">
+              <input
+                type="text"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                placeholder="Search account number, bank, or file..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-7 py-1.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <svg
+                className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              {searchValue && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchValue("");
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                  title="Clear search"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Action Toolbar */}
+          <div className="flex items-center justify-between px-1 mb-2 text-[11px]">
+            <span className="text-slate-500 font-medium">
+              Showing {filteredFiles.length} of {files.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectAll();
+                }}
+                disabled={files.length === 0}
+                className="font-bold text-emerald-700 hover:text-emerald-800 hover:underline disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Select All
+              </button>
+              <span className="text-slate-300">&bull;</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClearAll();
+                }}
+                disabled={selectedCount === 0}
+                className="font-semibold text-rose-600 hover:text-rose-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+
+          {/* Master Checkbox Row */}
+          {files.length > 0 && (
+            <div className="px-1 py-1 mb-1.5 border-b border-slate-100 pb-2">
+              <div
+                className="flex items-center justify-between gap-2.5 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer select-none transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isAllSelected) {
+                    onClearAll();
+                  } else {
+                    onSelectAll();
+                  }
+                }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isAllSelected) {
+                        onClearAll();
+                      } else {
+                        onSelectAll();
+                      }
+                    }}
+                    onChange={() => {}}
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 accent-[#059669] focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-800">
+                    Select All Accounts
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {isAllSelected ? "All selected" : `${files.length} available`}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Scrollable Accounts List */}
+          <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+            {filteredFiles.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400 font-medium">
+                {searchValue
+                  ? `No accounts found matching "${searchValue}"`
+                  : "No accounts available"}
+              </div>
+            ) : (
+              filteredFiles.map((file) => {
+                const isChecked = selectedFileIds.some(
+                  (id) => String(id) === String(file.id)
+                );
+                const accNumber = getDisplayAccountNumber(file);
+                const bankSubtitle = getDisplayAccountSubtitle(file);
+                const isMerged = Boolean(
+                  file.is_merged ||
+                    String(file.original_filename || "")
+                      .toLowerCase()
+                      .startsWith("merged_statement")
+                );
+                const statusUpper = String(file.status || "").toUpperCase();
+
+                return (
+                  <div
+                    key={file.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggle(file.id);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === " " || e.key === "Enter") {
+                        e.preventDefault();
+                        onToggle(file.id);
+                      }
+                    }}
+                    className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                      isChecked
+                        ? "bg-emerald-50/80 border-emerald-300 text-emerald-950 shadow-2xs font-medium"
+                        : "hover:bg-slate-50/90 border-slate-100 bg-white text-slate-700 hover:border-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggle(file.id);
+                        }}
+                        onChange={() => {}}
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 accent-[#059669] focus:ring-emerald-500 cursor-pointer"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-[#172554] tracking-tight">
+                            {accNumber}
+                          </span>
+                          {isMerged && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold tracking-wider uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                              MERGED
+                            </span>
+                          )}
+                          {statusUpper === "COMPLETED" && !isMerged && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-teal-50 text-teal-700 border border-teal-200 shrink-0">
+                              COMPLETED
+                            </span>
+                          )}
+                          {statusUpper === "FAILED" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                              FAILED
+                            </span>
+                          )}
+                          {statusUpper !== "COMPLETED" &&
+                            statusUpper !== "FAILED" &&
+                            !isMerged &&
+                            statusUpper && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                                {statusUpper}
+                              </span>
+                            )}
+                        </div>
+                        <div
+                          className="text-[10px] text-slate-500 truncate mt-0.5"
+                          title={bankSubtitle}
+                        >
+                          {bankSubtitle}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 mt-2 px-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClearAll();
+              }}
+              disabled={selectedCount === 0}
+              className="text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              Clear All
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+              }}
+              className="rounded-xl bg-[#059669] hover:bg-[#047857] px-4 py-1.5 text-xs font-bold text-white transition shadow-sm cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CaseFileReport() {
   const navigate = useNavigate();
   const { caseId: paramCaseId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const { user } = useAuth();
+  const userRole = String(user?.role || "").toLowerCase();
+  const isSuperAdmin = userRole === "superadmin" || userRole === "admin";
+  const isClientAdmin = userRole === "client_admin";
 
   // Sequence counters to ignore stale async responses
   const summaryReqIdRef = useRef(0);
@@ -121,16 +938,33 @@ function CaseFileReport() {
   // Track if initial fileId from URL query has been processed for the active case
   const initialUrlFileProcessedRef = useRef(false);
 
-  // Active case state & all cases for switcher
+  // Active case state & all cases for switcher (non-SuperAdmin)
   const [activeCaseId, setActiveCaseId] = useState(paramCaseId || "");
   const [allCases, setAllCases] = useState([]);
   const [loadingAllCases, setLoadingAllCases] = useState(false);
+
+  // Super Admin Cascading State: Client -> User -> Case -> Account
+  const [superAdminClients, setSuperAdminClients] = useState([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [loadingClients, setLoadingClients] = useState(false);
+
+  const [superAdminUsers, setSuperAdminUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  const [superAdminCases, setSuperAdminCases] = useState([]);
+  const [loadingCases, setLoadingCases] = useState(false);
+
+  const clientReqIdRef = useRef(0);
+  const userReqIdRef = useRef(0);
+  const caseReqIdRef = useRef(0);
 
   // Sync activeCaseId if paramCaseId changes (e.g. browser back/forward or route change)
   useEffect(() => {
     if (paramCaseId && String(paramCaseId) !== String(activeCaseId)) {
       setActiveCaseId(paramCaseId);
       setSelectedFileIds([]);
+      setAccountSearchQuery("");
       setSummary(null);
       setTransactions([]);
       setTotalTransactions(0);
@@ -144,8 +978,34 @@ function CaseFileReport() {
     }
   }, [paramCaseId, activeCaseId]);
 
-  // Fetch all cases for the Case Switcher dropdown
+  // Load clients for Super Admin
   useEffect(() => {
+    if (!isSuperAdmin) return;
+    let isMounted = true;
+    async function fetchClients() {
+      try {
+        setLoadingClients(true);
+        const res = await getClients();
+        const list =
+          res?.items || res?.clients || (Array.isArray(res) ? res : []);
+        if (isMounted) {
+          setSuperAdminClients(list);
+        }
+      } catch (err) {
+        console.error("Failed to fetch clients for Super Admin:", err);
+      } finally {
+        if (isMounted) setLoadingClients(false);
+      }
+    }
+    fetchClients();
+    return () => {
+      isMounted = false;
+    };
+  }, [isSuperAdmin]);
+
+  // Fetch all cases for non-SuperAdmin users
+  useEffect(() => {
+    if (isSuperAdmin) return;
     let isMounted = true;
     async function fetchCases() {
       try {
@@ -177,14 +1037,169 @@ function CaseFileReport() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isSuperAdmin, activeCaseId]);
 
-  // Handle Case Switching
+  // Super Admin: Client Selection
+  const handleClientSelect = async (clientId) => {
+    const normClientId = String(clientId || "");
+    if (normClientId === String(selectedClientId)) return;
+
+    clientReqIdRef.current++;
+    userReqIdRef.current++;
+    caseReqIdRef.current++;
+    summaryReqIdRef.current++;
+    txReqIdRef.current++;
+    graphReqIdRef.current++;
+
+    setSelectedClientId(normClientId);
+    setSelectedUserId("");
+    setSuperAdminUsers([]);
+    setActiveCaseId("");
+    setSuperAdminCases([]);
+    setCaseData(null);
+    setFiles([]);
+    setSelectedFileIds([]);
+    setAccountSearchQuery("");
+    setSummary(null);
+    setTransactions([]);
+    setTotalTransactions(0);
+    setTotalPages(0);
+    setGraphTransactions([]);
+    setDynamicModeCounts({});
+    setCaseError("");
+
+    if (!normClientId) return;
+
+    const currentReqId = ++userReqIdRef.current;
+    try {
+      setLoadingUsers(true);
+      const res = await getUsers(normClientId);
+      if (currentReqId !== userReqIdRef.current) return;
+      const rawList =
+        res?.users || res?.items || (Array.isArray(res) ? res : []);
+      setSuperAdminUsers(rawList);
+    } catch (err) {
+      if (currentReqId !== userReqIdRef.current) return;
+      console.error("Failed to load users for client:", err);
+    } finally {
+      if (currentReqId === userReqIdRef.current) {
+        setLoadingUsers(false);
+      }
+    }
+  };
+
+  // Super Admin: User Selection
+  const handleUserSelect = async (userId) => {
+    const normUserId = String(userId || "");
+    if (normUserId === String(selectedUserId)) return;
+
+    userReqIdRef.current++;
+    caseReqIdRef.current++;
+    summaryReqIdRef.current++;
+    txReqIdRef.current++;
+    graphReqIdRef.current++;
+
+    setSelectedUserId(normUserId);
+    setActiveCaseId("");
+    setSuperAdminCases([]);
+    setCaseData(null);
+    setFiles([]);
+    setSelectedFileIds([]);
+    setAccountSearchQuery("");
+    setSummary(null);
+    setTransactions([]);
+    setTotalTransactions(0);
+    setTotalPages(0);
+    setGraphTransactions([]);
+    setDynamicModeCounts({});
+    setCaseError("");
+
+    if (!normUserId) return;
+
+    const currentReqId = ++caseReqIdRef.current;
+    try {
+      setLoadingCases(true);
+      const res = await getCases(normUserId);
+      if (currentReqId !== caseReqIdRef.current) return;
+      const rawList = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res)
+        ? res
+        : [];
+      setSuperAdminCases(rawList);
+    } catch (err) {
+      if (currentReqId !== caseReqIdRef.current) return;
+      console.error("Failed to load cases for user:", err);
+    } finally {
+      if (currentReqId === caseReqIdRef.current) {
+        setLoadingCases(false);
+      }
+    }
+  };
+
+  // Super Admin / Shared: Case Selection
+  const handleCaseSelect = (caseId) => {
+    const normCaseId = String(caseId || "");
+    if (normCaseId === String(activeCaseId)) return;
+
+    caseReqIdRef.current++;
+    summaryReqIdRef.current++;
+    txReqIdRef.current++;
+    graphReqIdRef.current++;
+
+    setActiveCaseId(normCaseId);
+    setSelectedFileIds([]);
+    setAccountSearchQuery("");
+    setSummary(null);
+    setTransactions([]);
+    setTotalTransactions(0);
+    setTotalPages(0);
+    setGraphTransactions([]);
+    setDynamicModeCounts({});
+    setCaseError("");
+    initialUrlFileProcessedRef.current = false;
+
+    if (normCaseId) {
+      navigate(`/dashboard/cases/${normCaseId}/reports/file-statement`);
+    } else {
+      navigate(`/dashboard/reports/file-statement`);
+    }
+  };
+
+  // Reset Cascading Scope for Super Admin
+  const handleResetCascadingSelection = () => {
+    clientReqIdRef.current++;
+    userReqIdRef.current++;
+    caseReqIdRef.current++;
+    summaryReqIdRef.current++;
+    txReqIdRef.current++;
+    graphReqIdRef.current++;
+
+    setSelectedClientId("");
+    setSelectedUserId("");
+    setSuperAdminUsers([]);
+    setActiveCaseId("");
+    setSuperAdminCases([]);
+    setCaseData(null);
+    setFiles([]);
+    setSelectedFileIds([]);
+    setAccountSearchQuery("");
+    setSummary(null);
+    setTransactions([]);
+    setTotalTransactions(0);
+    setTotalPages(0);
+    setGraphTransactions([]);
+    setDynamicModeCounts({});
+    setCaseError("");
+    setSearchParams({}, { replace: true });
+    navigate(`/dashboard/reports/file-statement`, { replace: true });
+  };
+
+  // Handle Case Switching for non-SuperAdmin
   const handleSwitchCase = (newCaseId) => {
     if (!newCaseId || String(newCaseId) === String(activeCaseId)) return;
     setActiveCaseId(newCaseId);
     setSelectedFileIds([]);
-    setIsFileDropdownOpen(false);
     setAccountSearchQuery("");
     setSummary(null);
     setTransactions([]);
@@ -200,93 +1215,85 @@ function CaseFileReport() {
     navigate(`/dashboard/cases/${newCaseId}/reports/file-statement`);
   };
 
+  // Memoized options for cascading dropdowns
+  const selectedClientObj = useMemo(() => {
+    return (superAdminClients || []).find(
+      (c) => String(c.id) === String(selectedClientId)
+    );
+  }, [superAdminClients, selectedClientId]);
+
+  const selectedUserObj = useMemo(() => {
+    return (superAdminUsers || []).find(
+      (u) => String(u.id) === String(selectedUserId)
+    );
+  }, [superAdminUsers, selectedUserId]);
+
+  const clientOptions = useMemo(() => {
+    return (superAdminClients || []).map((client) => ({
+      id: client.id,
+      label: client.name || "Unnamed Client",
+      subtitle: client.company_code
+        ? `Code: ${client.company_code}`
+        : `Client ID #${client.id}`,
+      badge: client.is_active ? "ACTIVE" : "INACTIVE",
+      badgeColor: client.is_active ? "emerald" : "red",
+      avatar: (client.name || "C").charAt(0).toUpperCase(),
+      searchKey: `${client.name || ""} ${client.company_code || ""}`,
+    }));
+  }, [superAdminClients]);
+
+  const userOptions = useMemo(() => {
+    const clientName = selectedClientObj?.name || "Client";
+    return (superAdminUsers || []).map((u) => ({
+      id: u.id,
+      label: `${u.username} (${clientName})`,
+      subtitle: u.email || `${u.role || "User"}`,
+      badge: u.role ? String(u.role).toUpperCase() : undefined,
+      avatar: (u.username || "U").charAt(0).toUpperCase(),
+      searchKey: `${u.username || ""} ${u.email || ""}`,
+    }));
+  }, [superAdminUsers, selectedClientObj]);
+
+  const caseOptions = useMemo(() => {
+    return (superAdminCases || []).map((c) => {
+      const ioName =
+        c.io?.officer_name ||
+        c.io?.name ||
+        (c.io_id ? `IO #${c.io_id}` : null);
+      const statusText = c.status || "DRAFT";
+      const subtitleParts = [];
+      subtitleParts.push(`Status: ${statusText}`);
+      if (ioName) {
+        subtitleParts.push(`IO: ${ioName}`);
+      }
+      return {
+        id: c.id,
+        label: `${c.case_name || "Untitled Case"} — ${
+          c.case_number || `ID #${c.id}`
+        }`,
+        subtitle: subtitleParts.join(" • "),
+        badge: statusText,
+        badgeColor:
+          statusText === "ACTIVE" || statusText === "COMPLETED"
+            ? "emerald"
+            : "slate",
+        avatar: "📁",
+        searchKey: `${c.case_name || ""} ${c.case_number || ""} ${statusText} ${
+          ioName || ""
+        }`,
+      };
+    });
+  }, [superAdminCases]);
+
   // Case & Files state
   const [caseData, setCaseData] = useState(null);
   const [files, setFiles] = useState([]);
-  const [isCaseLoading, setIsCaseLoading] = useState(true);
+  const [isCaseLoading, setIsCaseLoading] = useState(Boolean(activeCaseId));
   const [caseError, setCaseError] = useState("");
 
   // Selected files - default empty so user picks single or multiple files manually
   const [selectedFileIds, setSelectedFileIds] = useState([]);
-  const [isFileDropdownOpen, setIsFileDropdownOpen] = useState(false);
   const [accountSearchQuery, setAccountSearchQuery] = useState("");
-  const [dropdownCoords, setDropdownCoords] = useState({ top: 0, left: 0, width: 440 });
-  const fileDropdownRef = useRef(null);
-  const popoverRef = useRef(null);
-
-  // Dynamically calculate and clamp dropdown position for viewport safety
-  const updateDropdownPosition = useCallback(() => {
-    if (!fileDropdownRef.current) return;
-    const rect = fileDropdownRef.current.getBoundingClientRect();
-
-    const maxAvailableWidth = window.innerWidth - 32;
-    const popoverWidth = Math.min(440, Math.max(300, maxAvailableWidth));
-
-    let left = rect.left;
-    if (left + popoverWidth > window.innerWidth - 16) {
-      left = window.innerWidth - popoverWidth - 16;
-    }
-    if (left < 16) {
-      left = 16;
-    }
-
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const estimatedHeight = 390;
-
-    let top = rect.bottom + 6;
-    if (spaceBelow < 260 && spaceAbove > spaceBelow) {
-      top = Math.max(16, rect.top - estimatedHeight - 6);
-    }
-
-    setDropdownCoords({
-      top: Math.round(top),
-      left: Math.round(left),
-      width: Math.round(popoverWidth),
-    });
-  }, []);
-
-  // Update position on open, resize, or scroll
-  useEffect(() => {
-    if (!isFileDropdownOpen) return;
-    updateDropdownPosition();
-
-    const handleUpdate = () => {
-      updateDropdownPosition();
-    };
-
-    window.addEventListener("resize", handleUpdate);
-    window.addEventListener("scroll", handleUpdate, true);
-    return () => {
-      window.removeEventListener("resize", handleUpdate);
-      window.removeEventListener("scroll", handleUpdate, true);
-    };
-  }, [isFileDropdownOpen, updateDropdownPosition]);
-
-  // Close file dropdown on outside click or Escape key (portal-safe)
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (
-        fileDropdownRef.current &&
-        !fileDropdownRef.current.contains(event.target) &&
-        popoverRef.current &&
-        !popoverRef.current.contains(event.target)
-      ) {
-        setIsFileDropdownOpen(false);
-      }
-    }
-    function handleEscape(event) {
-      if (event.key === "Escape") {
-        setIsFileDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
 
   // O(1) file lookup map for instantaneous lookups with zero freeze/hang
   const fileMap = useMemo(() => {
@@ -297,12 +1304,16 @@ function CaseFileReport() {
 
   // Filtered files for the dropdown search (preserves active selections)
   const filteredDropdownFiles = useMemo(() => {
-    if (!accountSearchQuery.trim()) return files || [];
+    if (!accountSearchQuery || !accountSearchQuery.trim()) return files || [];
     const q = accountSearchQuery.trim().toLowerCase();
     return (files || []).filter((f) => {
-      const accNo = getDisplayAccountNumber(f).toLowerCase();
-      const bank = String(f.bank_name || "").toLowerCase();
-      const orig = String(f.original_filename || "").toLowerCase();
+      const accNo = (
+        getDisplayAccountNumber
+          ? getDisplayAccountNumber(f)
+          : String(f?.account_number || "")
+      ).toLowerCase();
+      const bank = String(f?.bank_name || "").toLowerCase();
+      const orig = String(f?.original_filename || "").toLowerCase();
       return accNo.includes(q) || bank.includes(q) || orig.includes(q);
     });
   }, [files, accountSearchQuery]);
@@ -539,6 +1550,35 @@ function CaseFileReport() {
 
       setCaseData(loadedCase);
       setFiles(loadedFiles);
+
+      // If Super Admin and client/user not set yet (e.g. direct URL navigation), sync them!
+      if (isSuperAdmin && loadedCase) {
+        const cId = loadedCase.client_id || loadedCase.client?.id;
+        const uId = loadedCase.created_by || loadedCase.assigned_to;
+        if (cId && !selectedClientId) {
+          setSelectedClientId(String(cId));
+          getUsers(cId)
+            .then((res) => {
+              const uList =
+                res?.users || res?.items || (Array.isArray(res) ? res : []);
+              setSuperAdminUsers(uList);
+            })
+            .catch(() => {});
+        }
+        if (uId && !selectedUserId) {
+          setSelectedUserId(String(uId));
+          getCases(uId)
+            .then((res) => {
+              const cList = Array.isArray(res?.data)
+                ? res.data
+                : Array.isArray(res)
+                ? res
+                : [];
+              setSuperAdminCases(cList);
+            })
+            .catch(() => {});
+        }
+      }
 
       // Handle initial URL fileId query parameter only once per case load
       if (!initialUrlFileProcessedRef.current) {
@@ -1558,26 +2598,78 @@ function CaseFileReport() {
                 </h1>
               </div>
 
-              {/* Case Name & IO Name Display */}
+              {/* Context Badges (Client, User, Case, IO) */}
               <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+                {isSuperAdmin && selectedClientObj && (
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50/80 px-3.5 py-1.5 text-xs font-bold text-purple-900 shadow-2xs">
+                    <span className="text-purple-700 font-semibold text-[11px] uppercase tracking-wider">
+                      Client:
+                    </span>
+                    <span className="text-[#172554]">{selectedClientObj.name}</span>
+                  </div>
+                )}
+
+                {isSuperAdmin && selectedUserObj && (
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-1.5 text-xs font-bold text-blue-900 shadow-2xs">
+                    <span className="text-blue-700 font-semibold text-[11px] uppercase tracking-wider">
+                      User:
+                    </span>
+                    <span className="text-[#172554]">{selectedUserObj.username}</span>
+                  </div>
+                )}
+
                 {/* Case Name Badge */}
                 <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-1.5 text-xs font-bold text-emerald-900 shadow-2xs">
-                  <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  <svg
+                    className="h-4 w-4 text-emerald-600 shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                    />
                   </svg>
-                  <span className="text-emerald-700 font-semibold text-[11px] uppercase tracking-wider">Case:</span>
-                  <span className="text-[#172554]">{caseData?.case_name ? caseData.case_name : (activeCaseId ? "Loading..." : "Please Select a Case")}</span>
+                  <span className="text-emerald-700 font-semibold text-[11px] uppercase tracking-wider">
+                    Case:
+                  </span>
+                  <span className="text-[#172554]">
+                    {caseData?.case_name
+                      ? caseData.case_name
+                      : activeCaseId
+                      ? "Loading..."
+                      : "Please Select a Case"}
+                  </span>
                 </div>
 
                 {/* IO Name Badge */}
                 <div className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/80 px-3.5 py-1.5 text-xs font-bold text-sky-900 shadow-2xs">
-                  <svg className="h-4 w-4 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <svg
+                    className="h-4 w-4 text-sky-600 shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
                   </svg>
-                  <span className="text-sky-700 font-semibold text-[11px] uppercase tracking-wider">IO:</span>
+                  <span className="text-sky-700 font-semibold text-[11px] uppercase tracking-wider">
+                    IO:
+                  </span>
                   <span className="text-[#172554]">
                     {caseData?.io?.officer_name
-                      ? `${caseData.io.officer_name}${caseData.io.designation ? ` (${caseData.io.designation})` : ""}`
+                      ? `${caseData.io.officer_name}${
+                          caseData.io.designation
+                            ? ` (${caseData.io.designation})`
+                            : ""
+                        }`
                       : "Not Assigned"}
                   </span>
                 </div>
@@ -1591,8 +2683,18 @@ function CaseFileReport() {
                 onClick={() => window.print()}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 active:scale-95 cursor-pointer"
               >
-                <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                <svg
+                  className="h-4 w-4 text-slate-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                  />
                 </svg>
                 Print Report
               </button>
@@ -1601,11 +2703,11 @@ function CaseFileReport() {
                 type="button"
                 onClick={handleExportCSV}
                 disabled={
-  isExportingCSV ||
-  selectedFileIds.length === 0 ||
-  totalTransactions === 0
-}
-className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#059669] px-4 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-900/10 transition hover:bg-[#047857] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                  isExportingCSV ||
+                  selectedFileIds.length === 0 ||
+                  totalTransactions === 0
+                }
+                className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#059669] px-4 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-900/10 transition hover:bg-[#047857] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                 title="Export All Filtered Transactions across all pages to CSV"
               >
                 {isExportingCSV ? (
@@ -1615,8 +2717,18 @@ className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-now
                   </>
                 ) : (
                   <>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
                     <span>Export CSV</span>
                   </>
@@ -1625,109 +2737,35 @@ className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-now
             </div>
           </div>
 
-          {/* Quick Case Switcher & File Dropdown Row */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-sm shadow-slate-900/5 relative z-30">
-            <div className="flex flex-wrap items-center gap-3">
-              <label htmlFor="case-select-dropdown" className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-                <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                </svg>
-                Select / Switch Case:
-              </label>
-
-              {/* Case Select Dropdown */}
-              <div className="relative min-w-[240px] sm:min-w-[300px]">
-                <select
-                  id="case-select-dropdown"
-                  value={activeCaseId || ""}
-                  onChange={(e) => handleSwitchCase(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2 pr-9 text-xs font-bold text-[#172554] shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition cursor-pointer"
-                >
-                  <option value="" disabled>-- Choose a Case --</option>
-                  {allCases.map((c) => (
-                    <option key={c.id} value={c.id} className="bg-white text-slate-800">
-                      {c.case_name || "Untitled Case"}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Compact Checkbox Dropdown for Accounts - Immediately to the right on same row */}
-              <div className="relative" ref={fileDropdownRef}>
-                <button
-                  type="button"
-                  id="file-select-dropdown-button"
-                  onClick={() => {
-                    if (!isFileDropdownOpen) {
-                      updateDropdownPosition();
-                    }
-                    setIsFileDropdownOpen((prev) => !prev);
-                  }}
-                  disabled={!activeCaseId || isCaseLoading || files.length === 0}
-                  aria-haspopup="true"
-                  aria-expanded={isFileDropdownOpen}
-                  className={`
-                    inline-flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-2xs min-w-[240px] sm:min-w-[300px]
-                    ${
-                      isFileDropdownOpen
-                        ? "border-emerald-500 bg-white text-emerald-900 ring-2 ring-emerald-500/20"
-                        : selectedCount > 0
-                        ? "border-emerald-300 bg-emerald-50/50 text-[#172554] hover:border-emerald-400 hover:bg-emerald-50/80"
-                        : "border-slate-300 bg-slate-50/70 text-slate-600 hover:bg-slate-100/70"
-                    }
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                  `}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className={`flex h-6 w-6 items-center justify-center rounded-lg shrink-0 ${
-                        selectedCount > 0
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-200/70 text-slate-500"
-                      }`}
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                        />
-                      </svg>
-                    </div>
-                    <span className="truncate font-bold">
-                      {isCaseLoading
-                        ? "Loading statement accounts..."
-                        : files.length === 0
-                        ? "No accounts available"
-                        : selectedCount === 0
-                        ? "Select Accounts (0 selected)"
-                        : selectedCount === files.length
-                        ? `All Accounts Selected (${files.length})`
-                        : `Select Accounts (${selectedCount} of ${files.length} selected)`}
-                    </span>
+          {/* ========================================================= */}
+          {/* SUPER ADMIN: Cascading Client -> User -> Case -> Accounts */}
+          {/* ========================================================= */}
+          {isSuperAdmin ? (
+            <section className="relative z-30 rounded-2xl border border-[#E2E8F0] bg-white/95 p-5 shadow-[0_8px_30px_rgba(23,37,84,0.06)] backdrop-blur-sm sm:p-6">
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-5 w-1 rounded-full bg-emerald-500" />
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
+                      Tenant-Aware Cascading Scope
+                    </p>
                   </div>
+                  <h2 className="mt-1 text-xl font-bold text-[#172554]">
+                    Select Client, User, Case & Accounts
+                  </h2>
+                  <p className="mt-1 text-sm text-[#64748B]">
+                    Follow the 4-step sequence to scope and analyze bank statement transactions.
+                  </p>
+                </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {selectedCount > 0 && (
-                      <span className="inline-flex items-center justify-center rounded-full bg-emerald-100 border border-emerald-200 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800">
-                        {selectedCount}
-                      </span>
-                    )}
+                {(selectedClientId || selectedUserId || activeCaseId) && (
+                  <button
+                    type="button"
+                    onClick={handleResetCascadingSelection}
+                    className="inline-flex items-center gap-1.5 self-start rounded-xl border border-[#DCE5EF] bg-white px-3 py-1.5 text-xs font-semibold text-[#64748B] transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 sm:self-center cursor-pointer"
+                  >
                     <svg
-                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                        isFileDropdownOpen ? "rotate-180 text-emerald-600" : ""
-                      }`}
+                      className="h-3.5 w-3.5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -1735,322 +2773,214 @@ className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-now
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth="2.5"
-                        d="M19 9l-7 7-7-7"
+                        strokeWidth="2"
+                        d="M6 18L18 6M6 6l12 12"
                       />
                     </svg>
-                  </div>
-                </button>
-
-                {/* Dropdown Menu Popup rendered via Portal to completely escape stacking contexts & clipping */}
-                {isFileDropdownOpen &&
-                  typeof document !== "undefined" &&
-                  createPortal(
-                    <div
-                      ref={popoverRef}
-                      style={{
-                        position: "fixed",
-                        top: `${dropdownCoords.top}px`,
-                        left: `${dropdownCoords.left}px`,
-                        width: `${dropdownCoords.width}px`,
-                        zIndex: 9999,
-                        backgroundColor: "#ffffff",
-                      }}
-                      className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl shadow-slate-900/20 animate-in fade-in zoom-in-95 duration-150 select-none"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* Dropdown Header with Search & Counts */}
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2.5 px-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-extrabold text-[#172554] tracking-wide">
-                            Bank Accounts
-                          </span>
-                          <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                            {files.length} {files.length === 1 ? "account" : "accounts"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs font-bold">
-                          <span className="text-emerald-700">
-                            {selectedCount} selected
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Search Bar & Quick Toggles */}
-                      <div className="space-y-2 mb-2.5">
-                        <div className="relative">
-                          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                            <svg
-                              className="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                              />
-                            </svg>
-                          </div>
-                          <input
-                            type="text"
-                            value={accountSearchQuery}
-                            onChange={(e) => setAccountSearchQuery(e.target.value)}
-                            placeholder="Search account number, bank, or filename..."
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-8 pr-7 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          {accountSearchQuery && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAccountSearchQuery("");
-                              }}
-                              className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
-                              title="Clear search"
-                            >
-                              &times;
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between px-1 text-[11px]">
-                          <span className="text-slate-500 font-medium">
-                            Showing {filteredDropdownFiles.length} of {files.length}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSelectAllFiles();
-                              }}
-                              disabled={files.length === 0}
-                              className="font-bold text-emerald-700 hover:text-emerald-800 hover:underline disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                            >
-                              Select All
-                            </button>
-                            <span className="text-slate-300">&bull;</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeselectAllFiles();
-                              }}
-                              disabled={selectedCount === 0}
-                              className="font-semibold text-rose-600 hover:text-rose-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                            >
-                              Clear All
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Select All Row */}
-                      {files.length > 0 && !isCaseLoading && !caseError && (
-                        <div className="px-1 py-1 mb-1.5 border-b border-slate-100 pb-2">
-                          <div
-                            className="flex items-center justify-between gap-2.5 rounded-lg px-2 py-1.5 hover:bg-slate-50 cursor-pointer select-none transition"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleSelectAll();
-                            }}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <input
-                                type="checkbox"
-                                checked={isAllSelected}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleSelectAll();
-                                }}
-                                onChange={() => {}}
-                                className="h-4 w-4 rounded border-slate-300 text-emerald-600 accent-[#059669] focus:ring-emerald-500 cursor-pointer"
-                              />
-                              <span className="text-xs font-bold text-slate-800">
-                                Select All Accounts
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-slate-500 font-medium">
-                              {isAllSelected
-                                ? "All selected"
-                                : `${files.length} available`}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Scrollable Accounts List */}
-                      <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
-                        {isCaseLoading ? (
-                          <div className="flex items-center justify-center gap-2 py-6 text-xs text-slate-500">
-                            <span className="h-4 w-4 animate-spin rounded-full border border-emerald-500 border-t-transparent" />
-                            Loading accounts...
-                          </div>
-                        ) : caseError ? (
-                          <div className="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700 font-medium">
-                            {caseError}
-                          </div>
-                        ) : filteredDropdownFiles.length === 0 ? (
-                          <div className="py-6 text-center text-xs text-slate-400 font-medium">
-                            {accountSearchQuery
-                              ? `No accounts found matching "${accountSearchQuery}"`
-                              : "No accounts available"}
-                          </div>
-                        ) : (
-                          filteredDropdownFiles.map((file) => {
-                            const isChecked = selectedFileIds.some(
-                              (id) => String(id) === String(file.id)
-                            );
-                            const accNumber = getDisplayAccountNumber(file);
-                            const bankSubtitle = getDisplayBankSubtitle(file);
-                            const isMerged = Boolean(
-                              file.is_merged ||
-                              String(file.original_filename || "").toLowerCase().startsWith("merged_statement")
-                            );
-                            const statusUpper = String(file.status || "").toUpperCase();
-
-                            return (
-                              <div
-                                key={file.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectFile(file.id);
-                                }}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                  if (e.key === " " || e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleSelectFile(file.id);
-                                  }
-                                }}
-                                className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
-                                  isChecked
-                                    ? "bg-emerald-50/80 border-emerald-300 text-emerald-950 shadow-2xs font-medium"
-                                    : "hover:bg-slate-50/90 border-slate-100 bg-white text-slate-700 hover:border-slate-200"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSelectFile(file.id);
-                                    }}
-                                    onChange={() => {}}
-                                    className="h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 accent-[#059669] focus:ring-emerald-500 cursor-pointer"
-                                  />
-
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono text-xs font-bold text-[#172554] tracking-tight">
-                                        {accNumber}
-                                      </span>
-                                      {isMerged && (
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold tracking-wider uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
-                                          MERGED
-                                        </span>
-                                      )}
-                                      {statusUpper === "COMPLETED" && !isMerged && (
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-teal-50 text-teal-700 border border-teal-200 shrink-0">
-                                          COMPLETED
-                                        </span>
-                                      )}
-                                      {statusUpper === "FAILED" && (
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
-                                          FAILED
-                                        </span>
-                                      )}
-                                      {statusUpper !== "COMPLETED" && statusUpper !== "FAILED" && !isMerged && statusUpper && (
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
-                                          {statusUpper}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div
-                                      className="text-[10px] text-slate-500 truncate mt-0.5"
-                                      title={bankSubtitle}
-                                    >
-                                      {bankSubtitle}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-
-                      {/* Footer Actions: Clear All & Done */}
-                      <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 mt-2 px-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeselectAllFiles();
-                          }}
-                          disabled={selectedCount === 0}
-                          className="text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-                        >
-                          Clear All
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsFileDropdownOpen(false);
-                          }}
-                          className="rounded-xl bg-[#059669] hover:bg-[#047857] px-4 py-1.5 text-xs font-bold text-white transition shadow-sm cursor-pointer"
-                        >
-                          Done
-                        </button>
-                      </div>
-                    </div>,
-                    document.body
-                  )}
+                    Reset Selection
+                  </button>
+                )}
               </div>
 
-              {loadingAllCases && (
-                <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                  <span className="h-3 w-3 animate-spin rounded-full border border-emerald-500 border-t-transparent" />
-                  Loading cases...
-                </span>
-              )}
-            </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Step 1: Select Client */}
+                <SearchableDropdown
+                  stepNumber={1}
+                  label="Select Client"
+                  value={selectedClientId}
+                  options={clientOptions}
+                  onSelect={handleClientSelect}
+                  placeholder="Choose a client company..."
+                  searchPlaceholder="Search client by name or code..."
+                  loading={loadingClients}
+                  disabled={loadingClients}
+                  emptyMessage="No client companies found"
+                  badgeColor="emerald"
+                />
 
-            <div className="text-xs font-medium text-slate-500">
-              Total Cases: <span className="font-extrabold text-[#172554]">{allCases.length}</span>
+                {/* Step 2: Select User */}
+                <SearchableDropdown
+                  stepNumber={2}
+                  label="Select User"
+                  value={selectedUserId}
+                  options={userOptions}
+                  onSelect={handleUserSelect}
+                  placeholder={
+                    !selectedClientId
+                      ? "Select a client first"
+                      : "Choose a user..."
+                  }
+                  searchPlaceholder="Search user by username or email..."
+                  loading={loadingUsers}
+                  disabled={!selectedClientId || loadingUsers}
+                  emptyMessage={
+                    !selectedClientId
+                      ? "Select a client first"
+                      : "No users found for this client"
+                  }
+                  badgeColor="blue"
+                />
+
+                {/* Step 3: Select Case */}
+                <SearchableDropdown
+                  stepNumber={3}
+                  label="Select Case"
+                  value={activeCaseId}
+                  options={caseOptions}
+                  onSelect={handleCaseSelect}
+                  placeholder={
+                    !selectedUserId
+                      ? "Select a user first"
+                      : "Choose an investigation case..."
+                  }
+                  searchPlaceholder="Search case by name or number..."
+                  loading={loadingCases}
+                  disabled={!selectedUserId || loadingCases}
+                  emptyMessage={
+                    !selectedUserId
+                      ? "Select a user first"
+                      : "No cases found for this user"
+                  }
+                  badgeColor="emerald"
+                />
+
+                {/* Step 4: Select Accounts */}
+                <SearchableAccountMultiSelect
+                  stepNumber={4}
+                  label="Select Accounts"
+                  files={files}
+                  selectedFileIds={selectedFileIds}
+                  onToggle={handleSelectFile}
+                  onSelectAll={handleSelectAllFiles}
+                  onClearAll={handleDeselectAllFiles}
+                  disabled={
+                    !activeCaseId || isCaseLoading || files.length === 0
+                  }
+                  loading={isCaseLoading}
+                  getDisplayAccountNumber={getDisplayAccountNumber}
+                  getDisplayAccountSubtitle={getDisplayBankSubtitle}
+                  accountSearchQuery={accountSearchQuery}
+                  setAccountSearchQuery={setAccountSearchQuery}
+                />
+              </div>
+            </section>
+          ) : (
+            /* ========================================================= */
+            /* NON-SUPERADMIN: Quick Case Switcher & Upgraded Accounts   */
+            /* ========================================================= */
+            <div className="relative z-30 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm shadow-slate-900/5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <SearchableDropdown
+                  stepNumber={1}
+                  label="Select / Switch Case"
+                  value={activeCaseId}
+                  options={allCases.map((c) => ({
+                    id: c.id,
+                    label: `${c.case_name || "Untitled Case"} — ${
+                    c.case_number || `ID #${c.id}`
+                    }`,
+                    subtitle: `Status: ${c.status || "DRAFT"} • IO: ${
+                      c.io?.officer_name || c.io?.name || "Not Assigned"
+                    }`,
+                    badge: c.status || "DRAFT",
+                    avatar: "📁",
+                    searchKey: `${c.case_name || ""} ${c.case_number || ""}`,
+                  }))}
+                  onSelect={handleSwitchCase}
+                  placeholder="Choose an investigation case..."
+                  searchPlaceholder="Search case..."
+                  loading={loadingAllCases}
+                  disabled={loadingAllCases}
+                  emptyMessage="No cases available"
+                  badgeColor="emerald"
+                />
+
+                <SearchableAccountMultiSelect
+                  stepNumber={2}
+                  label="Select Accounts"
+                  files={files}
+                  selectedFileIds={selectedFileIds}
+                  onToggle={handleSelectFile}
+                  onSelectAll={handleSelectAllFiles}
+                  onClearAll={handleDeselectAllFiles}
+                  disabled={
+                    !activeCaseId || isCaseLoading || files.length === 0
+                  }
+                  loading={isCaseLoading}
+                  getDisplayAccountNumber={getDisplayAccountNumber}
+                  getDisplayAccountSubtitle={getDisplayBankSubtitle}
+                  accountSearchQuery={accountSearchQuery}
+                  setAccountSearchQuery={setAccountSearchQuery}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
+        {/* ========================================================= */}
+        {/* EMPTY, LOADING & PROMPT STATES                            */}
+        {/* ========================================================= */}
+
+        {/* Prompt state: Super Admin has not selected a case yet */}
+        {isSuperAdmin && !activeCaseId && (
+          <div className="relative z-10 mt-8 rounded-2xl border border-dashed border-[#CBD5E1] bg-white/80 p-10 text-center shadow-sm backdrop-blur-sm sm:p-14">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-8 ring-emerald-50/50">
+              <svg
+                className="h-8 w-8"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+            </div>
+            <h3 className="mt-4 text-lg font-bold text-[#172554]">
+              Select Client, User & Case to View Report
+            </h3>
+            <p className="mt-2 text-sm text-[#64748B] max-w-md mx-auto leading-relaxed">
+              Please select a client company, user, and investigation case from the cascading dropdowns above to begin financial statement analysis.
+            </p>
+          </div>
+        )}
+
         {/* Loading state for case files */}
-        {isCaseLoading && (
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 py-16 text-slate-500">
+        {activeCaseId && isCaseLoading && (
+          <div className="relative z-10 mt-8 flex flex-col items-center justify-center gap-3 py-16 text-slate-500">
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-            <p className="text-xs font-semibold">Loading case statements & transactions...</p>
+            <p className="text-xs font-semibold">
+              Loading case statements & transactions...
+            </p>
           </div>
         )}
 
         {/* Case Error State */}
-        {!isCaseLoading && caseError && (
-          <div className="mt-8 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center shadow-sm">
+        {activeCaseId && !isCaseLoading && caseError && (
+          <div className="relative z-10 mt-8 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center shadow-sm">
             <p className="text-sm font-bold text-rose-700">{caseError}</p>
           </div>
         )}
 
         {/* Empty state: No files uploaded to case */}
-        {!isCaseLoading && !caseError && files.length === 0 && (
-          <div className="mt-8 rounded-2xl border-2 border-dashed border-slate-200 bg-white p-10 text-center shadow-sm">
+        {activeCaseId && !isCaseLoading && !caseError && files.length === 0 && (
+          <div className="relative z-10 mt-8 rounded-2xl border-2 border-dashed border-slate-200 bg-white p-10 text-center shadow-sm">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-400">
-              <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg
+                className="h-7 w-7"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                  d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
             </div>
             <h3 className="mt-4 text-base font-extrabold text-[#172554]">
@@ -2074,30 +3004,43 @@ className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-now
         )}
 
         {/* Empty state: Case has files, but none selected */}
-        {!isCaseLoading && files.length > 0 && selectedFilesData.length === 0 && (
-          <div className="mt-8 rounded-2xl border-2 border-dashed border-emerald-200 bg-emerald-50/30 p-10 sm:p-14 text-center shadow-sm">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-200 bg-white text-emerald-600 shadow-sm">
-              <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+        {activeCaseId &&
+          !isCaseLoading &&
+          files.length > 0 &&
+          selectedFileIds.length === 0 && (
+            <div className="relative z-10 mt-8 rounded-2xl border-2 border-dashed border-emerald-200 bg-emerald-50/30 p-10 sm:p-14 text-center shadow-sm">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-200 bg-white text-emerald-600 shadow-sm">
+                <svg
+                  className="h-7 w-7"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-base font-extrabold text-[#172554]">
+                No Statement File Selected
+              </h3>
+              <p className="mt-1.5 text-xs text-[#64748B] max-w-md mx-auto leading-relaxed">
+                Please select one or more account files above to view the financial statement summary and transaction analysis.
+              </p>
+              <div className="mt-5 flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSelectAllFiles}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#059669] hover:bg-[#047857] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition active:scale-95 cursor-pointer"
+                >
+                  Select All {files.length} Accounts
+                </button>
+              </div>
             </div>
-            <h3 className="mt-4 text-base font-extrabold text-[#172554]">
-              No Statement File Selected
-            </h3>
-            <p className="mt-1.5 text-xs text-[#64748B] max-w-md mx-auto leading-relaxed">
-              Please select one or more statement files from the dropdown above to view combined report summary, filtered transactions, and analytics.
-            </p>
-            <div className="mt-5 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={handleSelectAllFiles}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#059669] hover:bg-[#047857] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition active:scale-95 cursor-pointer"
-              >
-                Select All {files.length} Files
-              </button>
-            </div>
-          </div>
-        )}
+          )}
 
         {/* ===================================================
             FILE REPORT SUMMARY CARDS (Enhanced Executive Dashboard)

@@ -98,6 +98,14 @@ class User(Base):
         lazy="joined",
     )
 
+    @property
+    def client_name(self) -> str | None:
+        return self.client.name if self.client else None
+
+    @property
+    def company_code(self) -> str | None:
+        return self.client.company_code if self.client else None
+
 
 # Register related model
 import app.user.user_permission_model  # noqa: E402, F401

@@ -199,13 +199,13 @@ function CaseCard({ caseData, onOpen, isClientAdmin, isSuperAdmin }) {
           </div>
         </div>
 
-        {/* Case Client Company for superadmin */}
+        {/* Client Company */}
         {(isSuperAdmin || caseData?.client || caseData?.client_name) && (
           <div className="mt-4 border-t border-slate-200 pt-4">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-blue-500" />
               <p className="text-[9px] font-extrabold uppercase tracking-[0.15em] text-blue-700">
-                {isSuperAdmin ? "Case Client Company" : "Client Company"}
+                Client Company
               </p>
             </div>
 
@@ -312,74 +312,6 @@ function CaseCard({ caseData, onOpen, isClientAdmin, isSuperAdmin }) {
                       </p>
                     )}
                   </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* Case Owner's Client Company for superadmin */}
-        {isSuperAdmin && (
-          <div className="mt-4 border-t border-slate-200 pt-4">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-teal-500" />
-              <p className="text-[9px] font-extrabold uppercase tracking-[0.15em] text-teal-700">
-                Case Owner&apos;s Client Company
-              </p>
-            </div>
-
-            {(() => {
-              const ownerCompanyName =
-                caseData?.owner_client?.name ||
-                caseData?.owner_client_name ||
-                caseData?.creator?.client?.name ||
-                null;
-              const ownerCompanyCode =
-                caseData?.owner_client?.company_code ||
-                caseData?.owner_company_code ||
-                caseData?.creator?.client?.company_code ||
-                null;
-              const ownerClientId =
-                caseData?.owner_client?.id ||
-                caseData?.owner_client_id ||
-                caseData?.creator?.client_id ||
-                null;
-
-              if (!ownerCompanyName && !ownerCompanyCode && !ownerClientId) {
-                return (
-                  <div className="mt-2">
-                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                      Not Assigned
-                    </span>
-                  </div>
-                );
-              }
-
-              const initial = (ownerCompanyName?.charAt(0) || "C").toUpperCase();
-
-              return (
-                <div className="mt-2 flex items-center justify-between gap-2.5">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-teal-100 bg-teal-50 text-xs font-extrabold text-teal-700 shadow-xs">
-                      {initial}
-                    </div>
-                    <p
-                      title={ownerCompanyName || ""}
-                      className="truncate text-sm font-bold text-[#172554]"
-                    >
-                      {ownerCompanyName || "Unknown Company"}
-                    </p>
-                  </div>
-
-                  {ownerCompanyCode ? (
-                    <span className="inline-flex shrink-0 items-center rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-                      {ownerCompanyCode}
-                    </span>
-                  ) : ownerClientId ? (
-                    <span className="inline-flex shrink-0 items-center rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-                      ID #{ownerClientId}
-                    </span>
-                  ) : null}
                 </div>
               );
             })()}

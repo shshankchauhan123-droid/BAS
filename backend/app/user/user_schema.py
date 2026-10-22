@@ -64,6 +64,8 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     client_id: int | None = None
+    client_name: str | None = None
+    company_code: str | None = None
     first_login: bool = False
     permissions: UserPermissionsSchema | None = None
 

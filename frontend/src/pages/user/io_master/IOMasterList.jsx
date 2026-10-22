@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
 import {
@@ -50,6 +50,10 @@ function IOMasterList() {
   const userRole = String(user?.role || "").toLowerCase();
   const isSuperAdmin = userRole === "superadmin" || userRole === "admin";
   const isClientAdmin = userRole === "client_admin";
+
+  if (isSuperAdmin) {
+    return <Navigate to="/superadmin/io-master" replace />;
+  }
 
   const canViewIO =
     isSuperAdmin || isClientAdmin ||

@@ -19,6 +19,7 @@ import Login from "../pages/auth/Login";
 
 import SuperAdminDashboard from "../pages/superadmin/SuperAdminDashboard";
 import SuperAdminCaseList from "../pages/superadmin/SuperAdminCaseList";
+import SuperAdminIOMasterList from "../pages/superadmin/SuperAdminIOMasterList";
 import ClientAdminDashboard from "../pages/clientAdmin/ClientAdminDashboard";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import UserDashboard from "../pages/user/UserDashboard";
@@ -139,6 +140,20 @@ function AppRoutes() {
         />
 
         {/* =====================================================
+            SUPER ADMIN IO MASTER MANAGEMENT
+        ====================================================== */}
+        <Route
+          path="/superadmin/io-master"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["superadmin", "admin"]}>
+                <SuperAdminIOMasterList />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
             USER CASE MANAGEMENT
 
             Authentication required
@@ -177,7 +192,7 @@ function AppRoutes() {
           path="/dashboard/io-master"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "client_admin"]}>
+              <RoleRoute allowedRoles={["user", "admin", "client_admin", "superadmin"]}>
                 <IOMasterList />
               </RoleRoute>
             </ProtectedRoute>

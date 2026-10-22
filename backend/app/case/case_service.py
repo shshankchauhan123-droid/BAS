@@ -262,9 +262,12 @@ def get_cases(
     # SuperAdmin has global visibility across all cases
     if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
         if target_user_id:
+            target_user = get_user_by_id(db=db, user_id=target_user_id)
+            if not target_user:
+                return []
             from sqlalchemy import or_
             from sqlalchemy.orm import joinedload
-            return (
+            query = (
                 db.query(Case)
                 .options(
                     joinedload(Case.io),
@@ -278,6 +281,16 @@ def get_cases(
                         Case.assigned_to == target_user_id,
                     )
                 )
+            )
+            if target_user.client_id:
+                query = query.filter(
+                    or_(
+                        Case.client_id == target_user.client_id,
+                        Case.client_id.is_(None),
+                    )
+                )
+            return (
+                query
                 .order_by(Case.created_at.desc())
                 .all()
             )

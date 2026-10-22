@@ -150,6 +150,7 @@ function UserNavbar() {
       : "/dashboard";
 
   const casesPath = isSuperAdmin ? "/superadmin/cases" : "/dashboard/cases";
+  const ioMasterPath = isSuperAdmin ? "/superadmin/io-master" : "/dashboard/io-master";
 
   const userPerms =
     userDetails?.permissions || user?.permissions || {};
@@ -175,7 +176,8 @@ function UserNavbar() {
       return (
         currentPath === "/superadmin" ||
         (currentPath.startsWith("/superadmin/") &&
-          !currentPath.startsWith("/superadmin/cases"))
+          !currentPath.startsWith("/superadmin/cases") &&
+          !currentPath.startsWith("/superadmin/io-master"))
       );
     }
 
@@ -194,6 +196,13 @@ function UserNavbar() {
       return (
         currentPath === "/superadmin/cases" ||
         currentPath.startsWith("/superadmin/cases/")
+      );
+    }
+
+    if (path === "/superadmin/io-master") {
+      return (
+        currentPath === "/superadmin/io-master" ||
+        currentPath.startsWith("/superadmin/io-master/")
       );
     }
 
@@ -337,7 +346,7 @@ function UserNavbar() {
     },
     {
       label: "IO Master",
-      path: "/dashboard/io-master",
+      path: ioMasterPath,
       visible: canViewIO,
       icon: (
         <svg

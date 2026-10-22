@@ -160,19 +160,13 @@ function CaseTable({
 
               {isSuperAdmin && (
                 <th className="whitespace-nowrap px-5 py-4 text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-500 sm:px-6">
-                  Case Client Company
+                  Client Company
                 </th>
               )}
 
               {(isClientAdmin || isSuperAdmin) && (
                 <th className="whitespace-nowrap px-5 py-4 text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-500 sm:px-6">
                   Case Owner
-                </th>
-              )}
-
-              {isSuperAdmin && (
-                <th className="whitespace-nowrap px-5 py-4 text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-500 sm:px-6">
-                  Case Owner&apos;s Client Company
                 </th>
               )}
 
@@ -278,7 +272,7 @@ function CaseTable({
                                   {companyCode}
                                 </span>
                               ) : (
-                                <p className="text-[10px] text-slate-400">Case Company</p>
+                                <p className="text-[10px] text-slate-400">Company</p>
                               )}
                             </div>
                           </div>
@@ -344,63 +338,6 @@ function CaseTable({
                                 <p className="mt-0.5 text-[10px] text-slate-400">
                                   Case Owner
                                 </p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </td>
-                  )}
-
-                  {isSuperAdmin && (
-                    <td className="whitespace-nowrap px-5 py-5 sm:px-6">
-                      {(() => {
-                        const ownerCompanyName =
-                          caseData.owner_client?.name ||
-                          caseData.owner_client_name ||
-                          caseData.creator?.client?.name ||
-                          null;
-                        const ownerCompanyCode =
-                          caseData.owner_client?.company_code ||
-                          caseData.owner_company_code ||
-                          caseData.creator?.client?.company_code ||
-                          null;
-                        const ownerClientId =
-                          caseData.owner_client?.id ||
-                          caseData.owner_client_id ||
-                          caseData.creator?.client_id ||
-                          null;
-
-                        if (!ownerCompanyName && !ownerCompanyCode && !ownerClientId) {
-                          return (
-                            <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                              Not Assigned
-                            </span>
-                          );
-                        }
-
-                        return (
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-teal-100 bg-teal-50 text-xs font-extrabold text-teal-700 shadow-xs">
-                              {(ownerCompanyName || "C").charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p
-                                title={ownerCompanyName || ""}
-                                className="max-w-[170px] truncate text-sm font-bold text-[#172554]"
-                              >
-                                {ownerCompanyName || "Unknown Company"}
-                              </p>
-                              {ownerCompanyCode ? (
-                                <span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-                                  {ownerCompanyCode}
-                                </span>
-                              ) : ownerClientId ? (
-                                <p className="text-[10px] text-slate-400">
-                                  ID #{ownerClientId}
-                                </p>
-                              ) : (
-                                <p className="text-[10px] text-slate-400">Owner Company</p>
                               )}
                             </div>
                           </div>

@@ -1,5 +1,5 @@
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.user.user_model import User
 from app.user.user_permission_model import UserPermission
@@ -86,6 +86,7 @@ def get_users_by_client_id(
 ) -> list[User]:
     statement = (
         select(User)
+        .options(joinedload(User.client))
         .where(User.client_id == client_id)
         .order_by(User.created_at.desc())
     )
@@ -100,6 +101,7 @@ def get_all_users(
 ) -> list[User]:
     statement = (
         select(User)
+        .options(joinedload(User.client))
         .order_by(User.created_at.desc())
     )
 

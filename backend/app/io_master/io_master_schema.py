@@ -56,6 +56,11 @@ class IOMasterData(BaseModel):
     police_station: str
     created_by: int
     assigned_user_name: Optional[str] = None
+    assigned_user_email: Optional[str] = None
+    assigned_user_role: Optional[str] = None
+    client_id: Optional[int] = None
+    client_name: Optional[str] = None
+    company_code: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

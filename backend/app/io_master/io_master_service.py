@@ -5,6 +5,7 @@ from app.core.roles import ADMIN_ROLE, CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, USER_
 from app.io_master.io_master_model import IOMaster
 from app.io_master.io_master_repository import (
     create_io as repository_create_io,
+    get_all_ios,
     get_ios_by_user,
     get_ios_by_client,
     get_io_by_id_and_user,
@@ -104,6 +105,7 @@ def get_ios_service(
     db: Session,
     actor: User,
     target_user_id: int | None = None,
+    client_id: int | None = None,
 ) -> list[IOMaster]:
     actor_role = str(actor.role).lower()
 
@@ -111,34 +113,48 @@ def get_ios_service(
         perms = getattr(actor, "permissions", None)
         if perms and perms.can_view_io is False:
             raise PermissionError("You do not have permission to view Investigating Officers.")
-
-    if target_user_id is None:
-        if actor_role == CLIENT_ADMIN_ROLE:
-            if not actor.client_id:
-                return []
-            return get_ios_by_client(
-                db=db,
-                client_id=actor.client_id,
-            )
         return get_ios_by_user(
             db=db,
             user_id=actor.id,
         )
 
-    if actor_role not in {CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, ADMIN_ROLE}:
-        raise PermissionError("Normal users cannot view other users' Investigating Officers.")
-
-    target_user = get_user_by_id(db=db, user_id=target_user_id)
-    if not target_user:
-        raise ValueError("Target user not found.")
-
     if actor_role == CLIENT_ADMIN_ROLE:
-        if target_user.client_id != actor.client_id:
-            raise PermissionError("Target user does not belong to your company.")
+        if not actor.client_id:
+            return []
+        if target_user_id is not None:
+            target_user = get_user_by_id(db=db, user_id=target_user_id)
+            if not target_user:
+                raise ValueError("Target user not found.")
+            if target_user.client_id != actor.client_id:
+                raise PermissionError("Target user does not belong to your company.")
+            return get_ios_by_user(
+                db=db,
+                user_id=target_user.id,
+            )
+        return get_ios_by_client(
+            db=db,
+            client_id=actor.client_id,
+        )
+
+    if actor_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        if target_user_id is not None:
+            target_user = get_user_by_id(db=db, user_id=target_user_id)
+            if not target_user:
+                raise ValueError("Target user not found.")
+            return get_ios_by_user(
+                db=db,
+                user_id=target_user.id,
+            )
+        if client_id is not None:
+            return get_ios_by_client(
+                db=db,
+                client_id=client_id,
+            )
+        return get_all_ios(db=db)
 
     return get_ios_by_user(
         db=db,
-        user_id=target_user.id,
+        user_id=actor.id,
     )
 
 
