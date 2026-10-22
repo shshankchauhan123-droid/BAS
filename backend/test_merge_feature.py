@@ -359,6 +359,147 @@ def run_tests():
         graph_node_ok = len(nodes) == 1 and nodes[0]["file_id"] == merged1.id and nodes[0]["matching_transaction_count"] == 3
         record("Scenario 20: Transaction graph links directly to merged node", graph_node_ok, f"Node: {nodes[0]['id'] if nodes else None}, Tx count: {nodes[0]['matching_transaction_count'] if nodes else 0}")
 
+        # -------------------------------------------------------------
+        # SCENARIO 21: Re-merge existing merged statement with a new statement (AB + C -> ABC)
+        # -------------------------------------------------------------
+        f_c = make_file(test_case_1.id, "FY25_SBI_Stmt.pdf", "98765432101", date(2025, 4, 1), date(2025, 9, 30))
+        t_c = make_tx(f_c, date(2025, 5, 20), 12000, 0, 98000, "NEW STATEMENT TX", "IMPS", "GLOBAL TRADERS")
+
+        # merged1 has f1 and f2 (3 txs). f_c has 1 tx.
+        req_remerge = MergeFilesRequest(file_ids=[merged1.id, f_c.id], merged_filename="Cumulative_Merged_ABC.pdf")
+        merged_abc = merge_case_files(db, test_case_1.id, test_user, req_remerge)
+        created_files.append(merged_abc)
+
+        txs_abc = get_transactions_by_file(db, merged_abc.id)
+        abc_tx_ids = {t.id for t in txs_abc}
+
+        db.refresh(merged1)
+        db.refresh(f_c)
+
+        is_remerge_ok = (
+            merged_abc is not None and
+            merged_abc.is_merged is True and
+            len(txs_abc) == 4 and
+            t_c.id in abc_tx_ids and
+            merged1.is_superseded is True and
+            merged1.superseded_by_file_id == merged_abc.id and
+            f_c.is_superseded is True and
+            f_c.superseded_by_file_id == merged_abc.id
+        )
+        record("Scenario 21: Re-merge existing merged statement (AB + C -> ABC)", is_remerge_ok, f"ABC ID: {merged_abc.id}, Total txs: {len(txs_abc)}")
+
+        # -------------------------------------------------------------
+        # SCENARIO 22: Re-merge repeat request idempotency (AB + C repeat returns ABC)
+        # -------------------------------------------------------------
+        repeat_remerge = merge_case_files(db, test_case_1.id, test_user, req_remerge)
+        is_remerge_idempotent = (repeat_remerge.id == merged_abc.id)
+        record("Scenario 22: Re-merge repeat request idempotency", is_remerge_idempotent, f"ID: {repeat_remerge.id}")
+
+        # -------------------------------------------------------------
+        # SCENARIO 23: Cumulative date span and summary totals on re-merged file ABC
+        # -------------------------------------------------------------
+        summary_abc = get_file_transaction_summary(db, merged_abc.id)
+        # debits: 15000 + 25000 + 12000 = 52000; credits: 50000; total txs: 4
+        expected_debit_abc = Decimal("52000")
+        expected_credit_abc = Decimal("50000")
+        summary_abc_ok = (
+            summary_abc["total_transactions"] == 4 and
+            summary_abc["total_debits"] == expected_debit_abc and
+            summary_abc["total_credits"] == expected_credit_abc and
+            merged_abc.statement_start_date == date(2023, 4, 1) and
+            merged_abc.statement_end_date == date(2025, 9, 30)
+        )
+        record("Scenario 23: Cumulative date span and summary totals for ABC", summary_abc_ok, f"Period: {merged_abc.statement_start_date} to {merged_abc.statement_end_date}")
+
+        # -------------------------------------------------------------
+        # SCENARIO 24: Re-merge with multiple new statements (ABC + D + E -> ABCDE)
+        # -------------------------------------------------------------
+        f_d = make_file(test_case_1.id, "FY26_H1.pdf", "98765432101", date(2025, 10, 1), date(2026, 1, 31))
+        f_e = make_file(test_case_1.id, "FY26_H2.pdf", "98765432101", date(2026, 2, 1), date(2026, 3, 31))
+        make_tx(f_d, date(2025, 11, 15), 5000, 0, 93000, "D TX")
+        make_tx(f_e, date(2026, 2, 28), 0, 20000, 113000, "E TX")
+
+        req_multi = MergeFilesRequest(file_ids=[merged_abc.id, f_d.id, f_e.id])
+        merged_abcde = merge_case_files(db, test_case_1.id, test_user, req_multi)
+        created_files.append(merged_abcde)
+
+        txs_abcde = get_transactions_by_file(db, merged_abcde.id)
+        is_multi_ok = (len(txs_abcde) == 6 and merged_abcde.statement_end_date == date(2026, 3, 31))
+        record("Scenario 24: Multi-statement re-merge (ABC + D + E -> ABCDE)", is_multi_ok, f"Total txs: {len(txs_abcde)}")
+
+        # -------------------------------------------------------------
+        # SCENARIO 25: Rejection - Merging already included underlying statement (Lineage duplicate)
+        # -------------------------------------------------------------
+        failed_lineage = False
+        try:
+            # f1 is already part of merged_abcde
+            f_new = make_file(test_case_1.id, "Standalone.pdf", "98765432101", date(2026, 4, 1), date(2026, 4, 30))
+            merge_case_files(db, test_case_1.id, test_user, MergeFilesRequest(file_ids=[merged_abcde.id, f1.id]))
+        except ValueError as e:
+            failed_lineage = "already included" in str(e).lower() or "already been merged" in str(e).lower()
+        record("Scenario 25: Rejection of duplicate underlying source statement", failed_lineage)
+
+        # -------------------------------------------------------------
+        # SCENARIO 26: Rejection - Merging an already-superseded statement
+        # -------------------------------------------------------------
+        failed_superseded = False
+        try:
+            # merged1 was superseded by merged_abc
+            f_new2 = make_file(test_case_1.id, "Standalone2.pdf", "98765432101", date(2026, 5, 1), date(2026, 5, 31))
+            merge_case_files(db, test_case_1.id, test_user, MergeFilesRequest(file_ids=[merged1.id, f_new2.id]))
+        except ValueError as e:
+            failed_superseded = "already been merged" in str(e).lower()
+        record("Scenario 26: Rejection of superseded statement as input", failed_superseded)
+
+        # -------------------------------------------------------------
+        # SCENARIO 27: Filename sanitization on merge
+        # -------------------------------------------------------------
+        f_s1 = make_file(test_case_1.id, "San1.pdf", "77788899900", date(2025, 1, 1), date(2025, 3, 31))
+        f_s2 = make_file(test_case_1.id, "San2.pdf", "77788899900", date(2025, 4, 1), date(2025, 6, 30))
+        merged_san = merge_case_files(
+            db, test_case_1.id, test_user,
+            MergeFilesRequest(file_ids=[f_s1.id, f_s2.id], merged_filename="../illegal*path/name:test.pdf")
+        )
+        created_files.append(merged_san)
+        sanitized_ok = (
+            "illegal" in merged_san.original_filename and
+            "/" not in merged_san.original_filename and
+            "\\" not in merged_san.original_filename and
+            "*" not in merged_san.original_filename and
+            ":" not in merged_san.original_filename
+        )
+        record("Scenario 27: Custom filename sanitization", sanitized_ok, f"Sanitized: {merged_san.original_filename}")
+
+        # -------------------------------------------------------------
+        # SCENARIO 28: Repeated merge with None/missing statement_start_date (prevents NameError: 'date')
+        # -------------------------------------------------------------
+        f_null1 = make_file(test_case_1.id, "NoStartDate_A.pdf", "55566677788", None, None)
+        f_null2 = make_file(test_case_1.id, "WithStartDate_B.pdf", "55566677788", date(2025, 1, 1), date(2025, 3, 31))
+        make_tx(f_null1, date(2024, 12, 10), 1000, 0, 9000, "TX NULL A")
+        make_tx(f_null2, date(2025, 2, 15), 2000, 0, 7000, "TX B")
+
+        # Step 1: Merge A + B -> AB (where A has statement_start_date=None)
+        merged_null_ab = merge_case_files(db, test_case_1.id, test_user, MergeFilesRequest(file_ids=[f_null1.id, f_null2.id]))
+        created_files.append(merged_null_ab)
+
+        # Step 2: Add Statement C
+        f_null3 = make_file(test_case_1.id, "Statement_C.pdf", "55566677788", date(2025, 4, 1), date(2025, 6, 30))
+        make_tx(f_null3, date(2025, 5, 20), 0, 5000, 12000, "TX C")
+
+        # Step 3: Repeated merge AB + C -> ABC
+        merged_null_abc = merge_case_files(db, test_case_1.id, test_user, MergeFilesRequest(file_ids=[merged_null_ab.id, f_null3.id]))
+        created_files.append(merged_null_abc)
+
+        txs_null_abc = get_transactions_by_file(db, merged_null_abc.id)
+        is_null_remerge_ok = (
+            merged_null_abc is not None and
+            merged_null_abc.is_merged is True and
+            len(txs_null_abc) == 3 and
+            merged_null_abc.statement_start_date == date(2024, 12, 10) and
+            merged_null_abc.statement_end_date == date(2025, 6, 30)
+        )
+        record("Scenario 28: Repeated merge with None statement_start_date (AB + C -> ABC)", is_null_remerge_ok, f"ABC ID: {merged_null_abc.id}, Txs: {len(txs_null_abc)}, Dates: {merged_null_abc.statement_start_date} to {merged_null_abc.statement_end_date}")
+
     finally:
         print("\nCleaning up test data...")
         # Roll back and remove test entities cleanly
@@ -398,7 +539,7 @@ def run_tests():
     print(f"Total: {total_count} | Passed: {passed_count} | Failed: {total_count - passed_count}")
     print("=" * 70)
     if passed_count == total_count:
-        print("ALL 20 TEST SCENARIOS PASSED CONVINCINGLY!")
+        print(f"ALL {total_count} TEST SCENARIOS PASSED CONVINCINGLY!")
     else:
         print("SOME TESTS FAILED. PLEASE REVIEW DETAILS ABOVE.")
         sys.exit(1)

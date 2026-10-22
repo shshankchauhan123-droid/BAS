@@ -1,7 +1,33 @@
+from datetime import date, datetime
+from typing import Any
 from sqlalchemy.orm import Session
 
 from app.files.file_model import File, MergedFileSource
 from app.bank_transactions.bank_transaction_model import BankTransaction
+
+
+def _normalize_to_date(val: Any) -> date | None:
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+    if isinstance(val, str):
+        v = val.strip()
+        if not v:
+            return None
+        try:
+            return date.fromisoformat(v[:10])
+        except Exception:
+            pass
+        for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+            try:
+                return datetime.strptime(v, fmt).date()
+            except Exception:
+                pass
+    return None
+
 
 def create_file(
     db: Session,
@@ -84,25 +110,119 @@ def update_file(
     return file
 
 
+def get_leaf_source_files_for_merged(
+    db: Session,
+    merged_file_id: int,
+) -> list[File]:
+    """
+    Recursively find all base/original (non-merged) source files for a merged file.
+    Includes cycle detection and chronological sorting.
+    """
+    visited_ids = {merged_file_id}
+    queue = [merged_file_id]
+    leaf_files: list[File] = []
+    seen_leaf_ids = set()
+
+    while queue:
+        curr_id = queue.pop(0)
+        source_ids = [
+            row[0]
+            for row in db.query(MergedFileSource.source_file_id)
+            .filter(MergedFileSource.merged_file_id == curr_id)
+            .all()
+        ]
+        if not source_ids:
+            source_ids = [
+                row[0]
+                for row in db.query(File.id)
+                .filter(File.superseded_by_file_id == curr_id)
+                .all()
+            ]
+
+        for sid in source_ids:
+            if sid in visited_ids:
+                continue
+            visited_ids.add(sid)
+            s_file = db.query(File).filter(File.id == sid).first()
+            if not s_file:
+                continue
+            if getattr(s_file, "is_merged", False):
+                queue.append(sid)
+            else:
+                if s_file.id not in seen_leaf_ids:
+                    seen_leaf_ids.add(s_file.id)
+                    leaf_files.append(s_file)
+
+    leaf_files.sort(key=lambda x: (_normalize_to_date(x.statement_start_date) or date.min, x.id))
+    return leaf_files
+
+
+def get_leaf_source_file_ids_for_merged(
+    db: Session,
+    merged_file_id: int,
+) -> list[int]:
+    files = get_leaf_source_files_for_merged(db, merged_file_id)
+    return [f.id for f in files]
+
+
 def get_merged_file_by_sources(
     db: Session,
     case_id: int,
     source_file_ids: list[int],
 ) -> File | None:
     source_set = set(source_file_ids)
+
+    # Compute leaf IDs represented by the requested source_file_ids
+    # If the selected inputs have overlapping lineage, it cannot be an idempotent repeat
+    input_leaf_ids = set()
+    has_overlap = False
+    for fid in source_file_ids:
+        f_obj = db.query(File).filter(File.id == fid, File.case_id == case_id).first()
+        if f_obj:
+            if getattr(f_obj, "is_merged", False):
+                leaves = set(get_leaf_source_file_ids_for_merged(db, fid)) or {fid}
+            else:
+                leaves = {fid}
+            if input_leaf_ids & leaves:
+                has_overlap = True
+            input_leaf_ids.update(leaves)
+
+    if has_overlap:
+        return None
+
     merged_files = (
         db.query(File)
         .filter(File.case_id == case_id, File.is_merged == True)
         .all()
     )
+
+    # First check non-superseded active merged files
     for mf in merged_files:
-        sources = (
-            db.query(MergedFileSource.source_file_id)
+        if mf.is_superseded:
+            continue
+        direct_sources = {
+            s[0]
+            for s in db.query(MergedFileSource.source_file_id)
             .filter(MergedFileSource.merged_file_id == mf.id)
             .all()
-        )
-        if {s[0] for s in sources} == source_set:
+        }
+        mf_leaves = set(get_leaf_source_file_ids_for_merged(db, mf.id)) or direct_sources
+
+        if direct_sources == source_set or (input_leaf_ids and mf_leaves == input_leaf_ids):
             return mf
+
+    # Fallback to any merged file matching either direct sources or leaf sources
+    for mf in merged_files:
+        direct_sources = {
+            s[0]
+            for s in db.query(MergedFileSource.source_file_id)
+            .filter(MergedFileSource.merged_file_id == mf.id)
+            .all()
+        }
+        mf_leaves = set(get_leaf_source_file_ids_for_merged(db, mf.id)) or direct_sources
+        if direct_sources == source_set or (input_leaf_ids and mf_leaves == input_leaf_ids):
+            return mf
+
     return None
 
 
@@ -141,25 +261,29 @@ def resolve_source_file_ids(
 
     resolved: list[int] = []
     seen = set()
+    queue = list(file_ids)
 
-    for fid in file_ids:
+    while queue:
+        fid = queue.pop(0)
+        if fid in seen:
+            continue
+        seen.add(fid)
+
         file_obj = db.query(File).filter(File.id == fid, File.case_id == case_id).first()
         if not file_obj:
-            if fid not in seen:
-                seen.add(fid)
-                resolved.append(fid)
+            resolved.append(fid)
             continue
 
         if getattr(file_obj, "is_merged", False):
             sources = get_source_file_ids_for_merged(db, fid)
-            for sid in sources:
-                if sid not in seen:
-                    seen.add(sid)
-                    resolved.append(sid)
-        else:
-            if fid not in seen:
-                seen.add(fid)
+            if sources:
+                for sid in sources:
+                    if sid not in seen:
+                        queue.append(sid)
+            else:
                 resolved.append(fid)
+        else:
+            resolved.append(fid)
 
     return resolved
 

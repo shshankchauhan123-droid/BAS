@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 import os
 from pathlib import Path
 import re
@@ -14,6 +14,7 @@ from app.case.case_repository import get_case_by_id, get_case_by_id_and_user
 from app.core.roles import ADMIN_ROLE, CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, USER_ROLE
 from app.files.file_model import File, MergedFileSource
 from app.files.file_repository import (
+    _normalize_to_date,
     create_file,
     delete_file,
     get_all_cascade_source_files_for_merged,
@@ -21,6 +22,8 @@ from app.files.file_repository import (
     get_file_by_id_and_user,
     get_files_by_case,
     get_files_by_case_and_user,
+    get_leaf_source_files_for_merged,
+    get_leaf_source_file_ids_for_merged,
     get_merged_file_by_sources,
     get_source_files_for_merged,
     get_source_file_ids_for_merged,
@@ -744,7 +747,6 @@ def merge_case_files(
     # 5. Repeat request idempotency
     existing_merged = get_merged_file_by_sources(db=db, case_id=case_id, source_file_ids=unique_file_ids)
     if existing_merged:
-        # Ensure source files are marked superseded if not already
         changed = False
         for f in files:
             if not f.is_superseded or f.superseded_by_file_id != existing_merged.id:
@@ -753,13 +755,11 @@ def merge_case_files(
                 changed = True
         if changed:
             db.commit()
-        existing_merged.source_file_ids = unique_file_ids
+        existing_merged.source_file_ids = get_leaf_source_file_ids_for_merged(db, existing_merged.id) or unique_file_ids
         return existing_merged
 
-    # 6. Status validation & prevent nesting of merged/superseded files
+    # 6. Status validation (completed & not superseded)
     for f in files:
-        if getattr(f, "is_merged", False):
-            raise ValueError(f"File '{f.original_filename}' is already a merged statement and cannot be merged again.")
         if getattr(f, "is_superseded", False):
             raise ValueError(f"Cannot merge: file '{f.original_filename}' has already been merged into another statement.")
         if f.status != "COMPLETED":
@@ -782,36 +782,76 @@ def merge_case_files(
     if len(unique_accs) > 1:
         raise ValueError("Cannot merge statements: account numbers do not match across selected files.")
 
-    # 8. Chronological sorting
-    sorted_files = sorted(
-        files,
-        key=lambda x: (x.statement_start_date or date.min, x.id)
+    # 8. Collect all underlying leaf files and prevent duplicate inclusion
+    all_leaf_files: list[File] = []
+    seen_leaf_ids = set()
+
+    for f in files:
+        if getattr(f, "is_merged", False):
+            leaves = get_leaf_source_files_for_merged(db, f.id)
+            if not leaves:
+                leaves = [f]
+        else:
+            leaves = [f]
+
+        for leaf in leaves:
+            if leaf.id in seen_leaf_ids:
+                raise ValueError(
+                    f"Cannot merge: statement '{leaf.original_filename}' is already included in another selected input."
+                )
+            seen_leaf_ids.add(leaf.id)
+            all_leaf_files.append(leaf)
+
+    all_leaf_file_ids = [lf.id for lf in all_leaf_files]
+
+    # 9. Chronological sorting of leaf files
+    sorted_leaf_files = sorted(
+        all_leaf_files,
+        key=lambda x: (_normalize_to_date(x.statement_start_date) or date.min, x.id)
     )
 
-    primary_file = sorted_files[0]
+    primary_file = sorted_leaf_files[0]
     matched_acc_number = primary_file.account_number
-    account_name = next((f.account_name for f in sorted_files if f.account_name), primary_file.account_name)
-    bank_name = next((f.bank_name for f in sorted_files if f.bank_name), primary_file.bank_name)
-    branch_name = next((f.branch_name for f in sorted_files if f.branch_name), primary_file.branch_name)
-    ifsc = next((f.ifsc for f in sorted_files if f.ifsc), primary_file.ifsc)
-    micr = next((f.micr for f in sorted_files if f.micr), primary_file.micr)
-    account_type = next((f.account_type for f in sorted_files if f.account_type), primary_file.account_type)
+    account_name = next((f.account_name for f in sorted_leaf_files if f.account_name), primary_file.account_name)
+    bank_name = next((f.bank_name for f in sorted_leaf_files if f.bank_name), primary_file.bank_name)
+    branch_name = next((f.branch_name for f in sorted_leaf_files if f.branch_name), primary_file.branch_name)
+    ifsc = next((f.ifsc for f in sorted_leaf_files if f.ifsc), primary_file.ifsc)
+    micr = next((f.micr for f in sorted_leaf_files if f.micr), primary_file.micr)
+    account_type = next((f.account_type for f in sorted_leaf_files if f.account_type), primary_file.account_type)
 
-    start_dates = [f.statement_start_date for f in files if f.statement_start_date]
-    end_dates = [f.statement_end_date for f in files if f.statement_end_date]
+    start_dates = [_normalize_to_date(f.statement_start_date) for f in all_leaf_files]
+    start_dates = [d for d in start_dates if d is not None]
+
+    end_dates = [_normalize_to_date(f.statement_end_date) for f in all_leaf_files]
+    end_dates = [d for d in end_dates if d is not None]
+
     tx_dates = db.query(
         func.min(BankTransaction.transaction_date),
         func.max(BankTransaction.transaction_date)
-    ).filter(BankTransaction.file_id.in_(unique_file_ids)).first()
+    ).filter(BankTransaction.file_id.in_(all_leaf_file_ids)).first()
 
-    min_start = min(start_dates) if start_dates else (tx_dates[0] if tx_dates else None)
-    max_end = max(end_dates) if end_dates else (tx_dates[1] if tx_dates else None)
-    total_size = sum(f.file_size or 0 for f in files)
+    tx_min = _normalize_to_date(tx_dates[0]) if tx_dates else None
+    tx_max = _normalize_to_date(tx_dates[1]) if tx_dates else None
 
+    if tx_min:
+        start_dates.append(tx_min)
+    if tx_max:
+        end_dates.append(tx_max)
+
+    min_start = min(start_dates) if start_dates else None
+    max_end = max(end_dates) if end_dates else None
+
+    total_size = sum(f.file_size or 0 for f in all_leaf_files)
+
+    # Sanitize or auto-generate filename
     if data.merged_filename and data.merged_filename.strip():
-        merged_filename = data.merged_filename.strip()
-        if not merged_filename.lower().endswith(".pdf"):
-            merged_filename += ".pdf"
+        raw_name = data.merged_filename.strip()
+        clean_name = re.sub(r'[/\\:*?"<>|]', '_', raw_name).strip('. ')
+        if not clean_name:
+            clean_name = "Merged_Statement.pdf"
+        elif not clean_name.lower().endswith(".pdf"):
+            clean_name += ".pdf"
+        merged_filename = clean_name
     else:
         start_str = min_start.strftime("%d-%m-%Y") if min_start else "start"
         end_str = max_end.strftime("%d-%m-%Y") if max_end else "end"
@@ -821,28 +861,52 @@ def merge_case_files(
     stored_filename = f"merged_{uuid.uuid4().hex}.pdf"
     dest_path = case_directory / stored_filename
 
-    # Physical document merging
+    # 10. Physical document merging (prefer sorted leaf files, fallback to sorted selected files)
     try:
         import pymupdf as fitz
         merged_doc = fitz.open()
         all_pdf = True
-        for f in sorted_files:
-            src_path = Path(f.file_path)
-            if not src_path.exists():
-                backend_dir = Path(__file__).resolve().parent.parent.parent
-                if (backend_dir / f.file_path).exists():
-                    src_path = backend_dir / f.file_path
-            if src_path.exists() and src_path.suffix.lower() == ".pdf":
-                try:
-                    doc = fitz.open(src_path)
-                    merged_doc.insert_pdf(doc)
-                    doc.close()
-                except Exception:
-                    all_pdf = False
-                    break
-            else:
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+
+        # Attempt to assemble from leaf files in chronological order
+        pdf_sources_to_use = sorted_leaf_files
+        for lf in pdf_sources_to_use:
+            src_path = Path(lf.file_path)
+            if not src_path.exists() and (backend_dir / lf.file_path).exists():
+                src_path = backend_dir / lf.file_path
+            if not (src_path.exists() and src_path.suffix.lower() == ".pdf"):
                 all_pdf = False
                 break
+
+        # If any leaf PDF missing, check if direct selected input files exist (e.g. intermediate merged PDF)
+        if not all_pdf:
+            merged_doc.close()
+            merged_doc = fitz.open()
+            all_pdf = True
+            sorted_input_files = sorted(files, key=lambda x: (_normalize_to_date(x.statement_start_date) or date.min, x.id))
+            for f in sorted_input_files:
+                src_path = Path(f.file_path)
+                if not src_path.exists() and (backend_dir / f.file_path).exists():
+                    src_path = backend_dir / f.file_path
+                if src_path.exists() and src_path.suffix.lower() == ".pdf":
+                    try:
+                        doc = fitz.open(src_path)
+                        merged_doc.insert_pdf(doc)
+                        doc.close()
+                    except Exception:
+                        all_pdf = False
+                        break
+                else:
+                    all_pdf = False
+                    break
+        else:
+            for lf in pdf_sources_to_use:
+                src_path = Path(lf.file_path)
+                if not src_path.exists() and (backend_dir / lf.file_path).exists():
+                    src_path = backend_dir / lf.file_path
+                doc = fitz.open(src_path)
+                merged_doc.insert_pdf(doc)
+                doc.close()
 
         if all_pdf and len(merged_doc) > 0:
             merged_doc.save(str(dest_path))
@@ -859,8 +923,8 @@ def merge_case_files(
                 f"Account Number: {matched_acc_number}\n"
                 f"Bank: {bank_name or 'N/A'}\n"
                 f"Period: {min_start or 'N/A'} to {max_end or 'N/A'}\n"
-                f"Merged Files ({len(sorted_files)}):\n"
-                + "\n".join(f" - {f.original_filename}" for f in sorted_files)
+                f"Merged Statements ({len(sorted_leaf_files)}):\n"
+                + "\n".join(f" - {f.original_filename}" for f in sorted_leaf_files)
             )
             page.insert_text((50, 72), text, fontsize=11)
             doc.save(str(dest_path))
@@ -869,10 +933,10 @@ def merge_case_files(
         print("Notice: PDF merge fell back to text document:", e)
         dest_path.write_text(
             f"Merged Statement for {matched_acc_number}\n"
-            f"Source files: {', '.join(f.original_filename for f in sorted_files)}"
+            f"Source files: {', '.join(f.original_filename for f in sorted_leaf_files)}"
         )
 
-    # 9. Database transaction
+    # 11. Database transaction
     try:
         merged_file = File(
             case_id=case_id,
@@ -901,22 +965,28 @@ def merge_case_files(
         db.add(merged_file)
         db.flush()
 
-        for fid in unique_file_ids:
+        for fid in all_leaf_file_ids:
             mfs = MergedFileSource(
                 merged_file_id=merged_file.id,
                 source_file_id=fid,
             )
             db.add(mfs)
 
-        # Mark source files as superseded by this merged file
+        # Mark selected input files as superseded by this merged file
         for f in files:
             f.is_superseded = True
             f.superseded_by_file_id = merged_file.id
 
+        # Also ensure all underlying leaf source files have is_superseded = True
+        for lf in all_leaf_files:
+            lf.is_superseded = True
+            if not lf.superseded_by_file_id:
+                lf.superseded_by_file_id = merged_file.id
+
         db.commit()
         db.refresh(merged_file)
 
-        merged_file.source_file_ids = unique_file_ids
+        merged_file.source_file_ids = all_leaf_file_ids
 
         record_audit_log(
             db=db,
@@ -928,7 +998,8 @@ def merge_case_files(
             description=f"User {user.username} merged {len(unique_file_ids)} files into '{merged_file.original_filename}' for Case #{case.case_number}",
             details={
                 "merged_file_id": merged_file.id,
-                "source_file_ids": unique_file_ids,
+                "input_file_ids": unique_file_ids,
+                "leaf_source_file_ids": all_leaf_file_ids,
                 "case_id": case.id,
                 "account_number": matched_acc_number,
             },

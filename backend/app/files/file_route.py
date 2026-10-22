@@ -156,6 +156,9 @@ def merge_case_files_route(
             detail=str(error),
         )
     except Exception as error:
+        import logging
+        import traceback
+        logging.getLogger(__name__).error(f"Merge error in case {case_id}: {error}\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Merge failed: {str(error)}",
