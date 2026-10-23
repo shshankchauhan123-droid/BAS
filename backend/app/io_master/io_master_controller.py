@@ -40,11 +40,13 @@ def get_ios_controller(
     db: Session,
     actor: User,
     target_user_id: int | None = None,
+    client_id: int | None = None,
 ):
     ios = get_ios_service(
         db=db,
         actor=actor,
         target_user_id=target_user_id,
+        client_id=client_id,
     )
 
     return {

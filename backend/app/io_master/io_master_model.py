@@ -66,3 +66,23 @@ class IOMaster(Base):
     @property
     def assigned_user_name(self) -> str | None:
         return self.creator.username if self.creator else None
+
+    @property
+    def assigned_user_email(self) -> str | None:
+        return self.creator.email if self.creator else None
+
+    @property
+    def assigned_user_role(self) -> str | None:
+        return self.creator.role if self.creator else None
+
+    @property
+    def client_id(self) -> int | None:
+        return self.creator.client_id if self.creator else None
+
+    @property
+    def client_name(self) -> str | None:
+        return self.creator.client.name if self.creator and self.creator.client else None
+
+    @property
+    def company_code(self) -> str | None:
+        return self.creator.client.company_code if self.creator and self.creator.client else None

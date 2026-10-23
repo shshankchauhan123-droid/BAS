@@ -98,6 +98,46 @@ class Case(Base):
     creator = relationship("User", foreign_keys=[created_by])
     assignee = relationship("User", foreign_keys=[assigned_to])
 
+    @property
+    def owner_username(self) -> str | None:
+        return self.creator.username if self.creator else None
+
+    @property
+    def owner_email(self) -> str | None:
+        return self.creator.email if self.creator else None
+
+    @property
+    def owner_client_id(self) -> int | None:
+        return self.creator.client_id if self.creator else None
+
+    @property
+    def owner_client_name(self) -> str | None:
+        if self.creator and self.creator.client:
+            return self.creator.client.name
+        return None
+
+    @property
+    def owner_company_code(self) -> str | None:
+        if self.creator and self.creator.client:
+            return self.creator.client.company_code
+        return None
+
+    @property
+    def owner_client(self):
+        return self.creator.client if self.creator else None
+
+    @property
+    def client_name(self) -> str | None:
+        if self.client:
+            return self.client.name
+        return None
+
+    @property
+    def company_code(self) -> str | None:
+        if self.client:
+            return self.client.company_code
+        return None
+
 
 # Register related models with SQLAlchemy mapper
 import app.io_master.io_master_model  # noqa: E402, F401

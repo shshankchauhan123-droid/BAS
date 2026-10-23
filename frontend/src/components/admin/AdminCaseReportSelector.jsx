@@ -158,11 +158,12 @@ export default function AdminCaseReportSelector() {
         setLoadingFiles(true);
         setError("");
         const res = await getCaseFiles(selectedCaseId);
-        const list = Array.isArray(res?.data)
+        const rawList = Array.isArray(res?.data)
           ? res.data
           : Array.isArray(res)
           ? res
           : [];
+        const list = rawList.filter((f) => !f.is_superseded);
         if (isMounted) {
           setFiles(list);
           if (list.length > 0) {

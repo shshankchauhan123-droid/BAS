@@ -44,6 +44,18 @@ def signup_user(
     return user
 
 
+class AuthException(ValueError):
+    """
+    Structured authentication exception with stable error codes and user-friendly messages.
+    Inherits from ValueError for backwards compatibility.
+    """
+    def __init__(self, code: str, message: str, status_code: int = 401):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+
+
 def login_user(
     db: Session,
     username: str,
@@ -60,7 +72,11 @@ def login_user(
     if code:
         client = get_client_by_code(db, code)
         if not client:
-            raise ValueError("Invalid company code or credentials")
+            raise AuthException(
+                code="INVALID_COMPANY_CODE",
+                message="Invalid company code. Please check your credentials.",
+                status_code=401,
+            )
 
         user = get_user_by_username_and_client(db, cleaned, client.id)
 
@@ -71,7 +87,11 @@ def login_user(
                 user = email_user
 
         if not user:
-            raise ValueError("Invalid username or password")
+            raise AuthException(
+                code="USER_NOT_FOUND",
+                message="Invalid username or email. Please check your credentials.",
+                status_code=401,
+            )
 
     # 2. Company Code NOT provided
     else:
@@ -95,33 +115,45 @@ def login_user(
             # Search for candidate users across all clients
             candidate_users = get_users_by_username(db, cleaned)
             if len(candidate_users) == 0:
-                raise ValueError("Invalid username or password")
+                raise AuthException(
+                    code="USER_NOT_FOUND",
+                    message="Invalid username or email. Please check your credentials.",
+                    status_code=401,
+                )
             elif len(candidate_users) == 1:
                 # Single user globally with this username
                 user = candidate_users[0]
             else:
                 # Multiple tenants have a user with this username
                 # Business Rule: Do NOT perform password matching across multiple users!
-                raise ValueError(
-                    "Multiple company accounts found with this username. Please enter your Company Code."
+                raise AuthException(
+                    code="COMPANY_CODE_REQUIRED",
+                    message="Multiple company accounts found with this username. Please enter your Company Code.",
+                    status_code=400,
                 )
 
     if not user:
-        raise ValueError(
-            "Invalid username or password"
+        raise AuthException(
+            code="USER_NOT_FOUND",
+            message="Invalid username or email. Please check your credentials.",
+            status_code=401,
         )
 
     if not verify_password(
         password,
         user.password_hash,
     ):
-        raise ValueError(
-            "Invalid username or password"
+        raise AuthException(
+            code="INVALID_PASSWORD",
+            message="Incorrect password. Please try again.",
+            status_code=401,
         )
 
     if not user.is_active:
-        raise ValueError(
-            "User account is inactive"
+        raise AuthException(
+            code="ACCOUNT_INACTIVE",
+            message="User account is inactive. Please contact your administrator.",
+            status_code=403,
         )
 
     if (
@@ -129,8 +161,10 @@ def login_user(
         and user.client
         and not user.client.is_active
     ):
-        raise ValueError(
-            "Access denied. Your company account has been deactivated by administrator."
+        raise AuthException(
+            code="COMPANY_DEACTIVATED",
+            message="Access denied. Your company account has been deactivated by administrator.",
+            status_code=403,
         )
 
     # Record successful login in audit log

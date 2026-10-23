@@ -113,11 +113,12 @@ export default function ClientAdminReportModal({ isOpen, onClose, onCaseSelect }
         setLoadingFiles(true);
         setError("");
         const res = await getCaseFiles(selectedCaseId);
-        const fileList = Array.isArray(res?.data)
+        const rawList = Array.isArray(res?.data)
           ? res.data
           : Array.isArray(res)
           ? res
           : [];
+        const fileList = rawList.filter((f) => !f.is_superseded);
         if (isMounted) {
           setFiles(fileList);
         }

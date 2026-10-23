@@ -48,13 +48,31 @@ def get_transactions_by_file(
     db: Session,
     file_id: int,
 ) -> list[BankTransaction]:
+    from app.files.file_model import File, MergedFileSource
+    file_obj = db.query(File).filter(File.id == file_id).first()
+    if file_obj and getattr(file_obj, "is_merged", False):
+        source_ids = [
+            r[0] for r in db.query(MergedFileSource.source_file_id)
+            .filter(MergedFileSource.merged_file_id == file_id)
+            .all()
+        ]
+        return (
+            db.query(BankTransaction)
+            .filter(BankTransaction.file_id.in_(source_ids))
+            .order_by(
+                BankTransaction.transaction_date.asc().nulls_last(),
+                BankTransaction.id.asc(),
+            )
+            .all()
+        )
+
     return (
         db.query(BankTransaction)
         .filter(
             BankTransaction.file_id == file_id
         )
         .order_by(
-            BankTransaction.transaction_date.asc(),
+            BankTransaction.transaction_date.asc().nulls_last(),
             BankTransaction.id.asc(),
         )
         .all()
@@ -71,16 +89,33 @@ def get_transactions_by_file_paginated(
     page: int,
     page_size: int,
 ):
-    query = (
-        db.query(BankTransaction)
-        .filter(
-            BankTransaction.file_id == file_id
+    from app.files.file_model import File, MergedFileSource
+    file_obj = db.query(File).filter(File.id == file_id).first()
+    if file_obj and getattr(file_obj, "is_merged", False):
+        source_ids = [
+            r[0] for r in db.query(MergedFileSource.source_file_id)
+            .filter(MergedFileSource.merged_file_id == file_id)
+            .all()
+        ]
+        query = (
+            db.query(BankTransaction)
+            .filter(BankTransaction.file_id.in_(source_ids))
+            .order_by(
+                BankTransaction.transaction_date.asc().nulls_last(),
+                BankTransaction.id.asc(),
+            )
         )
-        .order_by(
-            BankTransaction.transaction_date.asc(),
-            BankTransaction.id.asc(),
+    else:
+        query = (
+            db.query(BankTransaction)
+            .filter(
+                BankTransaction.file_id == file_id
+            )
+            .order_by(
+                BankTransaction.transaction_date.asc().nulls_last(),
+                BankTransaction.id.asc(),
+            )
         )
-    )
 
     total = query.count()
 
@@ -424,10 +459,22 @@ def delete_transactions_by_file(
 # ============================================================
 
 def get_file_transaction_summary(db: Session, file_id: int):
+    from app.files.file_model import File, MergedFileSource
+    file_obj = db.query(File).filter(File.id == file_id).first()
+    if file_obj and getattr(file_obj, "is_merged", False):
+        source_ids = [
+            r[0] for r in db.query(MergedFileSource.source_file_id)
+            .filter(MergedFileSource.merged_file_id == file_id)
+            .all()
+        ]
+        target_filter = BankTransaction.file_id.in_(source_ids)
+    else:
+        target_filter = (BankTransaction.file_id == file_id)
+
     # Calculate total transactions
     total_transactions = (
         db.query(func.count(BankTransaction.id))
-        .filter(BankTransaction.file_id == file_id)
+        .filter(target_filter)
         .scalar()
     ) or 0
 
@@ -437,7 +484,7 @@ def get_file_transaction_summary(db: Session, file_id: int):
             func.min(BankTransaction.transaction_date),
             func.max(BankTransaction.transaction_date)
         )
-        .filter(BankTransaction.file_id == file_id)
+        .filter(target_filter)
         .first()
     )
     start_date = dates[0] if dates else None
@@ -446,14 +493,14 @@ def get_file_transaction_summary(db: Session, file_id: int):
     # Calculate total debits
     total_debits = (
         db.query(func.sum(BankTransaction.debit))
-        .filter(BankTransaction.file_id == file_id)
+        .filter(target_filter)
         .scalar()
     ) or Decimal("0.0")
 
     # Calculate total credits
     total_credits = (
         db.query(func.sum(BankTransaction.credit))
-        .filter(BankTransaction.file_id == file_id)
+        .filter(target_filter)
         .scalar()
     ) or Decimal("0.0")
 
@@ -759,7 +806,7 @@ def get_transaction_relationships(
     start_date: date | None = None,
     end_date: date | None = None,
 ):
-    from app.files.file_model import File
+    from app.files.file_model import File, MergedFileSource
     
     # Get details for all requested files
     files = db.query(File).filter(File.id.in_(file_ids), File.case_id == case_id).all()
@@ -782,9 +829,26 @@ def get_transaction_relationships(
             "total_debit_amount": 0.0,
             "total_credit_amount": 0.0,
         }
+
+    # Map source file IDs back to parent file (if merged)
+    file_to_node_map = {}
+    query_file_ids = []
+    for f in files:
+        if getattr(f, "is_merged", False):
+            sources = [
+                r[0] for r in db.query(MergedFileSource.source_file_id)
+                .filter(MergedFileSource.merged_file_id == f.id)
+                .all()
+            ]
+            for sid in sources:
+                file_to_node_map[sid] = f.id
+                query_file_ids.append(sid)
+        else:
+            file_to_node_map[f.id] = f.id
+            query_file_ids.append(f.id)
     
     # Query transactions from valid files
-    query = db.query(BankTransaction).filter(BankTransaction.file_id.in_(valid_file_ids))
+    query = db.query(BankTransaction).filter(BankTransaction.file_id.in_(query_file_ids))
     
     if transaction_mode and transaction_mode.lower() != "all":
         query = query.filter(BankTransaction.mode.ilike(f"%{transaction_mode.strip()}%"))
@@ -825,15 +889,16 @@ def get_transaction_relationships(
         summary_debit += dr
         summary_credit += cr
         
-        # Update node stats for the file that owns this transaction
-        if tx.file_id in nodes_map:
-            nodes_map[tx.file_id]["matching_transaction_count"] += 1
-            nodes_map[tx.file_id]["total_debit_amount"] += dr
-            nodes_map[tx.file_id]["total_credit_amount"] += cr
+        # Update node stats for the node representing this transaction
+        owner_file_id = file_to_node_map.get(tx.file_id, tx.file_id)
+        if owner_file_id in nodes_map:
+            nodes_map[owner_file_id]["matching_transaction_count"] += 1
+            nodes_map[owner_file_id]["total_debit_amount"] += dr
+            nodes_map[owner_file_id]["total_credit_amount"] += cr
             
         graph_tx = {
             "id": tx.id,
-            "file_id": tx.file_id,
+            "file_id": owner_file_id,
             "transaction_date": tx.transaction_date,
             "amount": max(dr, cr),
             "debit": dr,
@@ -852,7 +917,7 @@ def get_transaction_relationships(
             
             if tx_ac_num or tx_ac_name:
                 for f in files:
-                    if f.id == tx.file_id:
+                    if f.id == owner_file_id:
                         continue
                         
                     f_ac_num = (f.account_number or "").strip()
@@ -866,7 +931,7 @@ def get_transaction_relationships(
                         break
                         
             if target_file_id:
-                source = f"file-{tx.file_id}"
+                source = f"file-{owner_file_id}"
                 target = f"file-{target_file_id}"
                 
                 # For simplicity, keep a directed edge
@@ -911,7 +976,7 @@ def get_transaction_relationships(
 
 def get_counterparty_analysis(db: Session, case_id: int, file_ids: list[int]):
     from sqlalchemy import func
-    from app.files.file_model import File
+    from app.files.file_model import File, MergedFileSource
     
     # Check valid files
     files = db.query(File).filter(File.id.in_(file_ids), File.case_id == case_id).all()
@@ -920,6 +985,23 @@ def get_counterparty_analysis(db: Session, case_id: int, file_ids: list[int]):
         
     valid_file_ids = [f.id for f in files]
     file_map = {f.id: f.original_filename for f in files}
+
+    # Map source file IDs back to parent file (if merged)
+    source_to_parent_map = {}
+    query_file_ids = []
+    for f in files:
+        if getattr(f, "is_merged", False):
+            sources = [
+                r[0] for r in db.query(MergedFileSource.source_file_id)
+                .filter(MergedFileSource.merged_file_id == f.id)
+                .all()
+            ]
+            for sid in sources:
+                source_to_parent_map[sid] = f.id
+                query_file_ids.append(sid)
+        else:
+            source_to_parent_map[f.id] = f.id
+            query_file_ids.append(f.id)
     
     # Query grouped by counterparty AND file_id
     query = db.query(
@@ -933,7 +1015,7 @@ def get_counterparty_analysis(db: Session, case_id: int, file_ids: list[int]):
         func.max(BankTransaction.transaction_date).label("last_transaction")
     ).filter(
         BankTransaction.case_id == case_id,
-        BankTransaction.file_id.in_(valid_file_ids),
+        BankTransaction.file_id.in_(query_file_ids),
         BankTransaction.counterparty_name.isnot(None),
         BankTransaction.counterparty_name != "",
         BankTransaction.counterparty_status != "NOT_FOUND"
@@ -972,13 +1054,21 @@ def get_counterparty_analysis(db: Session, case_id: int, file_ids: list[int]):
         dr = 0.0 if math.isnan(dr_raw) else dr_raw
         cr = 0.0 if math.isnan(cr_raw) else cr_raw
         
-        cp["files"][row.file_id] = {
-            "file_id": row.file_id,
-            "file_name": file_map.get(row.file_id, str(row.file_id)),
-            "transaction_count": row.transaction_count,
-            "total_debit": dr,
-            "total_credit": cr
-        }
+        parent_file_id = source_to_parent_map.get(row.file_id, row.file_id)
+        parent_file_name = file_map.get(parent_file_id, str(parent_file_id))
+
+        if parent_file_id not in cp["files"]:
+            cp["files"][parent_file_id] = {
+                "file_id": parent_file_id,
+                "file_name": parent_file_name,
+                "transaction_count": 0,
+                "total_debit": 0.0,
+                "total_credit": 0.0
+            }
+
+        cp["files"][parent_file_id]["transaction_count"] += row.transaction_count
+        cp["files"][parent_file_id]["total_debit"] += dr
+        cp["files"][parent_file_id]["total_credit"] += cr
         
         cp["total_transactions"] += row.transaction_count
         cp["total_debit"] += dr

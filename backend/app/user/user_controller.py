@@ -45,6 +45,8 @@ def _format_user_response(user: User) -> UserResponse:
         role=user.role,
         is_active=user.is_active,
         client_id=user.client_id,
+        client_name=user.client.name if getattr(user, "client", None) else None,
+        company_code=user.client.company_code if getattr(user, "client", None) else None,
         first_login=user.first_login,
         permissions=perms_schema,
     )

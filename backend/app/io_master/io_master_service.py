@@ -5,6 +5,7 @@ from app.core.roles import ADMIN_ROLE, CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, USER_
 from app.io_master.io_master_model import IOMaster
 from app.io_master.io_master_repository import (
     create_io as repository_create_io,
+    get_all_ios,
     get_ios_by_user,
     get_ios_by_client,
     get_io_by_id_and_user,
@@ -104,6 +105,7 @@ def get_ios_service(
     db: Session,
     actor: User,
     target_user_id: int | None = None,
+    client_id: int | None = None,
 ) -> list[IOMaster]:
     actor_role = str(actor.role).lower()
 
@@ -111,34 +113,48 @@ def get_ios_service(
         perms = getattr(actor, "permissions", None)
         if perms and perms.can_view_io is False:
             raise PermissionError("You do not have permission to view Investigating Officers.")
-
-    if target_user_id is None:
-        if actor_role == CLIENT_ADMIN_ROLE:
-            if not actor.client_id:
-                return []
-            return get_ios_by_client(
-                db=db,
-                client_id=actor.client_id,
-            )
         return get_ios_by_user(
             db=db,
             user_id=actor.id,
         )
 
-    if actor_role not in {CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, ADMIN_ROLE}:
-        raise PermissionError("Normal users cannot view other users' Investigating Officers.")
-
-    target_user = get_user_by_id(db=db, user_id=target_user_id)
-    if not target_user:
-        raise ValueError("Target user not found.")
-
     if actor_role == CLIENT_ADMIN_ROLE:
-        if target_user.client_id != actor.client_id:
-            raise PermissionError("Target user does not belong to your company.")
+        if not actor.client_id:
+            return []
+        if target_user_id is not None:
+            target_user = get_user_by_id(db=db, user_id=target_user_id)
+            if not target_user:
+                raise ValueError("Target user not found.")
+            if target_user.client_id != actor.client_id:
+                raise PermissionError("Target user does not belong to your company.")
+            return get_ios_by_user(
+                db=db,
+                user_id=target_user.id,
+            )
+        return get_ios_by_client(
+            db=db,
+            client_id=actor.client_id,
+        )
+
+    if actor_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        if target_user_id is not None:
+            target_user = get_user_by_id(db=db, user_id=target_user_id)
+            if not target_user:
+                raise ValueError("Target user not found.")
+            return get_ios_by_user(
+                db=db,
+                user_id=target_user.id,
+            )
+        if client_id is not None:
+            return get_ios_by_client(
+                db=db,
+                client_id=client_id,
+            )
+        return get_all_ios(db=db)
 
     return get_ios_by_user(
         db=db,
-        user_id=target_user.id,
+        user_id=actor.id,
     )
 
 
@@ -194,17 +210,36 @@ def update_io_service(
     data: IOMasterUpdateRequest,
     user_id: int,
 ) -> IOMaster:
-    user = get_user_by_id(db=db, user_id=user_id)
-    if user and str(user.role).lower() == USER_ROLE:
-        perms = getattr(user, "permissions", None)
+    actor = get_user_by_id(db=db, user_id=user_id)
+    if not actor:
+        raise ValueError("User not found.")
+
+    actor_role = str(actor.role).lower()
+
+    if actor_role == USER_ROLE:
+        perms = getattr(actor, "permissions", None)
         if perms and perms.can_update_io is False:
             raise PermissionError("You do not have permission to update Investigating Officers.")
+        io = get_io_by_id_and_user(
+            db=db,
+            io_id=io_id,
+            user_id=user_id,
+        )
+    elif actor_role == CLIENT_ADMIN_ROLE:
+        io = get_io_by_id(db=db, io_id=io_id)
+        if not io:
+            raise ValueError("Investigating Officer not found.")
+        if not io.creator or io.creator.client_id != actor.client_id:
+            raise PermissionError("Access denied. Investigating Officer does not belong to your company.")
+    elif actor_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        io = get_io_by_id(db=db, io_id=io_id)
+    else:
+        io = get_io_by_id_and_user(
+            db=db,
+            io_id=io_id,
+            user_id=user_id,
+        )
 
-    io = get_io_by_id_and_user(
-        db=db,
-        io_id=io_id,
-        user_id=user_id,
-    )
     if not io:
         raise ValueError("Investigating Officer not found.")
 
@@ -226,10 +261,28 @@ def update_io_service(
             raise ValueError("Police station cannot be empty.")
         io.police_station = police_station
 
-    return repository_update_io(
+    updated_io = repository_update_io(
         db=db,
         io=io,
     )
+
+    record_audit_log(
+        db=db,
+        actor=actor,
+        action="IO_UPDATED",
+        entity_type="io_master",
+        entity_id=str(updated_io.id),
+        entity_name=updated_io.officer_name,
+        description=f"{actor.role.capitalize()} {actor.username} updated IO '{updated_io.officer_name}'",
+        details={
+            "officer_name": updated_io.officer_name,
+            "designation": updated_io.designation,
+            "police_station": updated_io.police_station,
+        },
+        client_id=actor.client_id,
+    )
+
+    return updated_io
 
 
 def delete_io_service(
@@ -237,19 +290,54 @@ def delete_io_service(
     io_id: int,
     user_id: int,
 ) -> None:
-    user = get_user_by_id(db=db, user_id=user_id)
-    if user and str(user.role).lower() == USER_ROLE:
-        perms = getattr(user, "permissions", None)
+    actor = get_user_by_id(db=db, user_id=user_id)
+    if not actor:
+        raise ValueError("User not found.")
+
+    actor_role = str(actor.role).lower()
+
+    if actor_role == USER_ROLE:
+        perms = getattr(actor, "permissions", None)
         if perms and perms.can_delete_io is False:
             raise PermissionError("You do not have permission to delete Investigating Officers.")
+        io = get_io_by_id_and_user(
+            db=db,
+            io_id=io_id,
+            user_id=user_id,
+        )
+    elif actor_role == CLIENT_ADMIN_ROLE:
+        io = get_io_by_id(db=db, io_id=io_id)
+        if not io:
+            raise ValueError("Investigating Officer not found.")
+        if not io.creator or io.creator.client_id != actor.client_id:
+            raise PermissionError("Access denied. Investigating Officer does not belong to your company.")
+    elif actor_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        io = get_io_by_id(db=db, io_id=io_id)
+    else:
+        io = get_io_by_id_and_user(
+            db=db,
+            io_id=io_id,
+            user_id=user_id,
+        )
 
-    io = get_io_by_id_and_user(
-        db=db,
-        io_id=io_id,
-        user_id=user_id,
-    )
     if not io:
         raise ValueError("Investigating Officer not found.")
+
+    record_audit_log(
+        db=db,
+        actor=actor,
+        action="IO_DELETED",
+        entity_type="io_master",
+        entity_id=str(io.id),
+        entity_name=io.officer_name,
+        description=f"{actor.role.capitalize()} {actor.username} deleted IO '{io.officer_name}'",
+        details={
+            "officer_name": io.officer_name,
+            "designation": io.designation,
+            "police_station": io.police_station,
+        },
+        client_id=actor.client_id,
+    )
 
     repository_delete_io(
         db=db,

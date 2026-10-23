@@ -2,10 +2,19 @@ import { apiRequest } from "./client";
 
 /**
  * Fetch all Investigating Officers (IO) created by the logged-in user,
- * or for an assigned user if called by an Admin.
+ * or for an assigned user / client if called by an Admin or SuperAdmin.
  */
-export function getIOMasters(userId = null) {
-  const url = userId ? `/api/v1/io-master/?user_id=${userId}` : "/api/v1/io-master/";
+export function getIOMasters(params = null) {
+  let url = "/api/v1/io-master/";
+  if (typeof params === "number" || typeof params === "string") {
+    url += `?user_id=${params}`;
+  } else if (params && typeof params === "object") {
+    const query = new URLSearchParams();
+    if (params.userId) query.append("user_id", params.userId);
+    if (params.clientId) query.append("client_id", params.clientId);
+    const qs = query.toString();
+    if (qs) url += `?${qs}`;
+  }
   return apiRequest(url, {
     method: "GET",
   });

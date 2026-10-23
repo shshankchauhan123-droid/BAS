@@ -17,6 +17,7 @@ from app.bank_transactions.bank_transaction_repository import (
     get_transaction_relationships,
 )
 from app.files.file_service import get_case_files
+from app.files.file_repository import resolve_source_file_ids
 from fastapi import HTTPException
 
 from app.bank_transactions.bank_transaction_schema import (
@@ -162,10 +163,12 @@ def get_case_transactions_mode_wise(
                 detail=f"Files {invalid_ids} do not belong to case {case_id}"
             )
 
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+
     mode_data = get_mode_wise_by_case(
         db=db,
         case_id=case_id,
-        file_ids=parsed_file_ids,
+        file_ids=resolved_file_ids,
     )
 
     return ModeWiseResponse(
@@ -297,12 +300,14 @@ def search_case_transactions(
                     detail=f"Files {invalid_ids} do not belong to case {case_id}"
                 )
 
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+
     transactions, total, mode_counts = get_filtered_transactions_by_case(
         db=db,
         case_id=case_id,
         page=page,
         page_size=page_size,
-        file_ids=parsed_file_ids,
+        file_ids=resolved_file_ids,
         search=search,
         date_from=date_from,
         date_to=date_to,
@@ -399,7 +404,9 @@ def get_case_summary(
                     detail=f"Files {invalid_ids} do not belong to case {case_id}"
                 )
 
-    summary_data = get_case_transaction_summary(db=db, case_id=case_id, file_ids=parsed_file_ids, mode=mode)
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+
+    summary_data = get_case_transaction_summary(db=db, case_id=case_id, file_ids=resolved_file_ids, mode=mode)
 
     return TransactionSummaryResponse(
         success=True,
@@ -560,12 +567,14 @@ def export_case_transactions(
                     detail=f"Files {invalid_ids} do not belong to case {case_id}"
                 )
 
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+
     transactions, _, _ = get_filtered_transactions_by_case(
         db=db,
         case_id=case_id,
         page=1,
         page_size=1000000,
-        file_ids=parsed_file_ids,
+        file_ids=resolved_file_ids,
         search=search,
         date_from=date_from,
         date_to=date_to,
@@ -617,7 +626,7 @@ def export_case_transactions(
     filename = f"bank-statement-transaction-report-case-{case_id}.csv"
     
     return StreamingResponse(
-        iter([output.getvalue()]),
+        iter(["\ufeff" + output.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
@@ -638,6 +647,12 @@ def get_counterparty_analysis_route(
 
     if not parsed_file_ids:
         raise HTTPException(status_code=400, detail="file_ids is required")
+
+    valid_case_files = get_case_files(case_id=case_id, db=db, user=user)
+    valid_file_ids_set = {f.id for f in valid_case_files}
+    invalid_ids = [fid for fid in parsed_file_ids if fid not in valid_file_ids_set]
+    if invalid_ids:
+        raise HTTPException(status_code=400, detail=f"Files {invalid_ids} do not belong to case {case_id} or are superseded")
 
     from app.bank_transactions.bank_transaction_repository import get_counterparty_analysis
     data = get_counterparty_analysis(db, case_id, parsed_file_ids)
@@ -679,13 +694,22 @@ def get_case_financial_analysis(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid file_ids format")
             
+        if parsed_file_ids:
+            valid_case_files = get_case_files(case_id=case_id, db=db, user=user)
+            valid_file_ids_set = {f.id for f in valid_case_files}
+            invalid_ids = [fid for fid in parsed_file_ids if fid not in valid_file_ids_set]
+            if invalid_ids:
+                raise HTTPException(status_code=400, detail=f"Files {invalid_ids} do not belong to case {case_id} or are superseded")
+            
     min_amt = float(min_amount) if min_amount is not None else None
     max_amt = float(max_amount) if max_amount is not None else None
             
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+
     data = get_financial_analysis(
         db=db,
         case_id=case_id,
-        file_ids=parsed_file_ids,
+        file_ids=resolved_file_ids,
         date_from=date_from,
         date_to=date_to,
         transaction_type=transaction_type,

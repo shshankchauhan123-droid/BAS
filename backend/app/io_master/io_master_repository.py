@@ -15,13 +15,24 @@ def create_io(
     return io
 
 
+def get_all_ios(
+    db: Session,
+) -> list[IOMaster]:
+    return (
+        db.query(IOMaster)
+        .options(joinedload(IOMaster.creator).joinedload(User.client))
+        .order_by(IOMaster.officer_name.asc())
+        .all()
+    )
+
+
 def get_ios_by_user(
     db: Session,
     user_id: int,
 ) -> list[IOMaster]:
     return (
         db.query(IOMaster)
-        .options(joinedload(IOMaster.creator))
+        .options(joinedload(IOMaster.creator).joinedload(User.client))
         .filter(IOMaster.created_by == user_id)
         .order_by(IOMaster.officer_name.asc())
         .all()
@@ -35,7 +46,7 @@ def get_ios_by_client(
     return (
         db.query(IOMaster)
         .join(User, IOMaster.created_by == User.id)
-        .options(joinedload(IOMaster.creator))
+        .options(joinedload(IOMaster.creator).joinedload(User.client))
         .filter(User.client_id == client_id)
         .order_by(IOMaster.officer_name.asc())
         .all()
@@ -49,7 +60,7 @@ def get_io_by_id_and_user(
 ) -> Optional[IOMaster]:
     return (
         db.query(IOMaster)
-        .options(joinedload(IOMaster.creator))
+        .options(joinedload(IOMaster.creator).joinedload(User.client))
         .filter(
             IOMaster.id == io_id,
             IOMaster.created_by == user_id,
@@ -64,7 +75,7 @@ def get_io_by_id(
 ) -> Optional[IOMaster]:
     return (
         db.query(IOMaster)
-        .options(joinedload(IOMaster.creator))
+        .options(joinedload(IOMaster.creator).joinedload(User.client))
         .filter(IOMaster.id == io_id)
         .first()
     )

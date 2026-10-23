@@ -60,6 +60,7 @@ def create_io_route(
 )
 def get_ios_route(
     user_id: int | None = Query(default=None, description="Target user ID (Client Admin / Superadmin only)"),
+    client_id: int | None = Query(default=None, description="Target client ID (Superadmin only)"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -68,6 +69,7 @@ def get_ios_route(
             db=db,
             actor=current_user,
             target_user_id=user_id,
+            client_id=client_id,
         )
     except PermissionError as error:
         raise HTTPException(

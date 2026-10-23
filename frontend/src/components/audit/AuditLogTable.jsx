@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback } from "react";
 import { getAuditLogs, getAuditStats } from "../../services/api/audit";
 import { getClients } from "../../services/api/clients";
 
-export default function AuditLogTable({ isSuperAdmin = false }) {
+export default function AuditLogTable({ isSuperAdmin = false, theme = "dark" }) {
+  const isLight = theme === "light";
+
   const [logs, setLogs] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -114,6 +116,37 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
   };
 
   const getActionBadge = (action) => {
+    if (isLight) {
+      switch (action) {
+        case "CASE_CREATED":
+          return "bg-emerald-50 text-emerald-800 border-emerald-200";
+        case "CASE_UPDATED":
+          return "bg-sky-50 text-sky-800 border-sky-200";
+        case "CASE_ARCHIVED":
+          return "bg-amber-50 text-amber-800 border-amber-200";
+        case "CASE_ARCHIVE_DENIED":
+          return "bg-rose-50 text-rose-800 border-rose-300 font-bold";
+        case "FILE_UPLOADED":
+          return "bg-teal-50 text-teal-800 border-teal-200";
+        case "FILE_UPDATED":
+          return "bg-cyan-50 text-cyan-800 border-cyan-200";
+        case "FILE_DELETED":
+          return "bg-rose-50 text-rose-800 border-rose-200";
+        case "FILE_PROCESSING_SUCCESS":
+          return "bg-emerald-50 text-emerald-800 border-emerald-200";
+        case "FILE_PROCESSING_FAILED":
+          return "bg-rose-50 text-rose-800 border-rose-300 font-bold";
+        case "USER_CREATED":
+          return "bg-purple-50 text-purple-800 border-purple-200";
+        case "USER_STATUS_TOGGLED":
+          return "bg-indigo-50 text-indigo-800 border-indigo-200";
+        case "PERMISSIONS_UPDATED":
+          return "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200";
+        default:
+          return "bg-slate-100 text-slate-700 border-slate-200";
+      }
+    }
+
     switch (action) {
       case "CASE_CREATED":
         return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
@@ -148,51 +181,146 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
     <div className="space-y-6">
       {/* Top Metric Cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        {/* 1. Today's Activities */}
+        <div
+          className={
+            isLight
+              ? "rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition hover:shadow-md hover:-translate-y-0.5 duration-200"
+              : "rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur"
+          }
+        >
+          <div
+            className={
+              isLight
+                ? "text-[11px] font-bold uppercase tracking-wider text-slate-500"
+                : "text-[11px] font-semibold uppercase tracking-wider text-slate-400"
+            }
+          >
             Today's Activities
           </div>
-          <div className="mt-2 text-2xl font-bold text-white">
+          <div
+            className={
+              isLight
+                ? "mt-2 text-2xl font-extrabold text-[#172554]"
+                : "mt-2 text-2xl font-bold text-white"
+            }
+          >
             {statsLoading ? "..." : stats?.total_today ?? 0}
           </div>
           <div className="mt-1 text-[11px] text-slate-500">Platform-wide events</div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-400">
+        {/* 2. Case Actions */}
+        <div
+          className={
+            isLight
+              ? "rounded-2xl border border-sky-100 bg-white p-4 shadow-xs transition hover:shadow-md hover:-translate-y-0.5 duration-200"
+              : "rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur"
+          }
+        >
+          <div
+            className={
+              isLight
+                ? "text-[11px] font-bold uppercase tracking-wider text-sky-700"
+                : "text-[11px] font-semibold uppercase tracking-wider text-sky-400"
+            }
+          >
             Case Actions
           </div>
-          <div className="mt-2 text-2xl font-bold text-sky-300">
+          <div
+            className={
+              isLight
+                ? "mt-2 text-2xl font-extrabold text-sky-700"
+                : "mt-2 text-2xl font-bold text-sky-300"
+            }
+          >
             {statsLoading ? "..." : stats?.case_activities ?? 0}
           </div>
           <div className="mt-1 text-[11px] text-slate-500">Created / Updated / Archived</div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-teal-400">
+        {/* 3. Files Uploaded */}
+        <div
+          className={
+            isLight
+              ? "rounded-2xl border border-teal-100 bg-white p-4 shadow-xs transition hover:shadow-md hover:-translate-y-0.5 duration-200"
+              : "rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur"
+          }
+        >
+          <div
+            className={
+              isLight
+                ? "text-[11px] font-bold uppercase tracking-wider text-teal-700"
+                : "text-[11px] font-semibold uppercase tracking-wider text-teal-400"
+            }
+          >
             Files Uploaded
           </div>
-          <div className="mt-2 text-2xl font-bold text-teal-300">
+          <div
+            className={
+              isLight
+                ? "mt-2 text-2xl font-extrabold text-teal-700"
+                : "mt-2 text-2xl font-bold text-teal-300"
+            }
+          >
             {statsLoading ? "..." : stats?.file_uploads ?? 0}
           </div>
           <div className="mt-1 text-[11px] text-slate-500">Statements uploaded</div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-rose-400">
+        {/* 4. Process Failures */}
+        <div
+          className={
+            isLight
+              ? "rounded-2xl border border-rose-100 bg-white p-4 shadow-xs transition hover:shadow-md hover:-translate-y-0.5 duration-200"
+              : "rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur"
+          }
+        >
+          <div
+            className={
+              isLight
+                ? "text-[11px] font-bold uppercase tracking-wider text-rose-700"
+                : "text-[11px] font-semibold uppercase tracking-wider text-rose-400"
+            }
+          >
             Process Failures
           </div>
-          <div className="mt-2 text-2xl font-bold text-rose-400">
+          <div
+            className={
+              isLight
+                ? "mt-2 text-2xl font-extrabold text-rose-600"
+                : "mt-2 text-2xl font-bold text-rose-400"
+            }
+          >
             {statsLoading ? "..." : stats?.file_processing_failures ?? 0}
           </div>
           <div className="mt-1 text-[11px] text-slate-500">Parsing errors</div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur col-span-2 sm:col-span-1">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-purple-400">
+        {/* 5. User Operations */}
+        <div
+          className={
+            isLight
+              ? "rounded-2xl border border-purple-100 bg-white p-4 shadow-xs transition hover:shadow-md hover:-translate-y-0.5 duration-200 col-span-2 sm:col-span-1"
+              : "rounded-2xl border border-white/5 bg-slate-900/60 p-4 shadow-lg backdrop-blur col-span-2 sm:col-span-1"
+          }
+        >
+          <div
+            className={
+              isLight
+                ? "text-[11px] font-bold uppercase tracking-wider text-purple-700"
+                : "text-[11px] font-semibold uppercase tracking-wider text-purple-400"
+            }
+          >
             User Operations
           </div>
-          <div className="mt-2 text-2xl font-bold text-purple-300">
+          <div
+            className={
+              isLight
+                ? "mt-2 text-2xl font-extrabold text-purple-700"
+                : "mt-2 text-2xl font-bold text-purple-300"
+            }
+          >
             {statsLoading ? "..." : stats?.user_management_activities ?? 0}
           </div>
           <div className="mt-1 text-[11px] text-slate-500">Creations / Status / Rights</div>
@@ -200,7 +328,13 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
       </div>
 
       {/* Filter and Control Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-900/50 p-4 backdrop-blur">
+      <div
+        className={
+          isLight
+            ? "flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs"
+            : "flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-900/50 p-4 backdrop-blur"
+        }
+      >
         <div className="flex flex-wrap items-center gap-3">
           {/* Action Filter */}
           <select
@@ -209,7 +343,11 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
               setSelectedAction(e.target.value);
               setPage(1);
             }}
-            className="rounded-xl border border-white/10 bg-slate-950/80 px-3.5 py-2 text-xs font-medium text-slate-200 focus:border-emerald-500 focus:outline-none"
+            className={
+              isLight
+                ? "rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none transition"
+                : "rounded-xl border border-white/10 bg-slate-950/80 px-3.5 py-2 text-xs font-medium text-slate-200 focus:border-emerald-500 focus:outline-none"
+            }
           >
             <option value="">All Actions</option>
             <option value="CASE_CREATED">Case Created</option>
@@ -233,7 +371,11 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
               setSelectedEntityType(e.target.value);
               setPage(1);
             }}
-            className="rounded-xl border border-white/10 bg-slate-950/80 px-3.5 py-2 text-xs font-medium text-slate-200 focus:border-emerald-500 focus:outline-none"
+            className={
+              isLight
+                ? "rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none transition"
+                : "rounded-xl border border-white/10 bg-slate-950/80 px-3.5 py-2 text-xs font-medium text-slate-200 focus:border-emerald-500 focus:outline-none"
+            }
           >
             <option value="">All Entity Types</option>
             <option value="case">Cases</option>
@@ -249,7 +391,11 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
                 setSelectedClientId(e.target.value);
                 setPage(1);
               }}
-              className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-3.5 py-2 text-xs font-semibold text-emerald-300 focus:border-emerald-400 focus:outline-none"
+              className={
+                isLight
+                  ? "rounded-xl border border-emerald-200 bg-emerald-50/50 px-3.5 py-2 text-xs font-bold text-emerald-900 focus:border-emerald-500 focus:outline-none"
+                  : "rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-3.5 py-2 text-xs font-semibold text-emerald-300 focus:border-emerald-400 focus:outline-none"
+              }
             >
               <option value="">All Client Companies</option>
               {clientsList.map((c) => (
@@ -261,16 +407,22 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
           )}
 
           {/* Search Entity ID */}
-          <input
-            type="text"
-            placeholder="Search Entity ID..."
-            value={searchEntityId}
-            onChange={(e) => setSearchEntityId(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setPage(1);
-            }}
-            className="w-36 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search Entity ID..."
+              value={searchEntityId}
+              onChange={(e) => setSearchEntityId(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") setPage(1);
+              }}
+              className={
+                isLight
+                  ? "w-40 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none transition"
+                  : "w-36 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+              }
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -278,11 +430,21 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
             type="button"
             onClick={handleRefresh}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+            className={
+              isLight
+                ? "inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-100 hover:text-[#172554]"
+                : "inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+            }
             title="Refresh Audit Logs"
           >
             <svg
-              className={`h-3.5 w-3.5 ${loading ? "animate-spin text-emerald-400" : ""}`}
+              className={`h-3.5 w-3.5 ${
+                loading
+                  ? "animate-spin text-emerald-600"
+                  : isLight
+                  ? "text-slate-500"
+                  : "text-slate-400"
+              }`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -300,16 +462,34 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs font-medium text-rose-400">
+        <div
+          className={
+            isLight
+              ? "rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800"
+              : "rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs font-medium text-rose-400"
+          }
+        >
           {error}
         </div>
       )}
 
       {/* Main Audit Table */}
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur">
+      <div
+        className={
+          isLight
+            ? "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"
+            : "overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur"
+        }
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-white/10 bg-slate-950/50 text-[11px] uppercase tracking-wider text-slate-400">
+            <thead
+              className={
+                isLight
+                  ? "border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-700"
+                  : "border-b border-white/10 bg-slate-950/50 text-[11px] uppercase tracking-wider text-slate-400"
+              }
+            >
               <tr>
                 <th className="px-5 py-4">Timestamp</th>
                 <th className="px-5 py-4">Actor / User</th>
@@ -319,10 +499,21 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
                 <th className="px-5 py-4 text-right">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 text-slate-300">
+            <tbody
+              className={
+                isLight
+                  ? "divide-y divide-slate-100 text-slate-700"
+                  : "divide-y divide-white/5 text-slate-300"
+              }
+            >
               {loading && logs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
+                  <td
+                    colSpan={6}
+                    className={`py-12 text-center ${
+                      isLight ? "text-slate-400" : "text-slate-500"
+                    }`}
+                  >
                     <div className="flex items-center justify-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
                       Loading audit records...
@@ -331,27 +522,65 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
+                  <td
+                    colSpan={6}
+                    className={`py-12 text-center ${
+                      isLight ? "text-slate-400" : "text-slate-500"
+                    }`}
+                  >
                     No activity logs recorded matching current criteria.
                   </td>
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr key={log.id} className="transition hover:bg-white/[0.02]">
+                  <tr
+                    key={log.id}
+                    className={
+                      isLight
+                        ? "transition hover:bg-slate-50/70"
+                        : "transition hover:bg-white/[0.02]"
+                    }
+                  >
                     {/* Timestamp */}
-                    <td className="whitespace-nowrap px-5 py-4 font-mono text-[11px] text-slate-400">
+                    <td
+                      className={`whitespace-nowrap px-5 py-4 font-mono text-[11px] ${
+                        isLight ? "text-slate-500" : "text-slate-400"
+                      }`}
+                    >
                       {formatTimestamp(log.created_at)}
                     </td>
 
                     {/* Actor */}
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-[11px] font-bold text-emerald-400">
+                        <div
+                          className={`flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-bold ${
+                            isLight
+                              ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                              : "bg-emerald-500/10 text-emerald-400"
+                          }`}
+                        >
                           {log.user_name ? log.user_name.charAt(0).toUpperCase() : "S"}
                         </div>
                         <div>
-                          <div className="font-semibold text-white">{log.user_name}</div>
-                          <div className="text-[10px] text-slate-500">{log.user_email}</div>
+                          <div
+                            className={
+                              isLight
+                                ? "font-bold text-[#172554]"
+                                : "font-semibold text-white"
+                            }
+                          >
+                            {log.user_name || "System"}
+                          </div>
+                          <div
+                            className={
+                              isLight
+                                ? "text-[10px] text-slate-500"
+                                : "text-[10px] text-slate-500"
+                            }
+                          >
+                            {log.user_email || "system@automated"}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -370,17 +599,32 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
                     {/* Target */}
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-1.5">
-                        <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase text-slate-400">
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] uppercase font-bold tracking-wide ${
+                            isLight
+                              ? "bg-slate-100 border border-slate-200 text-slate-600"
+                              : "bg-white/5 text-slate-400"
+                          }`}
+                        >
                           {log.entity_type}
                         </span>
-                        <span className="font-medium text-slate-200">
+                        <span
+                          className={`font-semibold ${
+                            isLight ? "text-slate-800" : "text-slate-200"
+                          }`}
+                        >
                           {log.entity_name || `#${log.entity_id}`}
                         </span>
                       </div>
                     </td>
 
                     {/* Description */}
-                    <td className="px-5 py-4 text-slate-300 max-w-md truncate" title={log.description}>
+                    <td
+                      className={`px-5 py-4 max-w-md truncate ${
+                        isLight ? "text-slate-600" : "text-slate-300"
+                      }`}
+                      title={log.description}
+                    >
                       {log.description}
                     </td>
 
@@ -389,7 +633,11 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
                       <button
                         type="button"
                         onClick={() => setActiveDetailLog(log)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:bg-emerald-500/20 hover:text-emerald-300 hover:border-emerald-500/40"
+                        className={
+                          isLight
+                            ? "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 shadow-2xs transition hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300"
+                            : "rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:bg-emerald-500/20 hover:text-emerald-300 hover:border-emerald-500/40"
+                        }
                       >
                         Inspect
                       </button>
@@ -402,10 +650,23 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
         </div>
 
         {/* Pagination Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 bg-slate-950/40 px-5 py-4 text-xs text-slate-400">
+        <div
+          className={
+            isLight
+              ? "flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-slate-50/70 px-5 py-4 text-xs text-slate-600"
+              : "flex flex-wrap items-center justify-between gap-4 border-t border-white/10 bg-slate-950/40 px-5 py-4 text-xs text-slate-400"
+          }
+        >
           <div>
-            Showing <strong className="text-white">{logs.length}</strong> of{" "}
-            <strong className="text-white">{total}</strong> total activities
+            Showing{" "}
+            <strong className={isLight ? "text-[#172554] font-bold" : "text-white"}>
+              {logs.length}
+            </strong>{" "}
+            of{" "}
+            <strong className={isLight ? "text-[#172554] font-bold" : "text-white"}>
+              {total}
+            </strong>{" "}
+            total activities
           </div>
 
           <div className="flex items-center gap-2">
@@ -413,19 +674,33 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
               type="button"
               disabled={page <= 1 || loading}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              className={
+                isLight
+                  ? "rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  : "rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              }
             >
               Previous
             </button>
             <span className="px-2 text-xs">
-              Page <strong className="text-white">{page}</strong> of{" "}
-              <strong className="text-white">{totalPages}</strong>
+              Page{" "}
+              <strong className={isLight ? "text-[#172554] font-bold" : "text-white"}>
+                {page}
+              </strong>{" "}
+              of{" "}
+              <strong className={isLight ? "text-[#172554] font-bold" : "text-white"}>
+                {totalPages}
+              </strong>
             </span>
             <button
               type="button"
               disabled={page >= totalPages || loading}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              className={
+                isLight
+                  ? "rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  : "rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              }
             >
               Next
             </button>
@@ -435,19 +710,39 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
 
       {/* Details Modal */}
       {activeDetailLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div
+            className={
+              isLight
+                ? "relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl text-slate-800"
+                : "relative w-full max-w-2xl rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl text-white"
+            }
+          >
+            <div
+              className={`flex items-center justify-between border-b pb-4 ${
+                isLight ? "border-slate-200" : "border-white/10"
+              }`}
+            >
               <div>
-                <h3 className="text-base font-bold text-white">Audit Event Details</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h3
+                  className={`text-base font-extrabold ${
+                    isLight ? "text-[#172554]" : "text-white"
+                  }`}
+                >
+                  Audit Event Details
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
                   Event ID #{activeDetailLog.id} • {formatTimestamp(activeDetailLog.created_at)}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveDetailLog(null)}
-                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+                className={`rounded-lg p-1.5 transition ${
+                  isLight
+                    ? "text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    : "text-slate-400 hover:bg-white/10 hover:text-white"
+                }`}
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -457,51 +752,125 @@ export default function AuditLogTable({ isSuperAdmin = false }) {
 
             <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Action</div>
-                  <div className="mt-1 font-semibold text-white">{activeDetailLog.action}</div>
-                </div>
-                <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Entity</div>
-                  <div className="mt-1 font-semibold text-white">
-                    {activeDetailLog.entity_type.toUpperCase()} #{activeDetailLog.entity_id} ({activeDetailLog.entity_name || "N/A"})
+                <div
+                  className={`rounded-xl border p-3 ${
+                    isLight ? "border-slate-200 bg-slate-50" : "border-white/5 bg-slate-950/60"
+                  }`}
+                >
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                    Action
+                  </div>
+                  <div
+                    className={`mt-1 font-bold ${
+                      isLight ? "text-[#172554]" : "text-white"
+                    }`}
+                  >
+                    {activeDetailLog.action}
                   </div>
                 </div>
-                <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Actor</div>
-                  <div className="mt-1 font-semibold text-white">
-                    {activeDetailLog.user_name} ({activeDetailLog.user_role})
+
+                <div
+                  className={`rounded-xl border p-3 ${
+                    isLight ? "border-slate-200 bg-slate-50" : "border-white/5 bg-slate-950/60"
+                  }`}
+                >
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                    Entity
                   </div>
-                  <div className="text-[10px] text-slate-400">{activeDetailLog.user_email}</div>
+                  <div
+                    className={`mt-1 font-bold ${
+                      isLight ? "text-[#172554]" : "text-white"
+                    }`}
+                  >
+                    {activeDetailLog.entity_type?.toUpperCase()} #{activeDetailLog.entity_id} (
+                    {activeDetailLog.entity_name || "N/A"})
+                  </div>
                 </div>
-                <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Client / Company ID</div>
-                  <div className="mt-1 font-semibold text-white">
-                    {activeDetailLog.client_id ? `Company #${activeDetailLog.client_id}` : "Global (SuperAdmin)"}
+
+                <div
+                  className={`rounded-xl border p-3 ${
+                    isLight ? "border-slate-200 bg-slate-50" : "border-white/5 bg-slate-950/60"
+                  }`}
+                >
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                    Actor
+                  </div>
+                  <div
+                    className={`mt-1 font-bold ${
+                      isLight ? "text-[#172554]" : "text-white"
+                    }`}
+                  >
+                    {activeDetailLog.user_name || "System"} ({activeDetailLog.user_role || "automated"})
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {activeDetailLog.user_email || "system@automated"}
+                  </div>
+                </div>
+
+                <div
+                  className={`rounded-xl border p-3 ${
+                    isLight ? "border-slate-200 bg-slate-50" : "border-white/5 bg-slate-950/60"
+                  }`}
+                >
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                    Client / Company ID
+                  </div>
+                  <div
+                    className={`mt-1 font-bold ${
+                      isLight ? "text-[#172554]" : "text-white"
+                    }`}
+                  >
+                    {activeDetailLog.client_id
+                      ? `Company #${activeDetailLog.client_id}`
+                      : "Global (SuperAdmin)"}
                   </div>
                 </div>
               </div>
 
               <div>
-                <div className="text-[11px] font-semibold text-slate-400 mb-1">Human Description</div>
-                <div className="rounded-xl border border-white/5 bg-slate-950/80 p-3 text-xs text-slate-200">
+                <div className="text-[11px] font-bold text-slate-500 mb-1">
+                  Human Description
+                </div>
+                <div
+                  className={`rounded-xl border p-3 text-xs ${
+                    isLight
+                      ? "border-slate-200 bg-slate-50 text-slate-700"
+                      : "border-white/5 bg-slate-950/80 text-slate-200"
+                  }`}
+                >
                   {activeDetailLog.description}
                 </div>
               </div>
 
               <div>
-                <div className="text-[11px] font-semibold text-slate-400 mb-1">Structured Details (JSON)</div>
-                <pre className="rounded-xl border border-white/5 bg-slate-950/90 p-3.5 font-mono text-[11px] text-emerald-300 overflow-x-auto">
+                <div className="text-[11px] font-bold text-slate-500 mb-1">
+                  Structured Details (JSON)
+                </div>
+                <pre
+                  className={`rounded-xl border p-3.5 font-mono text-[11px] overflow-x-auto ${
+                    isLight
+                      ? "border-slate-200 bg-slate-900 text-emerald-300"
+                      : "border-white/5 bg-slate-950/90 text-emerald-300"
+                  }`}
+                >
                   {JSON.stringify(activeDetailLog.details, null, 2)}
                 </pre>
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end border-t border-white/10 pt-4">
+            <div
+              className={`mt-6 flex justify-end border-t pt-4 ${
+                isLight ? "border-slate-200" : "border-white/10"
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => setActiveDetailLog(null)}
-                className="rounded-xl bg-white/10 px-5 py-2 text-xs font-semibold text-white transition hover:bg-white/20"
+                className={
+                  isLight
+                    ? "rounded-xl border border-slate-200 bg-slate-100 px-5 py-2 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-200 hover:text-[#172554]"
+                    : "rounded-xl bg-white/10 px-5 py-2 text-xs font-semibold text-white transition hover:bg-white/20"
+                }
               >
                 Close
               </button>

@@ -5,6 +5,19 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { loginUser } from "../../services/api/auth";
 
+/**
+ * ARTHBODH — Banking Analytical System (BAS)
+ * Authentication / Login Component
+ *
+ * Visual Theme:
+ * - Light slate canvas (#F5F8FC) matching UserDashboard.jsx
+ * - Deep navy (#172554) typography & high-contrast slate text
+ * - ArthBodh signature emerald (#059669) accents & primary actions
+ * - Pure white elevated cards (#ffffff) with subtle border (#E2E8F0)
+ * - Soft ambient gradients, decorative background glow, and lightweight CSS animations
+ * - Full accessibility with semantic labels and prefers-reduced-motion support
+ * - Complete preservation of authentication, validation, session, and role redirects
+ */
 function Login() {
   const navigate = useNavigate();
   const { login, logout } = useAuth();
@@ -34,6 +47,7 @@ function Login() {
     setErrors((previous) => ({
       ...previous,
       [name]: "",
+      general: "",
     }));
   }
 
@@ -60,7 +74,7 @@ function Login() {
   }
 
   /* ============================================================
-     LOGIN
+     LOGIN SUBMISSION
   ============================================================ */
 
   async function handleSubmit(event) {
@@ -75,9 +89,9 @@ function Login() {
         icon: "warning",
         title: "Check Your Credentials",
         text: "Please enter a valid username and password.",
-        background: "#07110f",
-        color: "#f8fafc",
-        iconColor: "#34d399",
+        background: "#ffffff",
+        color: "#172554",
+        iconColor: "#f59e0b",
         confirmButtonText: "Review",
         confirmButtonColor: "#059669",
         buttonsStyling: true,
@@ -97,11 +111,8 @@ function Login() {
     try {
       /*
        * Create plain string values before sending the request.
-       *
-       * This guarantees that JSON.stringify() receives
-       * normal strings and never an HTMLInputElement.
+       * Guarantees that JSON.stringify() receives normal strings.
        */
-
       const company_code = formData.company_code
         ? String(formData.company_code).trim().toUpperCase()
         : undefined;
@@ -110,25 +121,15 @@ function Login() {
 
       console.log("LOGIN COMPANY CODE:", company_code);
       console.log("LOGIN USERNAME:", username);
-      console.log("LOGIN USERNAME TYPE:", typeof username);
-      console.log("LOGIN PASSWORD TYPE:", typeof password);
 
       /*
        * Backend response expected:
-       *
        * {
        *   access_token: "...",
        *   token_type: "bearer",
-       *   user: {
-       *     id,
-       *     username,
-       *     email,
-       *     role,
-       *     is_active
-       *   }
+       *   user: { id, username, email, role, is_active }
        * }
        */
-
       const authData = await loginUser({
         company_code,
         username,
@@ -143,7 +144,6 @@ function Login() {
       /*
        * Validate authentication response.
        */
-
       if (!accessToken || !authenticatedUser) {
         throw new Error(
           "Authentication succeeded, but the server returned an invalid login response."
@@ -153,7 +153,6 @@ function Login() {
       /*
        * Validate user role.
        */
-
       if (!authenticatedUser.role) {
         throw new Error(
           "Authentication succeeded, but no user role was returned."
@@ -163,15 +162,13 @@ function Login() {
       /*
        * Normalize role.
        */
-
       const role = String(authenticatedUser.role)
         .trim()
         .toLowerCase();
 
       /*
-       * Determine dashboard.
+       * Determine dashboard based on user role.
        */
-
       let dashboardPath = null;
 
       if (role === "superadmin" || role === "admin") {
@@ -185,7 +182,6 @@ function Login() {
       /*
        * Unknown role should not enter the system.
        */
-
       if (!dashboardPath) {
         logout();
 
@@ -195,13 +191,8 @@ function Login() {
       }
 
       /*
-       * AuthContext handles:
-       *
-       * 1. Saving JWT token.
-       * 2. Saving authenticated user.
-       * 3. Updating authentication state.
+       * AuthContext handles saving JWT token and user state.
        */
-
       login({
         ...authData,
         user: {
@@ -216,31 +207,31 @@ function Login() {
       /*
        * SUCCESS MESSAGE
        */
-
       await Swal.fire({
         icon: "success",
         title: "Access Granted",
         html: `
           <div style="margin-top: 8px;">
             <div style="
-              color: #94a3b8;
-              font-size: 13px;
+              color: #475569;
+              font-size: 14px;
               line-height: 1.6;
             ">
               Welcome back,
-              <strong style="color:#6ee7b7;">
+              <strong style="color: #059669;">
                 ${authenticatedUser.username}
               </strong>
             </div>
 
             <div style="
-              margin-top: 12px;
-              padding: 10px 12px;
-              border: 1px solid rgba(52,211,153,0.18);
-              border-radius: 10px;
-              background: rgba(52,211,153,0.05);
-              color: #64748b;
-              font-size: 10px;
+              margin-top: 14px;
+              padding: 10px 14px;
+              border: 1px solid #a7f3d0;
+              border-radius: 12px;
+              background: #ecfdf5;
+              color: #065f46;
+              font-size: 11px;
+              font-weight: 700;
               letter-spacing: 0.12em;
               text-transform: uppercase;
             ">
@@ -248,25 +239,26 @@ function Login() {
             </div>
 
             <div style="
-              margin-top: 8px;
-              color: #475569;
-              font-size: 9px;
-              letter-spacing: 0.1em;
+              margin-top: 10px;
+              color: #64748b;
+              font-size: 10px;
+              font-weight: 600;
+              letter-spacing: 0.12em;
               text-transform: uppercase;
             ">
-              Bank Analysis System
+              ARTHBODH — Banking Analytical System
             </div>
           </div>
         `,
-        background: "#07110f",
-        color: "#f8fafc",
-        iconColor: "#34d399",
+        background: "#ffffff",
+        color: "#172554",
+        iconColor: "#059669",
         confirmButtonText:
           role === "superadmin" || role === "admin"
             ? "Enter SuperAdmin Control →"
             : role === "client_admin"
             ? "Enter Company Portal →"
-            : "Enter BAS Dashboard →",
+            : "Enter ARTHBODH Dashboard →",
         confirmButtonColor: "#059669",
         allowOutsideClick: false,
         buttonsStyling: true,
@@ -280,11 +272,7 @@ function Login() {
 
       /*
        * Redirect according to role.
-       *
-       * admin → /admin
-       * user  → /dashboard
        */
-
       navigate(dashboardPath, {
         replace: true,
       });
@@ -292,49 +280,111 @@ function Login() {
       console.error("Login failed:", error);
 
       /*
-       * Clear authentication state.
+       * Clear authentication state on failure.
        */
-
       logout();
 
-      /*
-       * Get backend error when available.
-       */
+      const status = error?.status || error?.response?.status;
+      const rawDetail = error?.response?.data?.detail;
+      const code =
+        error?.code ||
+        (typeof rawDetail === "object" ? rawDetail?.code : null) ||
+        error?.response?.data?.code ||
+        null;
 
-      const message =
-        error?.response?.data?.detail ||
+      const detailMsg =
+        typeof rawDetail === "string"
+          ? rawDetail
+          : rawDetail?.message || null;
+
+      let userTitle = "Authentication Failed";
+      let userMessage =
+        detailMsg ||
         error?.message ||
         "Unable to authenticate your account. Please try again.";
+
+      const fieldErrors = {};
+
+      if (code === "USER_NOT_FOUND") {
+        userTitle = "Invalid Username";
+        userMessage = "Invalid username or email. Please check your credentials.";
+        fieldErrors.username = userMessage;
+      } else if (code === "INVALID_PASSWORD") {
+        userTitle = "Incorrect Password";
+        userMessage = "Incorrect password. Please try again.";
+        fieldErrors.password = userMessage;
+      } else if (code === "INVALID_COMPANY_CODE") {
+        userTitle = "Invalid Company Code";
+        userMessage = "Invalid company code. Please check your credentials.";
+      } else if (code === "COMPANY_CODE_REQUIRED") {
+        userTitle = "Company Code Required";
+        userMessage =
+          "Multiple company accounts found with this username. Please enter your Company Code.";
+      } else if (code === "ACCOUNT_INACTIVE") {
+        userTitle = "Account Inactive";
+        userMessage = "User account is inactive. Please contact your administrator.";
+      } else if (code === "COMPANY_DEACTIVATED") {
+        userTitle = "Company Inactive";
+        userMessage =
+          "Access denied. Your company account has been deactivated by administrator.";
+      } else if (code === "SESSION_EXPIRED") {
+        userTitle = "Session Expired";
+        userMessage = "Session expired. Please log in again.";
+      } else if (status === 400 || status === 422) {
+        userTitle = "Validation Error";
+        userMessage = detailMsg || "Please check your credentials and try again.";
+      } else if (status === 401) {
+        userTitle = "Authentication Failed";
+        userMessage = detailMsg || "Invalid credentials. Please check your username and password.";
+      } else if (status === 403) {
+        userTitle = "Access Denied";
+        userMessage = detailMsg || "You do not have permission to access this system.";
+      } else if (status >= 500) {
+        userTitle = "Server Error";
+        userMessage = "A server error occurred. Please try again later or contact support.";
+      } else if (!status && error?.message?.includes("connect to the backend server")) {
+        userTitle = "Connection Error";
+        userMessage = error.message;
+      }
+
+      setErrors({
+        ...fieldErrors,
+        general: userMessage,
+      });
 
       /*
        * ERROR MESSAGE
        */
-
       await Swal.fire({
         icon: "error",
-        title: "Authentication Failed",
+        title: userTitle,
         html: `
           <div style="
-            color: #94a3b8;
-            font-size: 13px;
+            color: #475569;
+            font-size: 14px;
             line-height: 1.6;
           ">
-            ${message}
+            ${userMessage}
           </div>
 
           <div style="
-            margin-top: 12px;
-            color: #475569;
+            margin-top: 14px;
+            padding: 8px 12px;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+            background: #fef2f2;
+            color: #991b1b;
             font-size: 10px;
+            font-weight: 700;
             letter-spacing: 0.12em;
             text-transform: uppercase;
           ">
-            BAS authentication request rejected
+            ARTHBODH authentication request rejected
           </div>
         `,
-        background: "#07110f",
-        color: "#f8fafc",
-        iconColor: "#f87171",
+        background: "#ffffff",
+        color: "#172554",
+        iconColor: "#ef4444",
         confirmButtonText: "Try Again",
         confirmButtonColor: "#dc2626",
         buttonsStyling: true,
@@ -350,346 +400,300 @@ function Login() {
     }
   }
 
-  /* ============================================================
-     INPUT STYLES
-  ============================================================ */
-
-  const inputBase =
-    "w-full rounded-xl border bg-slate-950/60 px-4 py-3.5 text-sm text-white outline-none transition-all duration-200 placeholder:text-slate-600 focus:bg-slate-900/80 disabled:cursor-not-allowed disabled:opacity-50";
-
-  const inputNormal =
-    "border-white/[0.09] focus:border-emerald-400/50 focus:ring-4 focus:ring-emerald-400/[0.07]";
-
-  const inputError =
-    "border-red-500/50 focus:border-red-400 focus:ring-4 focus:ring-red-500/10";
-
   return (
     <>
       {/* ==========================================================
-          SWEETALERT STYLING
+          SWEETALERT & ANIMATION STYLING
       =========================================================== */}
-
       <style>
         {`
+          @keyframes arthbodhFadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(18px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+
+          @keyframes arthbodhFadeInLeft {
+            from {
+              opacity: 0;
+              transform: translateX(-18px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(0);
+            }
+          }
+
+          @keyframes arthbodhPulseGlow {
+            0%, 100% {
+              opacity: 0.28;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.45;
+              transform: scale(1.06);
+            }
+          }
+
+          .arthbodh-anim-left {
+            animation: arthbodhFadeInLeft 650ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+
+          .arthbodh-anim-right {
+            animation: arthbodhFadeInUp 650ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .arthbodh-anim-left,
+            .arthbodh-anim-right,
+            .arthbodh-pulse-glow {
+              animation: none !important;
+              transform: none !important;
+            }
+          }
+
           .bas-popup {
-            border: 1px solid rgba(52, 211, 153, 0.16) !important;
-            border-radius: 24px !important;
-
-            box-shadow:
-              0 0 0 1px rgba(52, 211, 153, 0.03),
-              0 25px 80px rgba(0, 0, 0, 0.65),
-              0 0 60px rgba(52, 211, 153, 0.08) !important;
-
-            backdrop-filter: blur(20px) !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 20px !important;
+            box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12) !important;
+            background: #ffffff !important;
+            color: #172554 !important;
+            padding: 24px !important;
           }
 
           .bas-popup-title {
+            color: #172554 !important;
+            font-weight: 800 !important;
             letter-spacing: -0.02em !important;
-            font-weight: 600 !important;
           }
 
           .bas-popup-html {
             margin: 0 !important;
           }
 
-          .bas-confirm-button,
+          .bas-confirm-button {
+            border-radius: 12px !important;
+            padding: 10px 24px !important;
+            font-size: 13px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.02em !important;
+            background-color: #059669 !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25) !important;
+            transition: all 180ms ease !important;
+          }
+
+          .bas-confirm-button:hover {
+            background-color: #047857 !important;
+          }
+
           .bas-error-button {
-            border-radius: 10px !important;
-            padding: 11px 20px !important;
-            font-size: 12px !important;
-            font-weight: 600 !important;
-            letter-spacing: 0.03em !important;
-            box-shadow: none !important;
+            border-radius: 12px !important;
+            padding: 10px 24px !important;
+            font-size: 13px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.02em !important;
+            background-color: #dc2626 !important;
+            color: #ffffff !important;
           }
 
           .swal2-icon {
             border-width: 2px !important;
           }
-
-          .swal2-icon.swal2-success {
-            border-color: rgba(52, 211, 153, 0.5) !important;
-            color: #34d399 !important;
-          }
-
-          .swal2-icon.swal2-error {
-            border-color: rgba(248, 113, 113, 0.5) !important;
-          }
-
-          .swal2-icon.swal2-warning {
-            border-color: rgba(251, 191, 36, 0.5) !important;
-          }
         `}
       </style>
 
       {/* ==========================================================
-          PAGE
+          PAGE WORKSPACE
       =========================================================== */}
-
-      <main className="relative min-h-screen overflow-hidden bg-[#050c0b] text-white selection:bg-emerald-400/30">
-
+      <main className="relative min-h-screen overflow-hidden bg-[#F5F8FC] text-[#172033] selection:bg-emerald-100 selection:text-emerald-900">
         {/* ========================================================
-            BACKGROUND
+            BACKGROUND GLOWS & FINANCIAL GRID PATTERN
         ========================================================= */}
-
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-
-          {/* Financial grid */}
-
+          {/* Subtle Ambient Grid Pattern */}
           <div
-            className="
-              absolute inset-0 opacity-[0.055]
-              bg-[linear-gradient(to_right,rgba(148,163,184,0.35)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.35)_1px,transparent_1px)]
-              bg-[size:52px_52px]
-            "
+            className="absolute inset-0 opacity-[0.45]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(226, 232, 240, 0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(226, 232, 240, 0.8) 1px, transparent 1px)",
+              backgroundSize: "52px 52px",
+            }}
           />
 
-          {/* Main glow */}
+          {/* Gentle ambient sapphire-emerald gradient glow (top-left) */}
+          <div
+            className="arthbodh-pulse-glow absolute -left-40 -top-40 h-[560px] w-[560px] rounded-full bg-emerald-200/30 blur-3xl"
+            style={{ animation: "arthbodhPulseGlow 12s ease-in-out infinite" }}
+          />
 
-          <div className="absolute left-1/2 top-1/2 h-[700px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.045] blur-3xl" />
+          {/* Gentle ambient sapphire-blue glow (top-right) */}
+          <div
+            className="arthbodh-pulse-glow absolute right-[-80px] top-[15%] h-[520px] w-[520px] rounded-full bg-blue-200/25 blur-3xl"
+            style={{
+              animation: "arthbodhPulseGlow 14s ease-in-out infinite 2s",
+            }}
+          />
 
-          {/* Cyan glow */}
+          {/* Bottom subtle emerald glow */}
+          <div className="absolute -bottom-48 left-[20%] h-[460px] w-[460px] rounded-full bg-teal-100/35 blur-3xl" />
 
-          <div className="absolute -right-40 -top-40 h-[500px] w-[500px] rounded-full bg-cyan-500/[0.035] blur-3xl" />
-
-          {/* Green bottom glow */}
-
-          <div className="absolute -bottom-52 -left-44 h-[500px] w-[500px] rounded-full bg-emerald-500/[0.035] blur-3xl" />
-
-          {/* ======================================================
-              TOP FINANCIAL DATA CIRCLE
-          ======================================================= */}
-
-          <div className="absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full border border-emerald-400/[0.08]">
-
-            <div className="absolute inset-12 rounded-full border border-emerald-400/[0.06]" />
-
-            <div className="absolute inset-24 rounded-full border border-emerald-400/[0.05]" />
-
-            <div className="absolute left-1/2 top-1/2 h-px w-1/2 origin-left bg-gradient-to-r from-emerald-400/50 to-transparent animate-[spin_10s_linear_infinite]" />
+          {/* Decorative concentric data rings (top-right) */}
+          <div className="absolute -right-32 -top-32 hidden h-[480px] w-[480px] rounded-full border border-slate-200/60 lg:block">
+            <div className="absolute inset-14 rounded-full border border-slate-200/40" />
+            <div className="absolute inset-28 rounded-full border border-slate-200/30" />
+            <div className="absolute left-1/2 top-1/2 h-px w-1/2 origin-left bg-gradient-to-r from-emerald-400/40 to-transparent animate-[spin_16s_linear_infinite]" />
           </div>
 
-          {/* ======================================================
-              BOTTOM DATA CIRCLE
-          ======================================================= */}
-
-          <div className="absolute -bottom-52 -right-44 h-[540px] w-[540px] rounded-full border border-cyan-400/[0.07]">
-
-            <div className="absolute inset-14 rounded-full border border-cyan-400/[0.05]" />
-
-            <div className="absolute inset-28 rounded-full border border-cyan-400/[0.05]" />
-          </div>
-
-          {/* ======================================================
-              DATA POINTS
-          ======================================================= */}
-
-          <span className="absolute left-[11%] top-[24%] h-1.5 w-1.5 rounded-full bg-emerald-300/70 shadow-[0_0_14px_rgba(52,211,153,0.8)] animate-pulse" />
-
-          <span className="absolute right-[17%] top-[28%] h-1 w-1 rounded-full bg-cyan-300/70 animate-pulse [animation-delay:700ms]" />
-
-          <span className="absolute bottom-[25%] left-[17%] h-1 w-1 rounded-full bg-emerald-300/60 animate-pulse [animation-delay:1200ms]" />
-
-          <span className="absolute bottom-[18%] right-[12%] h-1.5 w-1.5 rounded-full bg-cyan-300/60 shadow-[0_0_10px_rgba(103,232,249,0.7)] animate-pulse [animation-delay:1800ms]" />
-
-          {/* ======================================================
-              TRANSACTION LINES
-          ======================================================= */}
-
-          <div className="absolute left-[8%] top-[72%] h-px w-40 bg-gradient-to-r from-transparent via-emerald-400/20 to-transparent" />
-
-          <div className="absolute right-[8%] top-[18%] h-px w-48 bg-gradient-to-r from-transparent via-cyan-400/20 to-transparent" />
-
-          <div className="absolute left-[15%] top-[32%] h-24 w-px bg-gradient-to-b from-transparent via-emerald-400/10 to-transparent" />
+          {/* Floating animated data pulse points */}
+          <span className="absolute left-[12%] top-[24%] h-2 w-2 rounded-full bg-emerald-500/70 shadow-[0_0_12px_rgba(5,150,105,0.6)] animate-pulse" />
+          <span className="absolute right-[16%] top-[32%] h-1.5 w-1.5 rounded-full bg-blue-500/60 animate-pulse [animation-delay:800ms]" />
+          <span className="absolute bottom-[22%] left-[16%] h-1.5 w-1.5 rounded-full bg-emerald-500/50 animate-pulse [animation-delay:1400ms]" />
         </div>
 
         {/* ========================================================
-            TOP BAR
+            TOP BAR WITH ARTHBODH BRANDING
         ========================================================= */}
-
-        <header className="absolute left-0 right-0 top-0 z-20 border-b border-white/[0.06] bg-[#050c0b]/75 backdrop-blur-xl">
-
+        <header className="absolute left-0 right-0 top-0 z-20 border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
-
-            {/* BAS LOGO */}
-
+            {/* ARTHBODH BRAND LOGO */}
             <div className="flex items-center gap-3">
-
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07]">
-
-                <svg
-                  className="h-6 w-6 text-emerald-300"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path d="M3 10h18" />
-                  <path d="M5 10v8" />
-                  <path d="M9 10v8" />
-                  <path d="M15 10v8" />
-                  <path d="M19 10v8" />
-                  <path d="M3 18h18" />
-                  <path d="m12 3 9 5H3l9-5Z" />
-                </svg>
-
-                <div className="absolute inset-1.5 rounded-lg border border-emerald-300/10" />
-              </div>
-
-              <div>
-                <p className="text-sm font-bold tracking-[0.22em] text-white">
-                  BAS
-                </p>
-
-                <p className="text-[9px] uppercase tracking-[0.22em] text-slate-500">
-                  Bank Analysis System
-                </p>
+              <div className="flex flex-col items-start leading-none select-none">
+                <div className="flex items-baseline tracking-tight">
+                  <span className="text-2xl font-black text-emerald-700 sm:text-[26px]">
+                    अर्थ
+                  </span>
+                  <span className="ml-0.5 text-2xl font-extrabold text-[#172554] sm:text-[26px]">
+                    BODH
+                  </span>
+                </div>
+                <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                  BANKING ANALYTICAL SYSTEM
+                </span>
               </div>
             </div>
 
-            {/* STATUS */}
-
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
-
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-
-              Secure System
+            {/* STATUS BADGE */}
+            <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/90 px-3.5 py-1 text-[11px] font-semibold text-emerald-800 shadow-2xs">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50" />
+              <span>Secure System</span>
             </div>
           </div>
         </header>
 
         {/* ========================================================
-            MAIN CONTENT
+            MAIN TWO-COLUMN CONTENT
         ========================================================= */}
-
-        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 pb-8 pt-24 sm:px-6">
-
-          <div className="grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1fr_440px]">
-
+        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 pb-12 pt-28 sm:px-6 lg:px-8">
+          <div className="grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1fr_450px] xl:gap-14">
             {/* ====================================================
-                LEFT INFORMATION PANEL
+                LEFT INFORMATION PANEL (DESKTOP)
             ===================================================== */}
-
-            <section className="hidden lg:block">
-
+            <section className="hidden lg:block arthbodh-anim-left">
               <div className="max-w-xl">
-
-                {/* Label */}
-
-                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-1.5">
-
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
-
-                  <span className="text-[10px] font-medium uppercase tracking-[0.22em] text-emerald-200">
+                {/* Eyebrow Label */}
+                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 shadow-2xs">
+                  <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse shadow-sm shadow-emerald-600/50" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-800">
                     Secure Financial Access
                   </span>
                 </div>
 
-                {/* Heading */}
-
-                <h1 className="text-5xl font-semibold leading-[1.05] tracking-[-0.04em] xl:text-6xl">
-
-                  Financial
-
-                  <span className="block bg-gradient-to-r from-white via-emerald-100 to-emerald-400 bg-clip-text text-transparent">
+                {/* Main Heading */}
+                <h1 className="text-4xl font-extrabold leading-[1.12] tracking-tight text-[#172554] xl:text-5xl">
+                  Financial{" "}
+                  <span className="block bg-gradient-to-r from-emerald-600 to-teal-700 bg-clip-text text-transparent">
                     Intelligence.
                   </span>
                 </h1>
 
                 {/* Description */}
-
-                <p className="mt-6 max-w-lg text-base leading-7 text-slate-400">
+                <p className="mt-4 max-w-lg text-sm leading-relaxed text-[#64748B]">
                   Access the Bank Analysis System to investigate bank
                   statements, analyze transactions, discover financial
                   relationships, and build intelligent case insights.
                 </p>
 
                 {/* =================================================
-                    FEATURES
+                    FEATURE HIGHLIGHTS
                 ================================================== */}
-
-                <div className="mt-9 max-w-lg space-y-3">
-
+                <div className="mt-8 max-w-lg space-y-3.5">
                   {/* Transaction Intelligence */}
-
-                  <div className="group flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 backdrop-blur-sm transition hover:border-emerald-400/20 hover:bg-emerald-400/[0.025]">
-
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-400/15 bg-emerald-400/[0.05]">
-
+                  <div className="group flex items-center gap-4 rounded-xl border border-slate-200/90 bg-white/90 p-4 shadow-xs backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md hover:shadow-slate-900/5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
                       <svg
-                        className="h-5 w-5 text-emerald-400"
+                        className="h-5 w-5"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="1.7"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
                         <path d="M4 19V5" />
                         <path d="M4 19h16" />
                         <path d="m7 15 3-4 3 2 5-7" />
                       </svg>
-
                     </div>
 
                     <div>
-                      <p className="text-sm font-medium text-slate-200">
+                      <p className="text-sm font-bold text-[#172554]">
                         Transaction Intelligence
                       </p>
-
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-[#64748B]">
                         Analyze transaction activity and financial patterns.
                       </p>
                     </div>
                   </div>
 
                   {/* Relationship Analysis */}
-
-                  <div className="group flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 backdrop-blur-sm transition hover:border-cyan-400/20 hover:bg-cyan-400/[0.025]">
-
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-cyan-400/15 bg-cyan-400/[0.05]">
-
+                  <div className="group flex items-center gap-4 rounded-xl border border-slate-200/90 bg-white/90 p-4 shadow-xs backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md hover:shadow-slate-900/5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700 transition-colors group-hover:bg-blue-600 group-hover:text-white">
                       <svg
-                        className="h-5 w-5 text-cyan-400"
+                        className="h-5 w-5"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="1.7"
+                        strokeWidth="2"
                       >
                         <circle cx="12" cy="12" r="3" />
                         <circle cx="5" cy="7" r="2" />
                         <circle cx="19" cy="7" r="2" />
                         <circle cx="5" cy="17" r="2" />
                         <circle cx="19" cy="17" r="2" />
-
                         <path d="m7 8 3 2" />
                         <path d="m17 8-3 2" />
                         <path d="m7 16 3-2" />
                         <path d="m17 16-3-2" />
                       </svg>
-
                     </div>
 
                     <div>
-                      <p className="text-sm font-medium text-slate-200">
+                      <p className="text-sm font-bold text-[#172554]">
                         Relationship Analysis
                       </p>
-
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-[#64748B]">
                         Discover connections between accounts and entities.
                       </p>
                     </div>
                   </div>
 
-                  {/* Multi Bank */}
-
-                  <div className="group flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 backdrop-blur-sm transition hover:border-amber-400/20 hover:bg-amber-400/[0.025]">
-
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-400/15 bg-amber-400/[0.05]">
-
+                  {/* Multi-Bank Investigation */}
+                  <div className="group flex items-center gap-4 rounded-xl border border-slate-200/90 bg-white/90 p-4 shadow-xs backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md hover:shadow-slate-900/5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700 transition-colors group-hover:bg-amber-600 group-hover:text-white">
                       <svg
-                        className="h-5 w-5 text-amber-400"
+                        className="h-5 w-5"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="1.7"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
                         <path d="M3 10h18" />
                         <path d="M5 10v8" />
@@ -699,238 +703,171 @@ function Login() {
                         <path d="M3 18h18" />
                         <path d="m12 3 9 5H3l9-5Z" />
                       </svg>
-
                     </div>
 
                     <div>
-                      <p className="text-sm font-medium text-slate-200">
+                      <p className="text-sm font-bold text-[#172554]">
                         Multi-Bank Investigation
                       </p>
-
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-[#64748B]">
                         Work across statements and financial institutions.
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Metrics */}
-
-                <div className="mt-8 grid max-w-lg grid-cols-3 gap-3">
-
-                  <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-4 backdrop-blur-sm">
-
-                    <p className="text-lg font-semibold text-white">
+                {/* Metrics Badges */}
+                <div className="mt-7 grid max-w-lg grid-cols-3 gap-3">
+                  <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3.5 text-center shadow-2xs backdrop-blur-xs">
+                    <p className="text-base font-extrabold text-[#172554]">
                       24/7
                     </p>
-
-                    <p className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">
+                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
                       Intelligence
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-4 backdrop-blur-sm">
-
-                    <p className="text-lg font-semibold text-emerald-400">
-                      AI
+                  <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3.5 text-center shadow-2xs backdrop-blur-xs">
+                    <p className="text-base font-extrabold text-emerald-600">
+                      AI-Powered
                     </p>
-
-                    <p className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">
+                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
                       Analysis
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-4 backdrop-blur-sm">
-
-                    <p className="text-lg font-semibold text-white">
+                  <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3.5 text-center shadow-2xs backdrop-blur-xs">
+                    <p className="text-base font-extrabold text-[#172554]">
                       SEC
                     </p>
-
-                    <p className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">
+                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
                       Protected
                     </p>
                   </div>
-
                 </div>
 
-                {/* Bottom information */}
-
-                <div className="mt-8 flex items-center gap-3 text-[9px] uppercase tracking-[0.2em] text-slate-600">
-
-                  <div className="h-px w-12 bg-gradient-to-r from-emerald-400/50 to-transparent" />
-
-                  Secure financial intelligence channel
+                {/* Bottom Channel Status */}
+                <div className="mt-7 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                  <div className="h-px w-12 bg-gradient-to-r from-emerald-500 to-transparent" />
+                  Secure Financial Intelligence Channel
                 </div>
-
               </div>
             </section>
 
             {/* ====================================================
-                LOGIN CARD
+                RIGHT SECTION: ELEVATED WHITE LOGIN CARD
             ===================================================== */}
+            <section className="relative w-full arthbodh-anim-right">
+              {/* Soft Ambient Card Glow */}
+              <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-br from-emerald-100/70 via-blue-50/50 to-slate-100/60 blur-xl" />
 
-            <section className="relative w-full">
-
-              {/* Glow */}
-
-              <div className="absolute -inset-1 rounded-[26px] bg-gradient-to-b from-emerald-400/20 via-transparent to-cyan-500/10 opacity-70 blur-xl" />
-
-              <div className="relative rounded-[24px] border border-white/[0.1] bg-slate-950/80 p-6 shadow-2xl backdrop-blur-2xl sm:p-8">
+              <div className="relative rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
+                {/* Mobile-only Brand Header */}
+                <div className="mb-6 flex flex-col items-center justify-center text-center lg:hidden">
+                  <div className="flex items-baseline select-none">
+                    <span className="text-2xl font-black text-emerald-700">
+                      अर्थ
+                    </span>
+                    <span className="ml-0.5 text-2xl font-extrabold text-[#172554]">
+                      BODH
+                    </span>
+                  </div>
+                  <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                    BANKING ANALYTICAL SYSTEM
+                  </span>
+                </div>
 
                 {/* =================================================
                     CARD HEADER
                 ================================================== */}
-
-                <div className="mb-8 flex items-center justify-between">
-
+                <div className="mb-7 flex items-center justify-between border-b border-slate-100 pb-5">
                   <div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-700">
+                        ARTHBODH Secure Access
+                      </p>
+                    </div>
 
-                    <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-emerald-300/70">
-                      BAS Secure Access
-                    </p>
-
-                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                    <h2 className="mt-1.5 text-2xl font-extrabold tracking-tight text-[#172554]">
                       Welcome back
                     </h2>
 
-                    <p className="mt-1.5 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-[#64748B]">
                       Sign in to continue your financial investigation.
                     </p>
-
                   </div>
 
-                  {/* Bank Icon */}
-
-                  <div className="relative flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06]">
-
+                  {/* Bank / Security Shield Icon */}
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-2xs">
                     <svg
-                      className="h-6 w-6 text-emerald-300"
+                      className="h-6 w-6"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="1.5"
+                      strokeWidth="1.8"
                     >
-                      <path d="M3 10h18" />
-                      <path d="M5 10v8" />
-                      <path d="M9 10v8" />
-                      <path d="M15 10v8" />
-                      <path d="M19 10v8" />
-                      <path d="M3 18h18" />
-                      <path d="m12 3 9 5H3l9-5Z" />
+                      <path
+                        d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="m9 12 2 2 4-4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
-
-                    <div className="absolute inset-2 rounded-lg border border-emerald-300/10" />
-
                   </div>
-
                 </div>
 
                 {/* =================================================
-                    FORM
+                    AUTHENTICATION FORM
                 ================================================== */}
-
                 <form
                   onSubmit={handleSubmit}
                   noValidate
-                  className="space-y-5"
+                  className="space-y-4.5"
                 >
-
-                  {/* =================================================
-                      COMPANY CODE
-                  ================================================== */}
-
-                  <div>
-
-                    <div className="mb-2 flex items-center justify-between">
-
-                      {/* <label
-                        htmlFor="company_code"
-                        className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                  {/* GENERAL ERROR BANNER */}
+                  {errors.general && (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50/90 p-3 text-xs font-semibold text-red-800 shadow-2xs animate-in fade-in duration-200">
+                      <svg
+                        className="h-4 w-4 shrink-0 text-red-600 mt-0.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
                       >
-                        Company Code
-                      </label>
-
-                      <span className="text-[9px] uppercase tracking-wider text-slate-600">
-                        Optional for SuperAdmin / Email
-                      </span> */}
-
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span>{errors.general}</span>
                     </div>
+                  )}
 
-                    <div className="relative">
-
-                      <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-600">
-
-                        {/* <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                        >
-                          <path d="M3 21h18" />
-                          <path d="M5 21V7l8-4v18" />
-                          <path d="M19 21V11l-6-3" />
-                          <path d="M9 9h1" />
-                          <path d="M9 13h1" />
-                          <path d="M9 17h1" />
-                        </svg> */}
-
-                      </div>
-
-                      {/* <input
-                        id="company_code"
-                        name="company_code"
-                        type="text"
-                        value={formData.company_code}
-                        onChange={handleChange}
-                        autoComplete="organization"
-                        placeholder="e.g. ABC (for company users)"
-                        disabled={isSubmitting}
-                        className={`${inputBase} pl-11 uppercase placeholder:normal-case ${
-                          errors.company_code ? inputError : inputNormal
-                        }`}
-                      /> */}
-
-                    </div>
-
-                    {/* {errors.company_code && (
-                      <p className="mt-1.5 text-xs text-red-400">
-                        {errors.company_code}
-                      </p>
-                    )} */}
-
-                  </div>
-
-                  {/* =================================================
-                      USERNAME
-                  ================================================== */}
-
+                  {/* USERNAME FIELD */}
                   <div>
-
                     <label
                       htmlFor="username"
-                      className="mb-2 block text-xs font-medium uppercase tracking-wider text-slate-400"
+                      className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700"
                     >
                       Username
                     </label>
 
                     <div className="relative">
-
-                      <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-600">
-
+                      <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                         <svg
-                          width="16"
-                          height="16"
+                          width="17"
+                          height="17"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="1.6"
+                          strokeWidth="1.8"
                         >
                           <circle cx="12" cy="8" r="4" />
                           <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" />
                         </svg>
-
                       </div>
 
                       <input
@@ -942,53 +879,56 @@ function Login() {
                         autoComplete="username"
                         placeholder="Enter your username"
                         disabled={isSubmitting}
-                        className={`${inputBase} pl-11 ${
-                          errors.username ? inputError : inputNormal
+                        className={`w-full rounded-xl border bg-slate-50/50 py-3 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition-all duration-200 focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                          errors.username
+                            ? "border-red-300 ring-2 ring-red-500/10 focus:border-red-500 focus:ring-red-500/15"
+                            : "border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         }`}
                       />
-
                     </div>
 
                     {errors.username && (
-                      <p className="mt-1.5 text-xs text-red-400">
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-red-600">
+                        <svg
+                          className="h-3.5 w-3.5 shrink-0"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
                         {errors.username}
                       </p>
                     )}
-
                   </div>
 
-                  {/* =================================================
-                      PASSWORD
-                  ================================================== */}
-
+                  {/* PASSWORD FIELD */}
                   <div>
-
-                    <div className="mb-2 flex items-center justify-between">
-
+                    <div className="mb-1.5 flex items-center justify-between">
                       <label
                         htmlFor="password"
-                        className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                        className="block text-xs font-bold uppercase tracking-wider text-slate-700"
                       >
                         Password
                       </label>
 
-                      <span className="text-[9px] uppercase tracking-wider text-slate-600">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         Protected
                       </span>
-
                     </div>
 
                     <div className="relative">
-
-                      <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-600">
-
+                      <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                         <svg
-                          width="16"
-                          height="16"
+                          width="17"
+                          height="17"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="1.6"
+                          strokeWidth="1.8"
                         >
                           <rect
                             x="4"
@@ -997,10 +937,8 @@ function Login() {
                             height="11"
                             rx="2"
                           />
-
                           <path d="M8 10V7a4 4 0 0 1 8 0v3" />
                         </svg>
-
                       </div>
 
                       <input
@@ -1012,162 +950,120 @@ function Login() {
                         autoComplete="current-password"
                         placeholder="Enter your password"
                         disabled={isSubmitting}
-                        className={`${inputBase} pl-11 pr-16 ${
+                        className={`w-full rounded-xl border bg-slate-50/50 py-3 pl-11 pr-16 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition-all duration-200 focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
                           errors.password
-                            ? inputError
-                            : inputNormal
+                            ? "border-red-300 ring-2 ring-red-500/10 focus:border-red-500 focus:ring-red-500/15"
+                            : "border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         }`}
                       />
 
                       <button
                         type="button"
                         onClick={() =>
-                          setShowPassword(
-                            (previous) => !previous
-                          )
+                          setShowPassword((previous) => !previous)
                         }
                         disabled={isSubmitting}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 transition hover:text-emerald-300 disabled:opacity-40"
+                        aria-label={
+                          showPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100 hover:text-emerald-700 disabled:opacity-40"
                       >
                         {showPassword ? "Hide" : "Show"}
                       </button>
-
                     </div>
 
                     {errors.password && (
-                      <p className="mt-1.5 text-xs text-red-400">
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-red-600">
+                        <svg
+                          className="h-3.5 w-3.5 shrink-0"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
                         {errors.password}
                       </p>
                     )}
-
                   </div>
 
-                  {/* =================================================
-                      SECURITY STATUS
-                  ================================================== */}
-
-                  <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3">
-
-                    <div className="flex items-center gap-2.5">
-
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg border border-emerald-400/15 bg-emerald-400/[0.05]">
-
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-
+                  {/* SECURITY STATUS */}
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200/90 bg-slate-50/70 px-4 py-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500/60" />
                       </span>
 
                       <div>
-
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                          Secure channel
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                          Secure Channel
                         </p>
-
-                        <p className="text-[9px] text-slate-600">
-                          BAS authentication endpoint online
+                        <p className="text-[10px] text-slate-500">
+                          ARTHBODH authentication endpoint online
                         </p>
-
                       </div>
-
                     </div>
 
-                    <span className="text-[9px] font-medium uppercase tracking-wider text-emerald-400/70">
+                    <span className="rounded-full border border-emerald-200 bg-emerald-100/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800">
                       Ready
                     </span>
-
                   </div>
 
-                  {/* =================================================
-                      LOGIN BUTTON
-                  ================================================== */}
-
+                  {/* LOGIN SUBMIT BUTTON */}
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="
-                      group relative mt-1 flex w-full
-                      items-center justify-center overflow-hidden
-                      rounded-xl border border-emerald-300/30
-                      bg-emerald-400 px-4 py-3.5
-                      text-sm font-semibold text-slate-950
-                      shadow-[0_0_25px_rgba(52,211,153,0.12)]
-                      transition-all duration-300
-                      hover:border-emerald-200
-                      hover:bg-emerald-300
-                      hover:shadow-[0_0_35px_rgba(52,211,153,0.22)]
-                      focus:outline-none
-                      focus:ring-4
-                      focus:ring-emerald-400/20
-                      disabled:cursor-not-allowed
-                      disabled:opacity-50
-                    "
+                    className="group relative mt-2 flex w-full items-center justify-center overflow-hidden rounded-xl bg-[#059669] px-5 py-3.5 text-sm font-bold text-white shadow-sm shadow-emerald-900/15 transition-all duration-200 hover:bg-[#047857] hover:shadow-md hover:shadow-emerald-900/20 active:scale-[0.99] focus:outline-none focus:ring-4 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-
-                    <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                    <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
 
                     {isSubmitting ? (
-                      <span className="relative flex items-center gap-2">
-
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
-
-                        Authenticating...
-
+                      <span className="relative flex items-center gap-2.5">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        <span>Authenticating...</span>
                       </span>
                     ) : (
                       <span className="relative flex items-center gap-2">
-
-                        Enter BAS Dashboard
-
+                        <span>Enter ARTHBODH Dashboard</span>
                         <span className="transition-transform duration-200 group-hover:translate-x-1">
                           →
                         </span>
-
                       </span>
                     )}
-
                   </button>
-
                 </form>
 
                 {/* =================================================
                     SECURITY FOOTER
                 ================================================== */}
-
-                <div className="mt-6 border-t border-white/[0.06] pt-5">
-
-                  <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.15em] text-slate-600">
-
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
-
-                    Secure authentication
-
+                <div className="mt-6 border-t border-slate-100 pt-5">
+                  <div className="flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span>Secure Authentication</span>
                     <span>•</span>
-
-                    Financial intelligence platform
-
+                    <span>Financial Intelligence Platform</span>
                   </div>
-
                 </div>
-
               </div>
-
             </section>
-
           </div>
-
         </div>
 
         {/* ========================================================
-            BOTTOM STATUS
+            BOTTOM STATUS (DESKTOP)
         ========================================================= */}
-
-        <div className="pointer-events-none absolute bottom-4 left-5 hidden text-[9px] uppercase tracking-[0.25em] text-slate-700 sm:block">
-          BAS / AUTH / FINANCIAL INTELLIGENCE
+        <div className="pointer-events-none absolute bottom-4 left-6 hidden text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 sm:block">
+          ARTHBODH / AUTH / FINANCIAL INTELLIGENCE
         </div>
 
-        <div className="pointer-events-none absolute bottom-4 right-5 hidden text-[9px] uppercase tracking-[0.25em] text-slate-700 sm:block">
+        <div className="pointer-events-none absolute bottom-4 right-6 hidden text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 sm:block">
           SECURE CHANNEL // ONLINE
         </div>
-
       </main>
     </>
   );
