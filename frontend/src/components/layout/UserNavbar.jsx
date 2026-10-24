@@ -26,6 +26,28 @@ function UserNavbar() {
   const [userDetails, setUserDetails] = useState(user || null);
   const [userLoading, setUserLoading] = useState(false);
 
+  const isUploadRoute =
+    location.pathname.startsWith("/dashboard/upload") ||
+    location.pathname.startsWith("/upload");
+  const [uploadUserToggled, setUploadUserToggled] = useState(null);
+  const uploadSubmenuOpen =
+    uploadUserToggled !== null ? uploadUserToggled : isUploadRoute;
+
+  const isMastersRoute =
+    !location.pathname.includes("/reports") &&
+    (location.pathname.includes("/cases") ||
+      location.pathname.includes("/io-master"));
+  const [mastersUserToggled, setMastersUserToggled] = useState(null);
+  const mastersSubmenuOpen =
+    mastersUserToggled !== null ? mastersUserToggled : isMastersRoute;
+
+  const [prevPathname, setPrevPathname] = useState(location.pathname);
+  if (prevPathname !== location.pathname) {
+    setPrevPathname(location.pathname);
+    setMastersUserToggled(null);
+    setUploadUserToggled(null);
+  }
+
   // Expanded: 272px; collapsed: 84px
   const sidebarWidth = sidebarCollapsed ? 84 : 272;
 
@@ -229,6 +251,23 @@ function UserNavbar() {
       );
     }
 
+    if (path === "/dashboard/upload" || path === "/upload") {
+      return (
+        currentPath.startsWith("/dashboard/upload") ||
+        currentPath.startsWith("/upload")
+      );
+    }
+
+    if (
+      path === "/dashboard/upload/bank-statement" ||
+      path === "/upload/bank-statement"
+    ) {
+      return (
+        currentPath === "/dashboard/upload/bank-statement" ||
+        currentPath === "/upload/bank-statement"
+      );
+    }
+
     if (path === "/analysis") {
       return (
         currentPath === path ||
@@ -319,9 +358,10 @@ function UserNavbar() {
       ),
     },
     {
-      label: "Cases",
-      path: casesPath,
-      visible: canViewCases,
+      label: "Masters",
+      visible: canViewCases || canViewIO,
+      isOpen: mastersSubmenuOpen,
+      onToggle: () => setMastersUserToggled(!mastersSubmenuOpen),
       icon: (
         <svg
           viewBox="0 0 24 24"
@@ -330,24 +370,89 @@ function UserNavbar() {
           aria-hidden="true"
         >
           <path
-            d="M3.5 7.5A2.5 2.5 0 0 1 6 5h4l2 2h6a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 18 20H6a2.5 2.5 0 0 1-2.5-2.5v-10Z"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 12h8M8 15.5h5"
+            d="M12 2L2 7l10 5 10-5-10-5Z"
             stroke="currentColor"
             strokeWidth="1.8"
             strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M2 17l10 5 10-5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M2 12l10 5 10-5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </svg>
       ),
+      children: [
+        {
+          label: "Case Master",
+          path: casesPath,
+          visible: canViewCases,
+          icon: (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-4 h-4 shrink-0"
+              aria-hidden="true"
+            >
+              <path
+                d="M3.5 7.5A2.5 2.5 0 0 1 6 5h4l2 2h6a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 18 20H6a2.5 2.5 0 0 1-2.5-2.5v-10Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M8 12h8M8 15.5h5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          ),
+        },
+        {
+          label: "IO Master",
+          path: ioMasterPath,
+          visible: canViewIO,
+          icon: (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-4 h-4 shrink-0"
+              aria-hidden="true"
+            >
+              <circle
+                cx="12"
+                cy="8"
+                r="3.5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
+              <path
+                d="M5 20v-1.5a7 7 0 0 1 14 0V20H5Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ),
+        },
+      ],
     },
     {
-      label: "IO Master",
-      path: ioMasterPath,
-      visible: canViewIO,
+      label: "Upload",
+      visible: canViewCases,
+      isOpen: uploadSubmenuOpen,
+      onToggle: () => setUploadUserToggled(!uploadSubmenuOpen),
       icon: (
         <svg
           viewBox="0 0 24 24"
@@ -355,21 +460,45 @@ function UserNavbar() {
           className="w-5 h-5 shrink-0"
           aria-hidden="true"
         >
-          <circle
-            cx="12"
-            cy="8"
-            r="3.5"
+          <path
+            d="M4 16.5v2.25A2.25 2.25 0 0 0 6.25 21h11.5A2.25 2.25 0 0 0 20 18.75V16.5"
             stroke="currentColor"
             strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
           <path
-            d="M5 20v-1.5a7 7 0 0 1 14 0V20H5Z"
+            d="M16.5 10.5L12 6m0 0L7.5 10.5M12 6v10.5"
             stroke="currentColor"
             strokeWidth="1.8"
+            strokeLinecap="round"
             strokeLinejoin="round"
           />
         </svg>
       ),
+      children: [
+        {
+          label: "Bank Statement",
+          path: "/dashboard/upload/bank-statement",
+          visible: true,
+          icon: (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-4 h-4 shrink-0"
+              aria-hidden="true"
+            >
+              <path
+                d="M9 12h6m-6 3h6m2 5H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ),
+        },
+      ],
     },
     {
       label: "Reports",
@@ -397,40 +526,6 @@ function UserNavbar() {
         </svg>
       ),
     },
-    // {
-    //   label: "Analysis",
-    //   path: "/analysis",
-    //   visible: true,
-    //   icon: (
-    //     <svg
-    //       viewBox="0 0 24 24"
-    //       fill="none"
-    //       className="w-5 h-5 shrink-0"
-    //       aria-hidden="true"
-    //     >
-    //       <path
-    //         d="M3 13.2L7 9.2L11 13.2L21 3.2"
-    //         stroke="currentColor"
-    //         strokeWidth="1.8"
-    //         strokeLinecap="round"
-    //         strokeLinejoin="round"
-    //       />
-    //       <path
-    //         d="M16 3.2H21V8.2"
-    //         stroke="currentColor"
-    //         strokeWidth="1.8"
-    //         strokeLinecap="round"
-    //         strokeLinejoin="round"
-    //       />
-    //       <path
-    //         d="M4 20.8H20"
-    //         stroke="currentColor"
-    //         strokeWidth="1.8"
-    //         strokeLinecap="round"
-    //       />
-    //     </svg>
-    //   ),
-    // },
   ];
 
   // AVATAR COMPONENT
@@ -675,7 +770,137 @@ function UserNavbar() {
         {navigationItems
           .filter((item) => item.visible)
           .map((item) => {
-            const active = isActive(item.path);
+            const hasChildren =
+              Array.isArray(item.children) && item.children.length > 0;
+            const visibleChildren = hasChildren
+              ? item.children.filter((child) => child.visible !== false)
+              : [];
+            const hasVisibleChildren = visibleChildren.length > 0;
+
+            const isItemActive = hasVisibleChildren
+              ? visibleChildren.some((child) => isActive(child.path))
+              : isActive(item.path);
+
+            const isSubmenuOpen = item.isOpen ?? false;
+
+            if (hasVisibleChildren) {
+              const primaryChild = visibleChildren[0];
+              const primaryPath = primaryChild?.path || item.path;
+
+              return (
+                <div key={item.label} className="flex flex-col">
+                  {/* PARENT MENU BUTTON */}
+                  <button
+                    type="button"
+                    title={
+                      isCollapsed
+                        ? `${item.label} - ${primaryChild?.label || ""}`
+                        : undefined
+                    }
+                    aria-label={item.label}
+                    onClick={() => {
+                      if (isCollapsed) {
+                        goTo(primaryPath);
+                      } else {
+                        item.onToggle?.();
+                      }
+                    }}
+                    aria-current={isItemActive ? "page" : undefined}
+                    aria-expanded={!isCollapsed ? isSubmenuOpen : undefined}
+                    className={[
+                      "group relative flex w-full items-center rounded-xl py-3.5",
+                      "text-sm font-semibold transition-all duration-200",
+                      isCollapsed ? "justify-center px-2" : "gap-3 px-3.5",
+                      isItemActive
+                        ? "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200 shadow-sm"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-blue-950",
+                    ].join(" ")}
+                  >
+                    {isItemActive && (
+                      <span className="absolute bottom-2 left-0 top-2 w-1 rounded-r-full bg-emerald-700" />
+                    )}
+
+                    <span
+                      className={[
+                        "shrink-0 transition-colors",
+                        isItemActive
+                          ? "text-emerald-700"
+                          : "text-slate-400 group-hover:text-emerald-700",
+                      ].join(" ")}
+                    >
+                      {item.icon}
+                    </span>
+
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 truncate text-left text-sm font-bold">
+                          {item.label}
+                        </span>
+
+                        <svg
+                          className={[
+                            "h-4 w-4 shrink-0 transition-transform duration-200",
+                            isSubmenuOpen
+                              ? "rotate-180 text-emerald-700"
+                              : "text-slate-400 group-hover:text-slate-600",
+                          ].join(" ")}
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </>
+                    )}
+                  </button>
+
+                  {/* SUBMENU ACCORDION */}
+                  {!isCollapsed && isSubmenuOpen && (
+                    <div className="ml-5 mt-1 flex flex-col gap-1 border-l-2 border-emerald-100 pl-3">
+                      {visibleChildren.map((child) => {
+                        const isChildActive = isActive(child.path);
+
+                        return (
+                          <button
+                            key={child.label}
+                            type="button"
+                            onClick={() => goTo(child.path)}
+                            aria-current={isChildActive ? "page" : undefined}
+                            className={[
+                              "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs transition-all duration-150",
+                              isChildActive
+                                ? "bg-emerald-100/80 font-bold text-emerald-950 shadow-xs"
+                                : "font-semibold text-slate-600 hover:bg-slate-50 hover:text-blue-950",
+                            ].join(" ")}
+                          >
+                            <span
+                              className={[
+                                "shrink-0 transition-colors",
+                                isChildActive
+                                  ? "text-emerald-700"
+                                  : "text-slate-400 group-hover:text-emerald-700",
+                              ].join(" ")}
+                            >
+                              {child.icon}
+                            </span>
+                            <span className="flex-1 truncate text-left">
+                              {child.label}
+                            </span>
+                            {isChildActive && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
 
             return (
               <button
@@ -684,26 +909,26 @@ function UserNavbar() {
                 title={isCollapsed ? item.label : undefined}
                 aria-label={item.label}
                 onClick={() => goTo(item.path)}
-                aria-current={active ? "page" : undefined}
+                aria-current={isItemActive ? "page" : undefined}
                 className={[
                   "group relative flex w-full items-center rounded-xl py-3.5",
                   "text-sm font-semibold transition-all duration-200",
                   isCollapsed
                     ? "justify-center px-2"
                     : "gap-3 px-3.5",
-                  active
+                  isItemActive
                     ? "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200 shadow-sm"
                     : "text-slate-600 hover:bg-slate-50 hover:text-blue-950",
                 ].join(" ")}
               >
-                {active && (
+                {isItemActive && (
                   <span className="absolute bottom-2 left-0 top-2 w-1 rounded-r-full bg-emerald-700" />
                 )}
 
                 <span
                   className={[
                     "shrink-0 transition-colors",
-                    active
+                    isItemActive
                       ? "text-emerald-700"
                       : "text-slate-400 group-hover:text-emerald-700",
                   ].join(" ")}
@@ -717,7 +942,7 @@ function UserNavbar() {
                       {item.label}
                     </span>
 
-                    {active && (
+                    {isItemActive && (
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
                     )}
                   </>
@@ -1153,9 +1378,9 @@ function UserNavbar() {
           }
         }
       `}</style>
-      <DesktopSidebar />
-      <MobileNavigation />
-      <UserProfileModal />
+      {DesktopSidebar()}
+      {MobileNavigation()}
+      {UserProfileModal()}
     </>
   );
 }

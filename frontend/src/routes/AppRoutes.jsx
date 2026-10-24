@@ -36,7 +36,7 @@ import CaseReportsHub from "../pages/user/reports/CaseReportsHub";
 import TransactionRelationshipReport from "../pages/user/reports/TransactionRelationshipReport";
 import CaseFileReport from "../pages/user/reports/CaseFileReport";
 import DynamicReportDashboard from "../pages/user/analysis/DynamicReportDashboard";
-import ReportsOverview from "../pages/user/reports/ReportsOverview";
+import BankStatementUpload from "../pages/user/upload/BankStatementUpload";
 
 /* ============================================================
    ROUTE GUARDS & GLOBAL MODALS
@@ -283,6 +283,25 @@ function AppRoutes() {
               </RoleRoute>
             </ProtectedRoute>
           }
+        />
+
+        {/* =====================================================
+            BANK STATEMENT UPLOAD
+        ====================================================== */}
+        <Route
+          path="/dashboard/upload/bank-statement"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "superadmin", "admin", "client_admin"]}>
+                <BankStatementUpload />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/upload/bank-statement"
+          element={<Navigate to="/dashboard/upload/bank-statement" replace />}
         />
      {/* =====================================================
             REPORT 1: FILE STATEMENT & TRANSACTIONS REPORT
