@@ -17,7 +17,7 @@ from app.bank_transactions.bank_transaction_repository import (
     get_transaction_relationships,
 )
 from app.files.file_service import get_case_files
-from app.files.file_repository import resolve_source_file_ids
+from app.files.file_repository import resolve_source_file_ids, get_file_by_id
 from fastapi import HTTPException
 
 from app.bank_transactions.bank_transaction_schema import (
@@ -34,6 +34,38 @@ router = APIRouter(
     prefix="/api/v1/bank-transactions",
     tags=["Bank Transactions"],
 )
+
+
+def parse_and_validate_file_ids(
+    file_ids: str | None,
+    case_id: int,
+    db: Session,
+    user,
+) -> list[int] | None:
+    if file_ids is None:
+        return None
+
+    stripped = file_ids.strip()
+    if not stripped or stripped.lower() in {"none", "empty", "[]"}:
+        return []
+
+    try:
+        parsed = [int(f.strip()) for f in stripped.split(",") if f.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file_ids format")
+
+    if not parsed:
+        return []
+
+    valid_case_files = get_case_files(case_id=case_id, db=db, user=user, document_type="BANK_STATEMENT")
+    valid_file_ids_set = {f.id for f in valid_case_files}
+    invalid_ids = [fid for fid in parsed if fid not in valid_file_ids_set]
+    if invalid_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Files {invalid_ids} do not belong to case {case_id}, are not bank statements, or are superseded"
+        )
+    return parsed
 
 
 # ============================================================
@@ -59,6 +91,12 @@ def get_file_transactions(
     ),
     db: Session = Depends(get_db),
 ):
+    file_obj = get_file_by_id(db, file_id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    if hasattr(file_obj, "document_type") and file_obj.document_type != "BANK_STATEMENT":
+        raise HTTPException(status_code=400, detail="File is not a bank statement")
+
     transactions, total = get_transactions_by_file_paginated(
         db=db,
         file_id=file_id,
@@ -93,6 +131,10 @@ def get_file_transactions(
 )
 def get_case_transactions(
     case_id: int,
+    file_ids: str | None = Query(
+        default=None,
+        description="Comma-separated list of file IDs to filter by",
+    ),
     page: int = Query(
         default=1,
         ge=1,
@@ -105,12 +147,17 @@ def get_case_transactions(
         description="Number of transactions per page",
     ),
     db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
 ):
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, current_user)
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids, document_type="BANK_STATEMENT")
+
     transactions, total = get_transactions_by_case_paginated(
         db=db,
         case_id=case_id,
         page=page,
         page_size=page_size,
+        file_ids=resolved_file_ids,
     )
 
     total_pages = (
@@ -147,23 +194,8 @@ def get_case_transactions_mode_wise(
     db: Session = Depends(get_db),
     user = Depends(get_current_user),
 ):
-    parsed_file_ids = None
-    if file_ids:
-        try:
-            parsed_file_ids = [int(f.strip()) for f in file_ids.split(",") if f.strip()]
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid file_ids format")
-            
-        case_files = get_case_files(db, case_id, user)
-        valid_file_ids = {f.id for f in case_files}
-        invalid_ids = [f for f in parsed_file_ids if f not in valid_file_ids]
-        if invalid_ids:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Files {invalid_ids} do not belong to case {case_id}"
-            )
-
-    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user)
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids, document_type="BANK_STATEMENT")
 
     mode_data = get_mode_wise_by_case(
         db=db,
@@ -281,26 +313,8 @@ def search_case_transactions(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    parsed_file_ids = None
-    if file_ids:
-        try:
-            parsed_file_ids = [int(fid.strip()) for fid in file_ids.split(",") if fid.strip()]
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid file_ids format")
-            
-        if parsed_file_ids:
-            # Validate that all requested files belong to this case
-            valid_case_files = get_case_files(case_id=case_id, db=db, user=current_user)
-            valid_file_ids_set = {f.id for f in valid_case_files}
-            invalid_ids = [fid for fid in parsed_file_ids if fid not in valid_file_ids_set]
-            
-            if invalid_ids:
-                raise HTTPException(
-                    status_code=403, 
-                    detail=f"Files {invalid_ids} do not belong to case {case_id}"
-                )
-
-    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, current_user)
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids, document_type="BANK_STATEMENT")
 
     transactions, total, mode_counts = get_filtered_transactions_by_case(
         db=db,
@@ -353,6 +367,12 @@ def get_file_summary(
     file_id: int,
     db: Session = Depends(get_db),
 ):
+    file_obj = get_file_by_id(db, file_id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    if hasattr(file_obj, "document_type") and file_obj.document_type != "BANK_STATEMENT":
+        raise HTTPException(status_code=400, detail="File is not a bank statement")
+
     summary_data = get_file_transaction_summary(db=db, file_id=file_id)
 
     return TransactionSummaryResponse(
@@ -385,26 +405,8 @@ def get_case_summary(
                 detail="You do not have permission to view reports.",
             )
 
-    parsed_file_ids = None
-    if file_ids:
-        try:
-            parsed_file_ids = [int(fid.strip()) for fid in file_ids.split(",") if fid.strip()]
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid file_ids format")
-            
-        if parsed_file_ids:
-            # Validate that all requested files belong to this case
-            valid_case_files = get_case_files(case_id=case_id, db=db, user=current_user)
-            valid_file_ids_set = {f.id for f in valid_case_files}
-            invalid_ids = [fid for fid in parsed_file_ids if fid not in valid_file_ids_set]
-            
-            if invalid_ids:
-                raise HTTPException(
-                    status_code=403, 
-                    detail=f"Files {invalid_ids} do not belong to case {case_id}"
-                )
-
-    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, current_user)
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids, document_type="BANK_STATEMENT")
 
     summary_data = get_case_transaction_summary(db=db, case_id=case_id, file_ids=resolved_file_ids, mode=mode)
 
@@ -476,33 +478,20 @@ def get_transaction_relationships_route(
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=400, detail="start_date cannot be greater than end_date")
 
-    try:
-        parsed_file_ids = [int(f.strip()) for f in file_ids.split(",") if f.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid file_ids format")
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user)
 
-    if len(parsed_file_ids) < 1:
+    if not parsed_file_ids:
         return TransactionRelationshipResponse(
             success=True,
             message="Need at least 1 file to show relationships or transactions.",
             data={
                 "case_id": case_id,
-                "filters": {"file_ids": parsed_file_ids},
+                "filters": {"file_ids": []},
                 "nodes": [],
                 "edges": [],
                 "transactions": [],
                 "summary": {}
             }
-        )
-        
-    # Verify file ownership logic here
-    case_files = get_case_files(db, case_id, user)
-    valid_file_ids = {f.id for f in case_files}
-    invalid_ids = [f for f in parsed_file_ids if f not in valid_file_ids]
-    if invalid_ids:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Files {invalid_ids} do not belong to case {case_id} or you lack permissions."
         )
 
     graph_data = get_transaction_relationships(
@@ -549,25 +538,8 @@ def export_case_transactions(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    parsed_file_ids = None
-    if file_ids:
-        try:
-            parsed_file_ids = [int(fid.strip()) for fid in file_ids.split(",") if fid.strip()]
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid file_ids format")
-            
-        if parsed_file_ids:
-            valid_case_files = get_case_files(case_id=case_id, db=db, user=current_user)
-            valid_file_ids_set = {f.id for f in valid_case_files}
-            invalid_ids = [fid for fid in parsed_file_ids if fid not in valid_file_ids_set]
-            
-            if invalid_ids:
-                raise HTTPException(
-                    status_code=403, 
-                    detail=f"Files {invalid_ids} do not belong to case {case_id}"
-                )
-
-    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, current_user)
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids, document_type="BANK_STATEMENT")
 
     transactions, _, _ = get_filtered_transactions_by_case(
         db=db,
@@ -640,19 +612,9 @@ def get_counterparty_analysis_route(
     user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    try:
-        parsed_file_ids = [int(f.strip()) for f in file_ids.split(",") if f.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid file_ids format")
-
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user)
     if not parsed_file_ids:
-        raise HTTPException(status_code=400, detail="file_ids is required")
-
-    valid_case_files = get_case_files(case_id=case_id, db=db, user=user)
-    valid_file_ids_set = {f.id for f in valid_case_files}
-    invalid_ids = [fid for fid in parsed_file_ids if fid not in valid_file_ids_set]
-    if invalid_ids:
-        raise HTTPException(status_code=400, detail=f"Files {invalid_ids} do not belong to case {case_id} or are superseded")
+        raise HTTPException(status_code=400, detail="file_ids is required and must contain valid bank statement files")
 
     from app.bank_transactions.bank_transaction_repository import get_counterparty_analysis
     data = get_counterparty_analysis(db, case_id, parsed_file_ids)
@@ -687,24 +649,11 @@ def get_case_financial_analysis(
     db: Session = Depends(get_db),
     user = Depends(get_current_user),
 ):
-    parsed_file_ids = None
-    if file_ids:
-        try:
-            parsed_file_ids = [int(f.strip()) for f in file_ids.split(",") if f.strip()]
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid file_ids format")
-            
-        if parsed_file_ids:
-            valid_case_files = get_case_files(case_id=case_id, db=db, user=user)
-            valid_file_ids_set = {f.id for f in valid_case_files}
-            invalid_ids = [fid for fid in parsed_file_ids if fid not in valid_file_ids_set]
-            if invalid_ids:
-                raise HTTPException(status_code=400, detail=f"Files {invalid_ids} do not belong to case {case_id} or are superseded")
-            
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user)
     min_amt = float(min_amount) if min_amount is not None else None
     max_amt = float(max_amount) if max_amount is not None else None
             
-    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids)
+    resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids, document_type="BANK_STATEMENT")
 
     data = get_financial_analysis(
         db=db,

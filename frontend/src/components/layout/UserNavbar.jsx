@@ -41,11 +41,22 @@ function UserNavbar() {
   const mastersSubmenuOpen =
     mastersUserToggled !== null ? mastersUserToggled : isMastersRoute;
 
+  const isReportsRoute =
+    location.pathname.includes("/reports") ||
+    location.pathname === "/analysis" ||
+    location.pathname.startsWith("/analysis/") ||
+    location.pathname === "/dashboard/analysis" ||
+    location.pathname.startsWith("/dashboard/analysis/");
+  const [reportsUserToggled, setReportsUserToggled] = useState(null);
+  const reportsSubmenuOpen =
+    reportsUserToggled !== null ? reportsUserToggled : isReportsRoute;
+
   const [prevPathname, setPrevPathname] = useState(location.pathname);
   if (prevPathname !== location.pathname) {
     setPrevPathname(location.pathname);
     setMastersUserToggled(null);
     setUploadUserToggled(null);
+    setReportsUserToggled(null);
   }
 
   // Expanded: 272px; collapsed: 84px
@@ -247,7 +258,11 @@ function UserNavbar() {
       return (
         currentPath === "/reports" ||
         currentPath.startsWith("/reports/") ||
-        currentPath.includes("/reports")
+        currentPath.includes("/reports") ||
+        currentPath === "/analysis" ||
+        currentPath.startsWith("/analysis/") ||
+        currentPath === "/dashboard/analysis" ||
+        currentPath.startsWith("/dashboard/analysis/")
       );
     }
 
@@ -502,8 +517,9 @@ function UserNavbar() {
     },
     {
       label: "Reports",
-      path: "/reports",
       visible: canViewReports,
+      isOpen: reportsSubmenuOpen,
+      onToggle: () => setReportsUserToggled(!reportsSubmenuOpen),
       icon: (
         <svg
           viewBox="0 0 24 24"
@@ -525,6 +541,29 @@ function UserNavbar() {
           />
         </svg>
       ),
+      children: [
+        {
+          label: "Bank Statement Report",
+          path: "/reports",
+          visible: canViewReports,
+          icon: (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-4 h-4 shrink-0"
+              aria-hidden="true"
+            >
+              <path
+                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ),
+        },
+      ],
     },
   ];
 

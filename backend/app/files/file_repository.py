@@ -70,10 +70,13 @@ def get_files_by_case(
     db: Session,
     case_id: int,
     include_superseded: bool = False,
+    document_type: str | None = None,
 ) -> list[File]:
     query = db.query(File).filter(File.case_id == case_id)
     if not include_superseded:
         query = query.filter(File.is_superseded == False)
+    if document_type and hasattr(File, "document_type"):
+        query = query.filter(File.document_type == document_type)
     return (
         query
         .order_by(File.created_at.desc())
@@ -86,6 +89,7 @@ def get_files_by_case_and_user(
     case_id: int,
     user_id: int,
     include_superseded: bool = False,
+    document_type: str | None = None,
 ) -> list[File]:
     query = db.query(File).filter(
         File.case_id == case_id,
@@ -93,6 +97,8 @@ def get_files_by_case_and_user(
     )
     if not include_superseded:
         query = query.filter(File.is_superseded == False)
+    if document_type and hasattr(File, "document_type"):
+        query = query.filter(File.document_type == document_type)
     return (
         query
         .order_by(File.created_at.desc())
@@ -255,9 +261,19 @@ def resolve_source_file_ids(
     db: Session,
     case_id: int,
     file_ids: list[int] | None,
+    document_type: str | None = None,
 ) -> list[int] | None:
-    if not file_ids:
-        return file_ids
+    if file_ids is None:
+        if document_type:
+            query = db.query(File).filter(File.case_id == case_id)
+            if hasattr(File, "document_type"):
+                query = query.filter(File.document_type == document_type)
+            case_files = query.filter(File.is_superseded == False).all()
+            if not case_files:
+                return []
+            file_ids = [f.id for f in case_files]
+        else:
+            return None
 
     resolved: list[int] = []
     seen = set()
@@ -269,8 +285,14 @@ def resolve_source_file_ids(
             continue
         seen.add(fid)
 
-        file_obj = db.query(File).filter(File.id == fid, File.case_id == case_id).first()
+        query = db.query(File).filter(File.id == fid, File.case_id == case_id)
+        if document_type and hasattr(File, "document_type"):
+            query = query.filter(File.document_type == document_type)
+        file_obj = query.first()
         if not file_obj:
+            # If document_type filter is specified and file does not match, exclude it!
+            if document_type:
+                continue
             resolved.append(fid)
             continue
 

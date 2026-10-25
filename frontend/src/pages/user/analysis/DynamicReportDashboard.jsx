@@ -1547,13 +1547,12 @@ export default function DynamicReportDashboard() {
       try {
         const [caseRes, filesRes] = await Promise.all([
           getCase(selectedCaseId).catch(() => null),
-          getCaseFiles(selectedCaseId),
+          getCaseFiles(selectedCaseId, false, "BANK_STATEMENT"),
         ]);
         if (!isMounted) return;
 
-        const loadedCase = caseRes?.data || caseRes;
         const activeFiles = (filesRes?.data || filesRes || []).filter(
-          (f) => !f.is_superseded
+          (f) => !f.is_superseded && (!f.document_type || f.document_type === "BANK_STATEMENT") && f.document_type !== "UNKNOWN"
         );
         setFiles(activeFiles);
 

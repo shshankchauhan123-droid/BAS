@@ -112,13 +112,15 @@ export default function ClientAdminReportModal({ isOpen, onClose, onCaseSelect }
       try {
         setLoadingFiles(true);
         setError("");
-        const res = await getCaseFiles(selectedCaseId);
+        const res = await getCaseFiles(selectedCaseId, false, "BANK_STATEMENT");
         const rawList = Array.isArray(res?.data)
           ? res.data
           : Array.isArray(res)
           ? res
           : [];
-        const fileList = rawList.filter((f) => !f.is_superseded);
+        const fileList = rawList.filter(
+          (f) => !f.is_superseded && (!f.document_type || f.document_type === "BANK_STATEMENT") && f.document_type !== "UNKNOWN"
+        );
         if (isMounted) {
           setFiles(fileList);
         }

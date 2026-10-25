@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
@@ -47,6 +47,9 @@ def get_dashboard_statistics(
     
     # Bank Statements (Files)
     file_query = db.query(File)
+    if hasattr(File, "document_type"):
+        file_query = file_query.filter(File.document_type == "BANK_STATEMENT")
+    file_query = file_query.filter(File.is_superseded == False)
     if user_role not in ["superadmin", "admin"]:
         if user_role == "client_admin":
             file_query = file_query.join(Case, File.case_id == Case.id).filter(Case.client_id == current_user.client_id)
@@ -60,12 +63,14 @@ def get_dashboard_statistics(
     bank_statements_count = file_query.count()
     
     # Transactions
-    txn_query = db.query(BankTransaction)
+    txn_query = db.query(BankTransaction).join(File, BankTransaction.file_id == File.id)
+    if hasattr(File, "document_type"):
+        txn_query = txn_query.filter(File.document_type == "BANK_STATEMENT")
     if user_role not in ["superadmin", "admin"]:
         if user_role == "client_admin":
-            txn_query = txn_query.join(File, BankTransaction.file_id == File.id).join(Case, File.case_id == Case.id).filter(Case.client_id == current_user.client_id)
+            txn_query = txn_query.join(Case, File.case_id == Case.id).filter(Case.client_id == current_user.client_id)
         else:
-            txn_query = txn_query.join(File, BankTransaction.file_id == File.id).join(Case, File.case_id == Case.id).filter(
+            txn_query = txn_query.join(Case, File.case_id == Case.id).filter(
                 or_(
                     Case.created_by == current_user.id,
                     Case.assigned_to == current_user.id

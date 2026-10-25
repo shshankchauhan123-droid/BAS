@@ -5,11 +5,14 @@ import { apiRequest } from "./client";
 // Upload file
 // ============================================================
 
-export function uploadFile(caseId, file) {
+export function uploadFile(caseId, file, documentType = "BANK_STATEMENT") {
 
   const formData = new FormData();
 
   formData.append("file", file);
+  if (documentType) {
+    formData.append("document_type", documentType);
+  }
 
   return apiRequest(
     `/api/v1/files/${caseId}/upload`,
@@ -25,9 +28,12 @@ export function uploadFile(caseId, file) {
 // Get case files
 // ============================================================
 
-export function getCaseFiles(caseId, includeSuperseded = false) {
+export function getCaseFiles(caseId, includeSuperseded = false, documentType = null) {
 
-  const query = includeSuperseded ? "?include_superseded=true" : "";
+  const params = new URLSearchParams();
+  if (includeSuperseded) params.append("include_superseded", "true");
+  if (documentType) params.append("document_type", documentType);
+  const query = params.toString() ? `?${params.toString()}` : "";
 
   return apiRequest(
     `/api/v1/files/case/${caseId}${query}`,

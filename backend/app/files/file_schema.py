@@ -12,6 +12,7 @@ class FileUploadResponse(BaseModel):
 
 class FileUpdateRequest(BaseModel):
     original_filename: Optional[str] = None
+    document_type: Optional[str] = None
     account_name: Optional[str] = None
     account_number: Optional[str] = None
     bank_name: Optional[str] = None
@@ -46,6 +47,7 @@ class FileData(BaseModel):
     file_path: str
     mime_type: Optional[str]
     file_size: int
+    document_type: str = "BANK_STATEMENT"
     status: str
     error_message: Optional[str]
     account_name: Optional[str] = None

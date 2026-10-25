@@ -64,6 +64,13 @@ class File(Base):
         nullable=False,
     )
 
+    document_type = Column(
+        String(50),
+        nullable=False,
+        default="BANK_STATEMENT",
+        index=True,
+    )
+
     status = Column(
         String(50),
         nullable=False,

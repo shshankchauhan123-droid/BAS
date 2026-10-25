@@ -175,6 +175,7 @@ def upload_file(
     file: UploadFile,
     case_id: int,
     user: User,
+    document_type: str = "BANK_STATEMENT",
 ) -> File:
     user_id = user.id
     user_role = str(user.role).lower()
@@ -231,6 +232,10 @@ def upload_file(
     # Create database record
     # --------------------------------------------------------
 
+    valid_doc_type = (document_type or "BANK_STATEMENT").strip().upper()
+    if valid_doc_type not in {"BANK_STATEMENT", "UNKNOWN"}:
+        valid_doc_type = "BANK_STATEMENT"
+
     new_file = File(
         case_id=case_id,
         created_by=user_id,
@@ -239,6 +244,7 @@ def upload_file(
         file_path=file_path,
         mime_type=file.content_type,
         file_size=file_size,
+        document_type=valid_doc_type,
         status="QUEUED",
     )
 
@@ -342,6 +348,7 @@ def get_case_files(
     case_id: int,
     user: User,
     include_superseded: bool = False,
+    document_type: str | None = None,
 ) -> list[File]:
 
     user_id = user.id
@@ -351,7 +358,12 @@ def get_case_files(
         case = get_case_by_id(db=db, case_id=case_id)
         if not case:
             raise ValueError("Case not found")
-        return get_files_by_case(db=db, case_id=case_id, include_superseded=include_superseded)
+        return get_files_by_case(
+            db=db,
+            case_id=case_id,
+            include_superseded=include_superseded,
+            document_type=document_type,
+        )
     elif user_role == CLIENT_ADMIN_ROLE:
         case = get_case_by_id(db=db, case_id=case_id)
         if not case or not (
@@ -366,7 +378,12 @@ def get_case_files(
                 db.commit()
             except Exception:
                 db.rollback()
-        return get_files_by_case(db=db, case_id=case_id, include_superseded=include_superseded)
+        return get_files_by_case(
+            db=db,
+            case_id=case_id,
+            include_superseded=include_superseded,
+            document_type=document_type,
+        )
     else:
         case = get_case_by_id_and_user(
             db=db,
@@ -380,6 +397,7 @@ def get_case_files(
             case_id=case_id,
             user_id=user_id,
             include_superseded=include_superseded,
+            document_type=document_type,
         )
 
 
@@ -946,6 +964,7 @@ def merge_case_files(
             file_path=str(dest_path),
             mime_type="application/pdf",
             file_size=dest_path.stat().st_size if dest_path.exists() else total_size,
+            document_type="BANK_STATEMENT",
             status="COMPLETED",
             processing_stage="completed",
             processing_progress="100%",

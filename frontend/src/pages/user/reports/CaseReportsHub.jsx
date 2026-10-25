@@ -596,14 +596,18 @@ export default function CaseReportsHub() {
     try {
       setLoadingFiles(true);
 
-      const res = await getCaseFiles(newCaseId);
+      const res = await getCaseFiles(newCaseId, false, "BANK_STATEMENT");
       const rawList = Array.isArray(res?.data)
         ? res.data
         : Array.isArray(res)
         ? res
         : [];
 
-      setCaseFiles(rawList.filter((file) => !file.is_superseded));
+      setCaseFiles(
+        rawList.filter(
+          (file) => !file.is_superseded && (!file.document_type || file.document_type === "BANK_STATEMENT") && file.document_type !== "UNKNOWN"
+        )
+      );
     } catch (err) {
       console.error("Failed to load files for case:", err);
     } finally {
@@ -638,7 +642,7 @@ export default function CaseReportsHub() {
 
       const [caseRes, filesRes] = await Promise.all([
         getCase(activeCaseId),
-        getCaseFiles(activeCaseId),
+        getCaseFiles(activeCaseId, false, "BANK_STATEMENT"),
       ]);
 
       const fetchedCase = caseRes?.data || caseRes;
@@ -650,7 +654,11 @@ export default function CaseReportsHub() {
         ? filesRes
         : [];
 
-      setFiles(fileList);
+      setFiles(
+        fileList.filter(
+          (file) => !file.is_superseded && (!file.document_type || file.document_type === "BANK_STATEMENT") && file.document_type !== "UNKNOWN"
+        )
+      );
 
       // If Super Admin arrived via direct URL, synchronize the selected user
       if (isSuperAdmin && !selectedSuperAdminUserId && fetchedCase) {

@@ -51,14 +51,37 @@ app.include_router(websocket_router)
 app.include_router(dashboard_router)
 
 
+import re
+
+ALLOWED_ORIGINS = {
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+}
+ORIGIN_REGEX = re.compile(r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$")
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc: Exception):
     import traceback
     traceback.print_exc()
     from fastapi.responses import JSONResponse
+
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin and (origin in ALLOWED_ORIGINS or ORIGIN_REGEX.match(origin)):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
+
     return JSONResponse(
         status_code=500,
         content={"detail": f"Internal Server Error: {str(exc)}"},
+        headers=headers,
     )
 
 
