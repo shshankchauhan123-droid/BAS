@@ -13,6 +13,9 @@ from app.audit.audit_route import router as audit_router
 from app.io_master.io_master_route import router as io_master_router
 from app.websocket.websocket_route import router as websocket_router
 from app.dashboard.dashboard_route import router as dashboard_router
+from app.ncrp.ncrp_routes import router as ncrp_router
+from app.gst.gst_router import router as gst_router
+from app.cin.cin_router import router as cin_router
 
 
 app = FastAPI(
@@ -49,6 +52,9 @@ app.include_router(bank_transaction_router)
 app.include_router(audit_router)
 app.include_router(websocket_router)
 app.include_router(dashboard_router)
+app.include_router(ncrp_router)
+app.include_router(gst_router)
+app.include_router(cin_router)
 
 
 import re

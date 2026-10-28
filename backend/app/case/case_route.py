@@ -62,6 +62,7 @@ def create_case_route(
 )
 def get_cases_route(
     user_id: int | None = None,
+    client_id: int | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -70,6 +71,7 @@ def get_cases_route(
             db=db,
             user_id=current_user.id,
             target_user_id=user_id,
+            target_client_id=client_id,
         )
 
     except PermissionError as error:

@@ -5,13 +5,19 @@ import { apiRequest } from "./client";
 // Upload file
 // ============================================================
 
-export function uploadFile(caseId, file, documentType = "BANK_STATEMENT") {
+export function uploadFile(caseId, file, documentType = "BANK_STATEMENT", options = {}) {
 
   const formData = new FormData();
 
   formData.append("file", file);
   if (documentType) {
     formData.append("document_type", documentType);
+  }
+  if (options.clientId || options.client_id) {
+    formData.append("client_id", options.clientId || options.client_id);
+  }
+  if (options.userId || options.user_id) {
+    formData.append("user_id", options.userId || options.user_id);
   }
 
   return apiRequest(

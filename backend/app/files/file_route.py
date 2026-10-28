@@ -53,6 +53,8 @@ def upload_file_route(
     case_id: int,
     file: UploadFile = FastAPIFile(...),
     document_type: str = Form(default="BANK_STATEMENT"),
+    client_id: int | None = Form(default=None),
+    user_id: int | None = Form(default=None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -68,6 +70,8 @@ def upload_file_route(
             case_id=case_id,
             user=current_user,
             document_type=valid_doc_type,
+            target_client_id=client_id,
+            target_user_id=user_id,
         )
 
     except PermissionError as error:

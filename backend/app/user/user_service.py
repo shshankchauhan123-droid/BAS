@@ -102,7 +102,7 @@ def create_user_by_admin(
         first_login=True,  # Will prompt to change password on first login
     )
 
-    # Initialize user permissions (all 9 default to True)
+    # Initialize user permissions
     can_view_cases = True
     can_create_case = True
     can_upload_files = True
@@ -112,6 +112,10 @@ def create_user_by_admin(
     can_create_io = True
     can_update_io = True
     can_delete_io = True
+    can_bank_statement_analysis = False
+    can_ncrp_statement_analysis = False
+    can_gst_advance_search = False
+    can_cin_advance_search = False
 
     if data.permissions:
         can_view_cases = getattr(data.permissions, "can_view_cases", True)
@@ -123,6 +127,10 @@ def create_user_by_admin(
         can_create_io = getattr(data.permissions, "can_create_io", True)
         can_update_io = getattr(data.permissions, "can_update_io", True)
         can_delete_io = getattr(data.permissions, "can_delete_io", True)
+        can_bank_statement_analysis = getattr(data.permissions, "can_bank_statement_analysis", False)
+        can_ncrp_statement_analysis = getattr(data.permissions, "can_ncrp_statement_analysis", False)
+        can_gst_advance_search = bool(getattr(data.permissions, "can_gst_advance_search", False) or getattr(data.permissions, "gst_advance_search", False))
+        can_cin_advance_search = bool(getattr(data.permissions, "can_cin_advance_search", False) or getattr(data.permissions, "cin_advance_search", False))
 
     create_or_update_user_permissions(
         db=db,
@@ -136,6 +144,10 @@ def create_user_by_admin(
         can_create_io=can_create_io,
         can_update_io=can_update_io,
         can_delete_io=can_delete_io,
+        can_bank_statement_analysis=can_bank_statement_analysis,
+        can_ncrp_statement_analysis=can_ncrp_statement_analysis,
+        can_gst_advance_search=can_gst_advance_search,
+        can_cin_advance_search=can_cin_advance_search,
     )
     db.refresh(user)
 
@@ -162,6 +174,8 @@ def create_user_by_admin(
                 "can_create_io": can_create_io,
                 "can_update_io": can_update_io,
                 "can_delete_io": can_delete_io,
+                "can_bank_statement_analysis": can_bank_statement_analysis,
+                "can_ncrp_statement_analysis": can_ncrp_statement_analysis,
             },
         },
         client_id=client_id or actor.client_id,
@@ -316,7 +330,14 @@ def update_user_permissions_by_actor(
         "can_create_io": getattr(target_user.permissions, "can_create_io", True) if target_user.permissions else True,
         "can_update_io": getattr(target_user.permissions, "can_update_io", True) if target_user.permissions else True,
         "can_delete_io": getattr(target_user.permissions, "can_delete_io", True) if target_user.permissions else True,
+        "can_bank_statement_analysis": getattr(target_user.permissions, "can_bank_statement_analysis", False) if target_user.permissions else False,
+        "can_ncrp_statement_analysis": getattr(target_user.permissions, "can_ncrp_statement_analysis", False) if target_user.permissions else False,
+        "can_gst_advance_search": getattr(target_user.permissions, "can_gst_advance_search", False) if target_user.permissions else False,
+        "can_cin_advance_search": getattr(target_user.permissions, "can_cin_advance_search", False) if target_user.permissions else False,
     }
+
+    can_gst_advance_search = bool(getattr(data, "can_gst_advance_search", False) or getattr(data, "gst_advance_search", False))
+    can_cin_advance_search = bool(getattr(data, "can_cin_advance_search", False) or getattr(data, "cin_advance_search", False))
 
     create_or_update_user_permissions(
         db=db,
@@ -330,6 +351,10 @@ def update_user_permissions_by_actor(
         can_create_io=getattr(data, "can_create_io", True),
         can_update_io=getattr(data, "can_update_io", True),
         can_delete_io=getattr(data, "can_delete_io", True),
+        can_bank_statement_analysis=getattr(data, "can_bank_statement_analysis", False),
+        can_ncrp_statement_analysis=getattr(data, "can_ncrp_statement_analysis", False),
+        can_gst_advance_search=can_gst_advance_search,
+        can_cin_advance_search=can_cin_advance_search,
     )
     db.refresh(target_user)
 
@@ -355,6 +380,10 @@ def update_user_permissions_by_actor(
                 "can_create_io": getattr(data, "can_create_io", True),
                 "can_update_io": getattr(data, "can_update_io", True),
                 "can_delete_io": getattr(data, "can_delete_io", True),
+                "can_bank_statement_analysis": getattr(data, "can_bank_statement_analysis", False),
+                "can_ncrp_statement_analysis": getattr(data, "can_ncrp_statement_analysis", False),
+                "can_gst_advance_search": can_gst_advance_search,
+                "can_cin_advance_search": can_cin_advance_search,
             },
         },
         client_id=target_user.client_id or actor.client_id,

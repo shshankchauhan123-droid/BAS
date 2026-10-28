@@ -177,6 +177,9 @@ function CaseTable({
                 Status
               </th>
               <th className="whitespace-nowrap px-5 py-4 text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-500 sm:px-6">
+                Documents
+              </th>
+              <th className="whitespace-nowrap px-5 py-4 text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-500 sm:px-6">
                 Created
               </th>
               <th className="whitespace-nowrap px-5 py-4 text-right text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-500 sm:px-6">
@@ -382,6 +385,48 @@ function CaseTable({
                       />
                       {status.label}
                     </span>
+                  </td>
+
+                  <td className="whitespace-nowrap px-5 py-5 sm:px-6">
+                    {(() => {
+                      const bankCount = caseData.bank_statement_count || 0;
+                      const ncrpCount = caseData.ncrp_count || 0;
+                      const totalDocs = caseData.total_document_count ?? (bankCount + ncrpCount);
+
+                      if (totalDocs === 0) {
+                        return (
+                          <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                            0 Docs
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            {bankCount > 0 && (
+                              <span
+                                title={`${bankCount} Bank Statement${bankCount === 1 ? '' : 's'}`}
+                                className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+                              >
+                                <span className="font-bold">{bankCount}</span> Bank
+                              </span>
+                            )}
+                            {ncrpCount > 0 && (
+                              <span
+                                title={`${ncrpCount} NCRP Workbook${ncrpCount === 1 ? '' : 's'}`}
+                                className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700"
+                              >
+                                <span className="font-bold">{ncrpCount}</span> NCRP
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] font-medium text-slate-500 pl-0.5">
+                            {totalDocs} total {totalDocs === 1 ? 'document' : 'documents'}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </td>
 
                   <td className="whitespace-nowrap px-5 py-5 text-sm font-medium text-slate-500 sm:px-6">

@@ -138,6 +138,11 @@ class Case(Base):
             return self.client.company_code
         return None
 
+    # Dynamic document counts (populated at query time)
+    bank_statement_count: int = 0
+    ncrp_count: int = 0
+    total_document_count: int = 0
+
 
 # Register related models with SQLAlchemy mapper
 import app.io_master.io_master_model  # noqa: E402, F401

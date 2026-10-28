@@ -6,14 +6,18 @@ from app.client.client_schema import (
     ClientResponse,
     ClientUpdateMaxUsersRequest,
     ClientUpdateStatusRequest,
+    ClientUpdateRequest,
 )
 from app.client.client_service import (
     create_client_with_admin,
+    delete_client_safely,
     get_all_clients_with_stats,
     get_client_by_id_with_stats,
     set_client_max_users,
     set_client_status,
+    update_client_details,
 )
+from app.user.user_model import User
 
 
 def _format_client_response(data: dict) -> ClientResponse:
@@ -82,3 +86,21 @@ def update_client_max_users_controller(
 ) -> ClientResponse:
     result = set_client_max_users(db, client_id, data.max_users)
     return _format_client_response(result)
+
+
+def update_client_controller(
+    db: Session,
+    client_id: int,
+    data: ClientUpdateRequest,
+    actor: User | None = None,
+) -> ClientResponse:
+    result = update_client_details(db=db, client_id=client_id, data=data, actor=actor)
+    return _format_client_response(result)
+
+
+def delete_client_controller(
+    db: Session,
+    client_id: int,
+    actor: User | None = None,
+) -> dict:
+    return delete_client_safely(db=db, client_id=client_id, actor=actor)

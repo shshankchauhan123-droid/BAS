@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.database import Base
 from app.user.user_model import User
+from app.user.user_permission_model import UserPermission
 from app.case.case_model import Case
 from app.files.file_model import File, MergedFileSource
 from app.bank_transactions.bank_transaction_model import BankTransaction
@@ -45,6 +46,7 @@ class TestDocumentTypeAndReportFiltering(unittest.TestCase):
         self.db.query(MergedFileSource).delete()
         self.db.query(File).delete()
         self.db.query(Case).delete()
+        self.db.query(UserPermission).delete()
         self.db.query(User).delete()
         self.db.commit()
 
@@ -57,6 +59,19 @@ class TestDocumentTypeAndReportFiltering(unittest.TestCase):
             role="user",
         )
         self.db.add(self.user)
+        self.db.commit()
+
+        self.user_perms = UserPermission(
+            user_id=self.user.id,
+            can_bank_statement_analysis=True,
+            can_ncrp_statement_analysis=True,
+            can_upload_files=True,
+            can_delete_files=True,
+            can_view_reports=True,
+        )
+        self.db.add(self.user_perms)
+        self.db.commit()
+        self.db.refresh(self.user)
 
         # Create Case 1 and Case 2
         self.case1 = Case(

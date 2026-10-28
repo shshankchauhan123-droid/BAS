@@ -199,6 +199,29 @@ function CaseCard({ caseData, onOpen, isClientAdmin, isSuperAdmin }) {
           </div>
         </div>
 
+        {/* Documents Summary */}
+        <div className="mt-4 border-t border-slate-200/70 pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <p className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-slate-600">
+                Documents & Workbooks
+              </p>
+            </div>
+            <span className="text-[11px] font-bold text-slate-700">
+              {(caseData?.total_document_count ?? ((caseData?.bank_statement_count || 0) + (caseData?.ncrp_count || 0)))} Total
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+              <span className="font-bold">{caseData?.bank_statement_count || 0}</span> Bank {caseData?.bank_statement_count === 1 ? "Stmt" : "Stmts"}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700">
+              <span className="font-bold">{caseData?.ncrp_count || 0}</span> NCRP {caseData?.ncrp_count === 1 ? "Workbook" : "Workbooks"}
+            </span>
+          </div>
+        </div>
+
         {/* Client Company */}
         {(isSuperAdmin || caseData?.client || caseData?.client_name) && (
           <div className="mt-4 border-t border-slate-200 pt-4">

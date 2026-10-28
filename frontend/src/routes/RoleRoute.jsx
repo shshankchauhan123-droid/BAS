@@ -2,7 +2,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-function RoleRoute({ children, allowedRoles = [] }) {
+function RoleRoute({ children, allowedRoles = [], requiredPermission = null }) {
   const { user, isAuthenticated, isInitializing } = useAuth();
   const location = useLocation();
 
@@ -113,6 +113,21 @@ function RoleRoute({ children, allowedRoles = [] }) {
         replace
       />
     );
+  }
+
+  /*
+   * For regular users, verify granular module permission if specified.
+   */
+  if (userRole === "user" && requiredPermission) {
+    const hasPermission = Boolean(user?.permissions?.[requiredPermission]);
+    if (!hasPermission) {
+      return (
+        <Navigate
+          to="/dashboard"
+          replace
+        />
+      );
+    }
   }
 
   /*

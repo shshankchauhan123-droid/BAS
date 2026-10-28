@@ -248,25 +248,79 @@ def create_case(
         return created
 
 
+def populate_case_document_counts(db: Session, cases: list[Case]) -> None:
+    if not cases:
+        return
+    case_ids = [c.id for c in cases if c and getattr(c, "id", None) is not None]
+    if not case_ids:
+        return
+
+    from app.files.file_model import File
+    from app.ncrp.ncrp_model import NcrpFile
+    from sqlalchemy import func
+
+    bank_counts = dict(
+        db.query(File.case_id, func.count(File.id))
+        .filter(File.case_id.in_(case_ids), File.is_superseded.is_(False))
+        .group_by(File.case_id)
+        .all()
+    )
+
+    ncrp_counts = dict(
+        db.query(NcrpFile.case_id, func.count(NcrpFile.id))
+        .filter(NcrpFile.case_id.in_(case_ids))
+        .group_by(NcrpFile.case_id)
+        .all()
+    )
+
+    for c in cases:
+        b_cnt = bank_counts.get(c.id, 0)
+        n_cnt = ncrp_counts.get(c.id, 0)
+        c.bank_statement_count = b_cnt
+        c.ncrp_count = n_cnt
+        c.total_document_count = b_cnt + n_cnt
+
+
 def get_cases(
     db: Session,
     user_id: int,
     target_user_id: int | None = None,
+    target_client_id: int | None = None,
 ):
     user = get_user_by_id(db=db, user_id=user_id)
     if not user:
         return []
 
     user_role = str(user.role).lower()
+    cases: list[Case] = []
 
     # SuperAdmin has global visibility across all cases
     if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
-        if target_user_id:
+        from app.client.client_model import Client
+        from sqlalchemy import or_
+        from sqlalchemy.orm import joinedload
+
+        # Validate target_client_id if provided
+        if target_client_id is not None:
+            client = db.query(Client).filter(Client.id == target_client_id).first()
+            if not client:
+                raise ValueError("Selected client not found.")
+
+        # Validate target_user_id if provided
+        target_user = None
+        if target_user_id is not None:
             target_user = get_user_by_id(db=db, user_id=target_user_id)
             if not target_user:
-                return []
-            from sqlalchemy import or_
-            from sqlalchemy.orm import joinedload
+                raise ValueError("Selected user not found.")
+
+        # Validate user-client relationship if both provided
+        if target_client_id is not None and target_user is not None:
+            if target_user.client_id != target_client_id:
+                raise ValueError("The selected user does not belong to the selected client.")
+
+        if target_client_id is None and target_user_id is None:
+            cases = get_all_cases(db=db)
+        else:
             query = (
                 db.query(Case)
                 .options(
@@ -275,33 +329,39 @@ def get_cases(
                     joinedload(Case.creator).joinedload(User.client),
                     joinedload(Case.assignee),
                 )
-                .filter(
+            )
+            if target_client_id is not None:
+                client_user_ids = (
+                    db.query(User.id)
+                    .filter(User.client_id == target_client_id)
+                    .subquery()
+                )
+                query = query.filter(
+                    or_(
+                        Case.client_id == target_client_id,
+                        Case.created_by.in_(client_user_ids.select()),
+                        Case.assigned_to.in_(client_user_ids.select()),
+                    )
+                )
+            if target_user_id is not None:
+                query = query.filter(
                     or_(
                         Case.created_by == target_user_id,
                         Case.assigned_to == target_user_id,
                     )
                 )
-            )
-            if target_user.client_id:
-                query = query.filter(
-                    or_(
-                        Case.client_id == target_user.client_id,
-                        Case.client_id.is_(None),
-                    )
-                )
-            return (
+            cases = (
                 query
                 .order_by(Case.created_at.desc())
                 .all()
             )
-        return get_all_cases(db=db)
 
     # Regular users strictly see cases they created or that are assigned to them
     elif user_role == USER_ROLE:
         perms = getattr(user, "permissions", None)
         if perms and perms.can_view_cases is False:
             raise PermissionError("You do not have permission to view cases.")
-        return get_cases_by_user(
+        cases = get_cases_by_user(
             db=db,
             user_id=user.id,
         )
@@ -310,6 +370,8 @@ def get_cases(
     elif user_role == CLIENT_ADMIN_ROLE:
         if not user.client_id:
             return []
+        if target_client_id is not None and target_client_id != user.client_id:
+            raise PermissionError("You do not have permission to access cases for another client.")
         from sqlalchemy.orm import joinedload
         from sqlalchemy import or_
 
@@ -356,9 +418,9 @@ def get_cases(
                 db.commit()
             except Exception:
                 db.rollback()
-        return cases
 
-    return []
+    populate_case_document_counts(db=db, cases=cases)
+    return cases
 
 
 def get_case(
@@ -371,37 +433,40 @@ def get_case(
         return None
 
     user_role = str(user.role).lower()
+    case = None
 
     if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
-        return get_case_by_id(db=db, case_id=case_id)
+        case = get_case_by_id(db=db, case_id=case_id)
     elif user_role == USER_ROLE:
         perms = getattr(user, "permissions", None)
         if perms and perms.can_view_cases is False:
             raise PermissionError("You do not have permission to view cases.")
-        return get_case_by_id_and_user(
+        case = get_case_by_id_and_user(
             db=db,
             case_id=case_id,
             user_id=user.id,
         )
     elif user_role == CLIENT_ADMIN_ROLE:
-        case = get_case_by_id(db=db, case_id=case_id)
-        if not case:
+        fetched_case = get_case_by_id(db=db, case_id=case_id)
+        if not fetched_case:
             return None
         is_client_case = (
-            case.client_id == user.client_id
-            or (case.creator and case.creator.client_id == user.client_id)
-            or (case.assignee and case.assignee.client_id == user.client_id)
+            fetched_case.client_id == user.client_id
+            or (fetched_case.creator and fetched_case.creator.client_id == user.client_id)
+            or (fetched_case.assignee and fetched_case.assignee.client_id == user.client_id)
         )
         if is_client_case:
-            if case.client_id is None and user.client_id is not None:
-                case.client_id = user.client_id
+            if fetched_case.client_id is None and user.client_id is not None:
+                fetched_case.client_id = user.client_id
                 try:
                     db.commit()
                 except Exception:
                     db.rollback()
-            return case
-        return None
-    return None
+            case = fetched_case
+
+    if case:
+        populate_case_document_counts(db=db, cases=[case])
+    return case
 
 
 def update_case(

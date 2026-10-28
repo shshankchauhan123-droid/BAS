@@ -36,12 +36,29 @@ router = APIRouter(
 )
 
 
+def verify_bank_statement_access(user, require_reports: bool = False):
+    if user and str(getattr(user, "role", "")).lower() == "user":
+        perms = getattr(user, "permissions", None)
+        if not perms or not getattr(perms, "can_bank_statement_analysis", False):
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission for Bank Statement Analysis. Contact your company administrator.",
+            )
+        if require_reports and getattr(perms, "can_view_reports", True) is False:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission to view reports.",
+            )
+
+
 def parse_and_validate_file_ids(
     file_ids: str | None,
     case_id: int,
     db: Session,
     user,
+    require_reports: bool = False,
 ) -> list[int] | None:
+    verify_bank_statement_access(user, require_reports=require_reports)
     if file_ids is None:
         return None
 
@@ -90,7 +107,9 @@ def get_file_transactions(
         description="Number of transactions per page",
     ),
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
+    verify_bank_statement_access(current_user)
     file_obj = get_file_by_id(db, file_id)
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
@@ -194,7 +213,7 @@ def get_case_transactions_mode_wise(
     db: Session = Depends(get_db),
     user = Depends(get_current_user),
 ):
-    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user)
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user, require_reports=True)
     resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids, document_type="BANK_STATEMENT")
 
     mode_data = get_mode_wise_by_case(
@@ -405,7 +424,7 @@ def get_case_summary(
                 detail="You do not have permission to view reports.",
             )
 
-    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, current_user)
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, current_user, require_reports=True)
     resolved_file_ids = resolve_source_file_ids(db=db, case_id=case_id, file_ids=parsed_file_ids, document_type="BANK_STATEMENT")
 
     summary_data = get_case_transaction_summary(db=db, case_id=case_id, file_ids=resolved_file_ids, mode=mode)
@@ -478,7 +497,7 @@ def get_transaction_relationships_route(
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=400, detail="start_date cannot be greater than end_date")
 
-    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user)
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user, require_reports=True)
 
     if not parsed_file_ids:
         return TransactionRelationshipResponse(
@@ -612,7 +631,7 @@ def get_counterparty_analysis_route(
     user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user)
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user, require_reports=True)
     if not parsed_file_ids:
         raise HTTPException(status_code=400, detail="file_ids is required and must contain valid bank statement files")
 
@@ -649,7 +668,7 @@ def get_case_financial_analysis(
     db: Session = Depends(get_db),
     user = Depends(get_current_user),
 ):
-    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user)
+    parsed_file_ids = parse_and_validate_file_ids(file_ids, case_id, db, user, require_reports=True)
     min_amt = float(min_amount) if min_amount is not None else None
     max_amt = float(max_amount) if max_amount is not None else None
             

@@ -46,6 +46,10 @@ def _format_user_response(user: User) -> UserResponse:
                 can_create_io=True,
                 can_update_io=True,
                 can_delete_io=True,
+                can_bank_statement_analysis=True,
+                can_ncrp_statement_analysis=True,
+                can_gst_advance_search=True,
+                can_cin_advance_search=True,
             )
         else:
             perms_schema = None

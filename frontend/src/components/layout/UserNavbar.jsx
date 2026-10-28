@@ -43,6 +43,9 @@ function UserNavbar() {
 
   const isReportsRoute =
     location.pathname.includes("/reports") ||
+    location.pathname.includes("/gst") ||
+    location.pathname.includes("/cin") ||
+    location.pathname.includes("/fact") ||
     location.pathname === "/analysis" ||
     location.pathname.startsWith("/analysis/") ||
     location.pathname === "/dashboard/analysis" ||
@@ -51,12 +54,21 @@ function UserNavbar() {
   const reportsSubmenuOpen =
     reportsUserToggled !== null ? reportsUserToggled : isReportsRoute;
 
+  const isFactRoute =
+    location.pathname.includes("/fact") ||
+    location.pathname.includes("/gst") ||
+    location.pathname.includes("/cin");
+  const [factUserToggled, setFactUserToggled] = useState(null);
+  const factSubmenuOpen =
+    factUserToggled !== null ? factUserToggled : isFactRoute;
+
   const [prevPathname, setPrevPathname] = useState(location.pathname);
   if (prevPathname !== location.pathname) {
     setPrevPathname(location.pathname);
     setMastersUserToggled(null);
     setUploadUserToggled(null);
     setReportsUserToggled(null);
+    setFactUserToggled(null);
   }
 
   // Expanded: 272px; collapsed: 84px
@@ -197,6 +209,21 @@ function UserNavbar() {
   const canViewReports =
     !isNormalUser || userPerms?.can_view_reports !== false;
 
+  const canUploadFiles =
+    !isNormalUser || userPerms?.can_upload_files !== false;
+
+  const canBankStatementAnalysis =
+    !isNormalUser || Boolean(userPerms?.can_bank_statement_analysis);
+
+  const canNcrpStatementAnalysis =
+    !isNormalUser || Boolean(userPerms?.can_ncrp_statement_analysis);
+
+  const canGstAdvanceSearch =
+    !isNormalUser || Boolean(userPerms?.can_gst_advance_search ?? userPerms?.gst_advance_search);
+
+  const canCinAdvanceSearch =
+    !isNormalUser || Boolean(userPerms?.can_cin_advance_search ?? userPerms?.cin_advance_search);
+
   const formattedRole = String(displayRole)
     .replaceAll("_", " ")
     .toUpperCase();
@@ -254,9 +281,85 @@ function UserNavbar() {
       );
     }
 
+    if (
+      path === "/reports/fact/gst" ||
+      path === "/dashboard/reports/fact/gst" ||
+      path === "/reports/gst"
+    ) {
+      return (
+        currentPath === "/reports/fact/gst" ||
+        currentPath.startsWith("/reports/fact/gst") ||
+        currentPath === "/dashboard/reports/fact/gst" ||
+        currentPath.startsWith("/dashboard/reports/fact/gst") ||
+        currentPath === "/reports/gst" ||
+        currentPath.startsWith("/reports/gst")
+      );
+    }
+
+    if (
+      path === "/reports/fact/cin" ||
+      path === "/dashboard/reports/fact/cin" ||
+      path === "/reports/cin"
+    ) {
+      return (
+        currentPath === "/reports/fact/cin" ||
+        currentPath.startsWith("/reports/fact/cin") ||
+        currentPath === "/dashboard/reports/fact/cin" ||
+        currentPath.startsWith("/dashboard/reports/fact/cin") ||
+        currentPath === "/reports/cin" ||
+        currentPath.startsWith("/reports/cin")
+      );
+    }
+
+    if (
+      path === "/reports/ncrp" ||
+      path === "/dashboard/reports/ncrp" ||
+      path === "/reports/ncrp-transaction" ||
+      path === "/dashboard/reports/ncrp-transaction" ||
+      path === "/reports/ncrp-money-flow" ||
+      path === "/dashboard/reports/ncrp-money-flow"
+    ) {
+      return (
+        currentPath === "/reports/ncrp" ||
+        currentPath.startsWith("/reports/ncrp") ||
+        currentPath === "/dashboard/reports/ncrp" ||
+        currentPath.startsWith("/dashboard/reports/ncrp") ||
+        currentPath === "/reports/ncrp-transaction" ||
+        currentPath.startsWith("/reports/ncrp-transaction") ||
+        currentPath === "/dashboard/reports/ncrp-transaction" ||
+        currentPath.startsWith("/dashboard/reports/ncrp-transaction") ||
+        currentPath === "/reports/ncrp-money-flow" ||
+        currentPath.startsWith("/reports/ncrp-money-flow") ||
+        currentPath === "/dashboard/reports/ncrp-money-flow" ||
+        currentPath.startsWith("/dashboard/reports/ncrp-money-flow")
+      );
+    }
+
     if (path === "/reports") {
+      if (
+        currentPath.includes("ncrp") ||
+        currentPath.includes("gst") ||
+        currentPath.includes("cin") ||
+        currentPath.includes("fact") ||
+        currentPath === "/reports/ncrp" ||
+        currentPath.startsWith("/reports/ncrp") ||
+        currentPath === "/dashboard/reports/ncrp" ||
+        currentPath.startsWith("/dashboard/reports/ncrp") ||
+        currentPath === "/reports/ncrp-transaction" ||
+        currentPath.startsWith("/reports/ncrp-transaction") ||
+        currentPath === "/dashboard/reports/ncrp-transaction" ||
+        currentPath.startsWith("/dashboard/reports/ncrp-transaction") ||
+        currentPath === "/reports/ncrp-money-flow" ||
+        currentPath.startsWith("/reports/ncrp-money-flow") ||
+        currentPath === "/dashboard/reports/ncrp-money-flow" ||
+        currentPath.startsWith("/dashboard/reports/ncrp-money-flow")
+      ) {
+        return false;
+      }
+
       return (
         currentPath === "/reports" ||
+        currentPath === "/dashboard/reports" ||
         currentPath.startsWith("/reports/") ||
         currentPath.includes("/reports") ||
         currentPath === "/analysis" ||
@@ -280,6 +383,16 @@ function UserNavbar() {
       return (
         currentPath === "/dashboard/upload/bank-statement" ||
         currentPath === "/upload/bank-statement"
+      );
+    }
+
+    if (
+      path === "/dashboard/upload/ncrp" ||
+      path === "/upload/ncrp"
+    ) {
+      return (
+        currentPath === "/dashboard/upload/ncrp" ||
+        currentPath === "/upload/ncrp"
       );
     }
 
@@ -465,7 +578,7 @@ function UserNavbar() {
     },
     {
       label: "Upload",
-      visible: canViewCases,
+      visible: canViewCases && canUploadFiles && (canBankStatementAnalysis || canNcrpStatementAnalysis),
       isOpen: uploadSubmenuOpen,
       onToggle: () => setUploadUserToggled(!uploadSubmenuOpen),
       icon: (
@@ -495,7 +608,7 @@ function UserNavbar() {
         {
           label: "Bank Statement",
           path: "/dashboard/upload/bank-statement",
-          visible: true,
+          visible: canBankStatementAnalysis,
           icon: (
             <svg
               viewBox="0 0 24 24"
@@ -505,6 +618,34 @@ function UserNavbar() {
             >
               <path
                 d="M9 12h6m-6 3h6m2 5H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ),
+        },
+        {
+          label: "NCRP Statement",
+          path: "/dashboard/upload/ncrp",
+          visible: canNcrpStatementAnalysis,
+          icon: (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-4 h-4 shrink-0"
+              aria-hidden="true"
+            >
+              <path
+                d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M8.25 13.5h7.5M8.25 16.5h4.5"
                 stroke="currentColor"
                 strokeWidth="1.8"
                 strokeLinecap="round"
@@ -545,7 +686,7 @@ function UserNavbar() {
         {
           label: "Bank Statement Report",
           path: "/reports",
-          visible: canViewReports,
+          visible: canViewReports && canBankStatementAnalysis,
           icon: (
             <svg
               viewBox="0 0 24 24"
@@ -562,6 +703,100 @@ function UserNavbar() {
               />
             </svg>
           ),
+        },
+        {
+          label: "NCRP Transaction Report",
+          path: "/reports/ncrp",
+          visible: canViewReports && canNcrpStatementAnalysis,
+          icon: (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-4 h-4 shrink-0"
+              aria-hidden="true"
+            >
+              <path
+                d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M8.25 13.5h7.5M8.25 16.5h4.5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ),
+        },
+        {
+          label: "FACT",
+          visible: canViewReports && (canGstAdvanceSearch || canCinAdvanceSearch),
+          isOpen: factSubmenuOpen,
+          onToggle: () => setFactUserToggled(!factSubmenuOpen),
+          icon: (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-4 h-4 shrink-0"
+              aria-hidden="true"
+            >
+              <path
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ),
+          children: [
+            {
+              label: "GST",
+              path: "/reports/fact/gst",
+              visible: canViewReports && canGstAdvanceSearch,
+              icon: (
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="w-3.5 h-3.5 shrink-0"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ),
+            },
+            {
+              label: "CIN",
+              path: "/reports/fact/cin",
+              visible: canViewReports && canCinAdvanceSearch,
+              icon: (
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="w-3.5 h-3.5 shrink-0"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ),
+            },
+          ],
         },
       ],
     },
@@ -586,9 +821,13 @@ function UserNavbar() {
     if (!profileModalOpen) return null;
 
     const permissions = [
-      { label: "View cases", value: userPerms?.can_view_cases },
-      { label: "View IO Master", value: userPerms?.can_view_io },
-      { label: "View reports", value: userPerms?.can_view_reports },
+      { label: "View cases", value: !isNormalUser ? true : userPerms?.can_view_cases !== false },
+      { label: "View IO Master", value: !isNormalUser ? true : userPerms?.can_view_io !== false },
+      { label: "View reports", value: !isNormalUser ? true : userPerms?.can_view_reports !== false },
+      { label: "Bank Statement Analysis", value: !isNormalUser ? true : Boolean(userPerms?.can_bank_statement_analysis) },
+      { label: "NCRP Statement Analysis", value: !isNormalUser ? true : Boolean(userPerms?.can_ncrp_statement_analysis) },
+      { label: "GST Advance Search", value: !isNormalUser ? true : Boolean(userPerms?.can_gst_advance_search ?? userPerms?.gst_advance_search) },
+      { label: "CIN Advance Search", value: !isNormalUser ? true : Boolean(userPerms?.can_cin_advance_search ?? userPerms?.cin_advance_search) },
     ];
 
     return (
@@ -745,9 +984,7 @@ function UserNavbar() {
 
               <div className="rounded-xl border border-slate-200 px-4">
                 {permissions.map((permission) => {
-                  const allowed = !isNormalUser
-                    ? true
-                    : permission.value !== false;
+                  const allowed = permission.value;
 
                   return (
                     <div
@@ -817,7 +1054,12 @@ function UserNavbar() {
             const hasVisibleChildren = visibleChildren.length > 0;
 
             const isItemActive = hasVisibleChildren
-              ? visibleChildren.some((child) => isActive(child.path))
+              ? visibleChildren.some((child) => {
+                  if (child.children && child.children.length > 0) {
+                    return child.children.some((c) => isActive(c.path));
+                  }
+                  return isActive(child.path);
+                })
               : isActive(item.path);
 
             const isSubmenuOpen = item.isOpen ?? false;
@@ -901,6 +1143,109 @@ function UserNavbar() {
                   {!isCollapsed && isSubmenuOpen && (
                     <div className="ml-5 mt-1 flex flex-col gap-1 border-l-2 border-emerald-100 pl-3">
                       {visibleChildren.map((child) => {
+                        const hasSubChildren =
+                          Array.isArray(child.children) && child.children.length > 0;
+                        const visibleSubChildren = hasSubChildren
+                          ? child.children.filter((sc) => sc.visible !== false)
+                          : [];
+
+                        if (visibleSubChildren.length > 0) {
+                          const isSubChildActive = visibleSubChildren.some((sc) =>
+                            isActive(sc.path)
+                          );
+                          const isSubOpen = child.isOpen ?? false;
+
+                          return (
+                            <div key={child.label} className="flex flex-col">
+                              {/* Submenu Accordion Toggle (e.g. FACT) */}
+                              <button
+                                type="button"
+                                onClick={() => child.onToggle?.()}
+                                aria-expanded={isSubOpen}
+                                aria-current={isSubChildActive ? "page" : undefined}
+                                className={[
+                                  "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs transition-all duration-150",
+                                  isSubChildActive
+                                    ? "bg-emerald-100/90 font-bold text-emerald-950 shadow-xs"
+                                    : "font-semibold text-slate-600 hover:bg-slate-50 hover:text-blue-950",
+                                ].join(" ")}
+                              >
+                                <span
+                                  className={[
+                                    "shrink-0 transition-colors",
+                                    isSubChildActive
+                                      ? "text-emerald-700"
+                                      : "text-slate-400 group-hover:text-emerald-700",
+                                  ].join(" ")}
+                                >
+                                  {child.icon}
+                                </span>
+                                <span className="flex-1 truncate text-left">
+                                  {child.label}
+                                </span>
+                                <svg
+                                  className={[
+                                    "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
+                                    isSubOpen
+                                      ? "rotate-180 text-emerald-700"
+                                      : "text-slate-400 group-hover:text-slate-600",
+                                  ].join(" ")}
+                                  viewBox="0 0 20 20"
+                                  fill="currentColor"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </button>
+
+                              {/* Nested Sub-items (e.g. GST) */}
+                              {isSubOpen && (
+                                <div className="ml-4 mt-1 flex flex-col gap-1 border-l-2 border-emerald-200/80 pl-2.5">
+                                  {visibleSubChildren.map((subChild) => {
+                                    const isCurrentActive = isActive(subChild.path);
+
+                                    return (
+                                      <button
+                                        key={subChild.label}
+                                        type="button"
+                                        onClick={() => goTo(subChild.path)}
+                                        aria-current={isCurrentActive ? "page" : undefined}
+                                        className={[
+                                          "group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-all duration-150",
+                                          isCurrentActive
+                                            ? "bg-emerald-100/90 font-bold text-emerald-950 shadow-xs"
+                                            : "font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-950",
+                                        ].join(" ")}
+                                      >
+                                        <span
+                                          className={[
+                                            "shrink-0 transition-colors",
+                                            isCurrentActive
+                                              ? "text-emerald-700"
+                                              : "text-slate-400 group-hover:text-emerald-700",
+                                          ].join(" ")}
+                                        >
+                                          {subChild.icon}
+                                        </span>
+                                        <span className="flex-1 truncate text-left">
+                                          {subChild.label}
+                                        </span>
+                                        {isCurrentActive && (
+                                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
                         const isChildActive = isActive(child.path);
 
                         return (

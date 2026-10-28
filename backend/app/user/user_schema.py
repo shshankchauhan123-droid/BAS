@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, model_validator
 
 
 class UserPermissionsSchema(BaseModel):
@@ -13,9 +13,25 @@ class UserPermissionsSchema(BaseModel):
     can_create_io: bool = True
     can_update_io: bool = True
     can_delete_io: bool = True
+    can_bank_statement_analysis: bool = False
+    can_ncrp_statement_analysis: bool = False
+    can_gst_advance_search: bool = False
+    can_cin_advance_search: bool = False
+
+    @computed_field
+    @property
+    def gst_advance_search(self) -> bool:
+        return self.can_gst_advance_search
+
+    @computed_field
+    @property
+    def cin_advance_search(self) -> bool:
+        return self.can_cin_advance_search
 
 
 class UserPermissionsUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     can_view_cases: bool = True
     can_create_case: bool = True
     can_upload_files: bool = True
@@ -25,6 +41,20 @@ class UserPermissionsUpdateRequest(BaseModel):
     can_create_io: bool = True
     can_update_io: bool = True
     can_delete_io: bool = True
+    can_bank_statement_analysis: bool = False
+    can_ncrp_statement_analysis: bool = False
+    can_gst_advance_search: bool = False
+    can_cin_advance_search: bool = False
+    gst_advance_search: bool | None = None
+    cin_advance_search: bool | None = None
+
+    @model_validator(mode="after")
+    def sync_fact_permission_keys(self):
+        if self.gst_advance_search is not None:
+            self.can_gst_advance_search = bool(self.gst_advance_search)
+        if self.cin_advance_search is not None:
+            self.can_cin_advance_search = bool(self.cin_advance_search)
+        return self
 
 
 class UserCreateRequest(BaseModel):

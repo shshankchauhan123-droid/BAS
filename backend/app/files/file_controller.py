@@ -30,6 +30,8 @@ def upload_file_controller(
     case_id: int,
     user: User,
     document_type: str = "BANK_STATEMENT",
+    target_client_id: int | None = None,
+    target_user_id: int | None = None,
 ) -> FileUploadResponse:
 
     uploaded_file = upload_file(
@@ -38,6 +40,8 @@ def upload_file_controller(
         case_id=case_id,
         user=user,
         document_type=document_type,
+        target_client_id=target_client_id,
+        target_user_id=target_user_id,
     )
 
     return FileUploadResponse(

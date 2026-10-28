@@ -69,6 +69,7 @@ function CaseList() {
   const canCreateCase = isSuperAdmin || isClientAdmin || user?.permissions?.can_create_case !== false;
 
   const [cases, setCases] = useState([]);
+  const [kpiStats, setKpiStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,6 +80,7 @@ function CaseList() {
   const loadCases = useCallback(async () => {
     if (!canViewCases) {
       setCases([]);
+      setKpiStats(null);
       setIsLoading(false);
       return;
     }
@@ -87,6 +89,9 @@ function CaseList() {
       setError("");
       const response = await getCases();
       setCases(Array.isArray(response?.data) ? response.data : []);
+      if (response?.kpis) {
+        setKpiStats(response.kpis);
+      }
     } catch (requestError) {
       console.error("Failed to load cases:", requestError);
       const message = requestError?.response?.data?.detail || requestError?.message || "Unable to load investigation cases.";
@@ -118,10 +123,14 @@ function CaseList() {
     );
   }, [cases, searchTerm]);
 
-  const totalCases = cases.length;
-  const draftCases = cases.filter((item) => String(item.status || "").toUpperCase() === "DRAFT").length;
-  const inProgressCases = cases.filter((item) => String(item.status || "").toUpperCase() === "IN_PROGRESS").length;
-  const completedCases = cases.filter((item) => String(item.status || "").toUpperCase() === "COMPLETED").length;
+  const totalCases = kpiStats?.total_cases ?? cases.length;
+  const draftCases = kpiStats?.draft_cases ?? cases.filter((item) => String(item.status || "").toUpperCase() === "DRAFT").length;
+  const inProgressCases = kpiStats?.in_progress_cases ?? cases.filter((item) => String(item.status || "").toUpperCase() === "IN_PROGRESS").length;
+  const completedCases = kpiStats?.completed_cases ?? cases.filter((item) => String(item.status || "").toUpperCase() === "COMPLETED").length;
+
+  const totalBankStatements = kpiStats?.total_bank_statements ?? cases.reduce((acc, c) => acc + (c?.bank_statement_count || 0), 0);
+  const totalNcrpWorkbooks = kpiStats?.total_ncrp_workbooks ?? cases.reduce((acc, c) => acc + (c?.ncrp_count || 0), 0);
+  const totalDocuments = kpiStats?.total_documents ?? (totalBankStatements + totalNcrpWorkbooks);
 
   function handleOpenCase(caseData) {
     const caseId = caseData?.id;
@@ -333,6 +342,38 @@ function CaseList() {
                   <StatCard label="Draft Cases" value={draftCases} note="Cases awaiting further action" icon="draft" tone="amber" percentage={totalCases ? draftCases / totalCases * 100 : 0} loading={isLoading} delay="arth-case-stagger-2" />
                   <StatCard label="In Progress" value={inProgressCases} note="Investigations in progress" icon="progress" tone="indigo" percentage={totalCases ? inProgressCases / totalCases * 100 : 0} loading={isLoading} delay="arth-case-stagger-3" />
                   <StatCard label="Completed Cases" value={completedCases} note="Investigations marked completed" icon="complete" tone="emerald" percentage={totalCases ? completedCases / totalCases * 100 : 0} loading={isLoading} delay="arth-case-stagger-4" />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-4 px-5 shadow-xs sm:px-6">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <path d="M14 2v6h6" />
+                      </svg>
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-800">Case Documents & Workbooks Overview</span>
+                      <p className="text-[11px] text-slate-500">Live document counts imported across accessible cases</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      <span>Bank Statements:</span>
+                      <strong className="font-extrabold">{isLoading ? "..." : totalBankStatements.toLocaleString("en-IN")}</strong>
+                    </div>
+                    <div className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/70 px-3 py-1.5 text-xs font-semibold text-purple-800">
+                      <span className="h-2 w-2 rounded-full bg-purple-500" />
+                      <span>NCRP Workbooks:</span>
+                      <strong className="font-extrabold">{isLoading ? "..." : totalNcrpWorkbooks.toLocaleString("en-IN")}</strong>
+                    </div>
+                    <div className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-xs font-semibold text-blue-800">
+                      <span className="h-2 w-2 rounded-full bg-blue-500" />
+                      <span>Total Documents:</span>
+                      <strong className="font-extrabold">{isLoading ? "..." : totalDocuments.toLocaleString("en-IN")}</strong>
+                    </div>
+                  </div>
                 </div>
               </section>
 

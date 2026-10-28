@@ -12,6 +12,7 @@ from app.case.case_model import Case
 from app.files.file_model import File, MergedFileSource
 from app.bank_transactions.bank_transaction_model import BankTransaction
 from app.bank_transactions.transaction_mode_model import TransactionMode
+from app.ncrp.ncrp_model import NcrpFile, NcrpTransaction
 
 load_dotenv()
 

@@ -176,6 +176,8 @@ def upload_file(
     case_id: int,
     user: User,
     document_type: str = "BANK_STATEMENT",
+    target_client_id: int | None = None,
+    target_user_id: int | None = None,
 ) -> File:
     user_id = user.id
     user_role = str(user.role).lower()
@@ -183,12 +185,30 @@ def upload_file(
         perms = getattr(user, "permissions", None)
         if perms and not perms.can_upload_files:
             raise PermissionError("You do not have permission to upload files. Contact your company administrator.")
+        valid_doc_type = (document_type or "BANK_STATEMENT").strip().upper()
+        if valid_doc_type == "BANK_STATEMENT":
+            if not perms or not getattr(perms, "can_bank_statement_analysis", False):
+                raise PermissionError("You do not have permission for Bank Statement Analysis. Contact your company administrator.")
 
     # --------------------------------------------------------
     # Check case ownership
     # --------------------------------------------------------
     if user_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
         case = get_case_by_id(db=db, case_id=case_id)
+        if case:
+            # Validate client / user consistency if supplied
+            if target_client_id is not None:
+                case_client = case.client_id or (case.creator.client_id if case.creator else None)
+                if case_client != target_client_id:
+                    raise ValueError("The selected case does not belong to the selected client.")
+            if target_user_id is not None:
+                if case.created_by != target_user_id and case.assigned_to != target_user_id:
+                    raise ValueError("The selected case does not belong to the selected user.")
+            if target_client_id is not None and target_user_id is not None:
+                from app.user.user_repository import get_user_by_id as repo_get_user
+                t_user = repo_get_user(db=db, user_id=target_user_id)
+                if not t_user or t_user.client_id != target_client_id:
+                    raise ValueError("The selected user does not belong to the selected client.")
     elif user_role == CLIENT_ADMIN_ROLE:
         case = get_case_by_id(db=db, case_id=case_id)
         if not case or not (
@@ -197,6 +217,9 @@ def upload_file(
             or (case.assignee and case.assignee.client_id == user.client_id)
         ):
             case = None
+        if case and target_user_id is not None:
+            if case.created_by != target_user_id and case.assigned_to != target_user_id:
+                raise ValueError("The selected case does not belong to the selected user.")
     else:
         case = get_case_by_id_and_user(
             db=db,
@@ -385,6 +408,12 @@ def get_case_files(
             document_type=document_type,
         )
     else:
+        valid_doc_type = (document_type or "BANK_STATEMENT").strip().upper() if document_type else None
+        if valid_doc_type == "BANK_STATEMENT":
+            perms = getattr(user, "permissions", None)
+            if not perms or not getattr(perms, "can_bank_statement_analysis", False):
+                raise PermissionError("You do not have permission for Bank Statement Analysis. Contact your company administrator.")
+
         case = get_case_by_id_and_user(
             db=db,
             case_id=case_id,
@@ -443,6 +472,13 @@ def get_file_for_view(
         raise ValueError(
             "File not found"
         )
+
+    if user_role == USER_ROLE:
+        valid_doc_type = getattr(file, "document_type", "BANK_STATEMENT")
+        if valid_doc_type == "BANK_STATEMENT":
+            perms = getattr(user, "permissions", None)
+            if not perms or not getattr(perms, "can_bank_statement_analysis", False):
+                raise PermissionError("You do not have permission for Bank Statement Analysis. Contact your company administrator.")
 
     # --------------------------------------------------------
     # Check physical file
@@ -729,6 +765,8 @@ def merge_case_files(
         perms = getattr(user, "permissions", None)
         if perms and not getattr(perms, "can_upload_files", True):
             raise PermissionError("You do not have permission to merge files. Contact your administrator.")
+        if not perms or not getattr(perms, "can_bank_statement_analysis", False):
+            raise PermissionError("You do not have permission for Bank Statement Analysis. Contact your company administrator.")
 
     # 1. Minimum files check
     unique_file_ids = list(dict.fromkeys(data.file_ids))
