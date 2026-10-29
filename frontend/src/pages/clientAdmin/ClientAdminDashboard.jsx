@@ -153,7 +153,7 @@ export default function ClientAdminDashboard() {
       const token = localStorage.getItem("antidrone_access_token");
       if (!token) return;
 
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8082";
       const wsProto = baseUrl.startsWith("https") ? "wss" : "ws";
       const host = baseUrl.replace(/^https?:\/\//, "");
       const wsUrl = `${wsProto}://${host}/api/v1/ws/admin-dashboard?token=${encodeURIComponent(token)}`;

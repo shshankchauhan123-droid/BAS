@@ -13,6 +13,10 @@ BACKEND_COMMAND = [
     "-m",
     "uvicorn",
     "app.main:app",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8082",
     "--reload",
 ]
 
@@ -75,8 +79,8 @@ def main():
         print(f"Celery process started (PID: {worker.pid})")
 
         print("\nStartup commands launched.")
-        print("FastAPI: http://127.0.0.1:8000")
-        print("API docs: http://127.0.0.1:8000/docs")
+        print("FastAPI: http://127.0.0.1:8082")
+        print("API docs: http://127.0.0.1:8082/docs")
         print("Press Ctrl+C to stop both services.\n")
 
         while True:
