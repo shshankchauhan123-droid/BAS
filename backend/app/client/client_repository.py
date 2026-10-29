@@ -113,12 +113,32 @@ def update_client_status(
 
 
 def update_client_max_users(
-
     db: Session,
     client: Client,
     max_users: int,
 ) -> Client:
     client.max_users = max_users
+    db.commit()
+    db.refresh(client)
+    return client
+
+
+def update_client_profile(
+    db: Session,
+    client: Client,
+    name: str | None = None,
+    company_code: str | None = None,
+    max_users: int | None = None,
+    is_active: bool | None = None,
+) -> Client:
+    if name is not None:
+        client.name = name.strip()
+    if company_code is not None:
+        client.company_code = company_code.strip().upper()
+    if max_users is not None:
+        client.max_users = max_users
+    if is_active is not None:
+        client.is_active = is_active
     db.commit()
     db.refresh(client)
     return client

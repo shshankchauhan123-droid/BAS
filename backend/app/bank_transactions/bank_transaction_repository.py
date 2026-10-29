@@ -6,6 +6,30 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 
 from app.bank_transactions.bank_transaction_model import BankTransaction
+from app.files.file_model import File, MergedFileSource
+
+
+def _apply_bank_statement_file_filter(query, db: Session, case_id: int, file_ids: list[int] | None):
+    if file_ids is not None:
+        if not file_ids:
+            return query.filter(func.false())
+        valid_subquery = db.query(File.id).filter(
+            File.id.in_(file_ids),
+            File.case_id == case_id,
+        )
+        if hasattr(File, "document_type"):
+            valid_subquery = valid_subquery.filter(File.document_type == "BANK_STATEMENT")
+        return query.filter(BankTransaction.file_id.in_(valid_subquery))
+    if hasattr(File, "document_type"):
+        return query.filter(
+            BankTransaction.file_id.in_(
+                db.query(File.id).filter(
+                    File.case_id == case_id,
+                    File.document_type == "BANK_STATEMENT",
+                )
+            )
+        )
+    return query
 
 
 # ============================================================
@@ -138,12 +162,21 @@ def get_transactions_by_file_paginated(
 def get_transactions_by_case(
     db: Session,
     case_id: int,
+    file_ids: list[int] | None = None,
 ) -> list[BankTransaction]:
-    return (
+    if file_ids is not None and len(file_ids) == 0:
+        return []
+
+    query = (
         db.query(BankTransaction)
         .filter(
             BankTransaction.case_id == case_id
         )
+    )
+    query = _apply_bank_statement_file_filter(query, db, case_id, file_ids)
+
+    return (
+        query
         .order_by(
             BankTransaction.transaction_date.asc(),
             BankTransaction.id.asc(),
@@ -161,16 +194,22 @@ def get_transactions_by_case_paginated(
     case_id: int,
     page: int,
     page_size: int,
+    file_ids: list[int] | None = None,
 ):
+    if file_ids is not None and len(file_ids) == 0:
+        return [], 0
+
     query = (
         db.query(BankTransaction)
         .filter(
             BankTransaction.case_id == case_id
         )
-        .order_by(
-            BankTransaction.transaction_date.asc(),
-            BankTransaction.id.asc(),
-        )
+    )
+    query = _apply_bank_statement_file_filter(query, db, case_id, file_ids)
+
+    query = query.order_by(
+        BankTransaction.transaction_date.asc(),
+        BankTransaction.id.asc(),
     )
 
     total = query.count()
@@ -212,6 +251,9 @@ def get_filtered_transactions_by_case(
     sort_order: str = 'asc',
     counterparty_name: str | None = None,
 ):
+    if file_ids is not None and len(file_ids) == 0:
+        return [], 0, []
+
     query = (
         db.query(BankTransaction)
         .filter(
@@ -219,8 +261,7 @@ def get_filtered_transactions_by_case(
         )
     )
 
-    if file_ids:
-        query = query.filter(BankTransaction.file_id.in_(file_ids))
+    query = _apply_bank_statement_file_filter(query, db, case_id, file_ids)
         
     if counterparty_name:
         from sqlalchemy import func
@@ -518,10 +559,25 @@ def get_file_transaction_summary(db: Session, file_id: int):
 # ============================================================
 
 def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] | None = None, mode: str | None = None):
+    if file_ids is not None and len(file_ids) == 0:
+        return {
+            "start_date": None,
+            "end_date": None,
+            "total_transactions": 0,
+            "total_debits": Decimal("0.0"),
+            "total_credits": Decimal("0.0"),
+            "debit_transactions": 0,
+            "credit_transactions": 0,
+            "most_active_date": None,
+            "most_active_date_count": 0,
+            "highest_debit": 0.0,
+            "highest_credit": 0.0,
+            "average_transaction_value": None
+        }
+
     # Calculate total transactions
     query_count = db.query(func.count(BankTransaction.id)).filter(BankTransaction.case_id == case_id)
-    if file_ids:
-        query_count = query_count.filter(BankTransaction.file_id.in_(file_ids))
+    query_count = _apply_bank_statement_file_filter(query_count, db, case_id, file_ids)
     if mode:
         query_count = query_count.filter(BankTransaction.mode == mode)
     total_transactions = query_count.scalar() or 0
@@ -531,8 +587,7 @@ def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] 
         func.min(BankTransaction.transaction_date),
         func.max(BankTransaction.transaction_date)
     ).filter(BankTransaction.case_id == case_id)
-    if file_ids:
-        query_dates = query_dates.filter(BankTransaction.file_id.in_(file_ids))
+    query_dates = _apply_bank_statement_file_filter(query_dates, db, case_id, file_ids)
     if mode:
         query_dates = query_dates.filter(BankTransaction.mode == mode)
     dates = query_dates.first()
@@ -542,32 +597,28 @@ def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] 
 
     # Calculate total debits
     query_debits = db.query(func.sum(BankTransaction.debit)).filter(BankTransaction.case_id == case_id)
-    if file_ids:
-        query_debits = query_debits.filter(BankTransaction.file_id.in_(file_ids))
+    query_debits = _apply_bank_statement_file_filter(query_debits, db, case_id, file_ids)
     if mode:
         query_debits = query_debits.filter(BankTransaction.mode == mode)
     total_debits = query_debits.scalar() or Decimal("0.0")
 
     # Calculate total credits
     query_credits = db.query(func.sum(BankTransaction.credit)).filter(BankTransaction.case_id == case_id)
-    if file_ids:
-        query_credits = query_credits.filter(BankTransaction.file_id.in_(file_ids))
+    query_credits = _apply_bank_statement_file_filter(query_credits, db, case_id, file_ids)
     if mode:
         query_credits = query_credits.filter(BankTransaction.mode == mode)
     total_credits = query_credits.scalar() or Decimal("0.0")
 
     # Calculate debit transactions count
     query_debit_count = db.query(func.count(BankTransaction.id)).filter(BankTransaction.case_id == case_id, BankTransaction.debit > 0)
-    if file_ids:
-        query_debit_count = query_debit_count.filter(BankTransaction.file_id.in_(file_ids))
+    query_debit_count = _apply_bank_statement_file_filter(query_debit_count, db, case_id, file_ids)
     if mode:
         query_debit_count = query_debit_count.filter(BankTransaction.mode == mode)
     debit_transactions = query_debit_count.scalar() or 0
 
     # Calculate credit transactions count
     query_credit_count = db.query(func.count(BankTransaction.id)).filter(BankTransaction.case_id == case_id, BankTransaction.credit > 0)
-    if file_ids:
-        query_credit_count = query_credit_count.filter(BankTransaction.file_id.in_(file_ids))
+    query_credit_count = _apply_bank_statement_file_filter(query_credit_count, db, case_id, file_ids)
     if mode:
         query_credit_count = query_credit_count.filter(BankTransaction.mode == mode)
     credit_transactions = query_credit_count.scalar() or 0
@@ -577,9 +628,7 @@ def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] 
         BankTransaction.transaction_date, 
         func.count(BankTransaction.id).label('tx_count')
     ).filter(BankTransaction.case_id == case_id)
-    
-    if file_ids:
-        query_active_date = query_active_date.filter(BankTransaction.file_id.in_(file_ids))
+    query_active_date = _apply_bank_statement_file_filter(query_active_date, db, case_id, file_ids)
     if mode:
         query_active_date = query_active_date.filter(BankTransaction.mode == mode)
         
@@ -596,8 +645,7 @@ def get_case_transaction_summary(db: Session, case_id: int, file_ids: list[int] 
         func.max(BankTransaction.debit),
         func.max(BankTransaction.credit)
     ).filter(BankTransaction.case_id == case_id)
-    if file_ids:
-        query_highest = query_highest.filter(BankTransaction.file_id.in_(file_ids))
+    query_highest = _apply_bank_statement_file_filter(query_highest, db, case_id, file_ids)
     if mode:
         query_highest = query_highest.filter(BankTransaction.mode == mode)
         
@@ -643,9 +691,14 @@ def get_mode_wise_by_case(
     case_id: int,
     file_ids: list[int] = None,
 ):
+    if file_ids is not None and len(file_ids) == 0:
+        return {
+            "total_transactions": 0,
+            "modes": []
+        }
+
     query = db.query(BankTransaction).filter(BankTransaction.case_id == case_id)
-    if file_ids:
-        query = query.filter(BankTransaction.file_id.in_(file_ids))
+    query = _apply_bank_statement_file_filter(query, db, case_id, file_ids)
 
     results = db.query(
         BankTransaction.mode,
@@ -705,9 +758,12 @@ def get_timeline_by_case(
     file_ids: list[int] = None,
     requested_interval: str = None,
 ):
+    if file_ids is not None and len(file_ids) == 0:
+        return {"interval": "day", "data": []}
+
     query = db.query(BankTransaction).filter(BankTransaction.case_id == case_id)
-    if file_ids:
-        query = query.filter(BankTransaction.file_id.in_(file_ids))
+    query = _apply_bank_statement_file_filter(query, db, case_id, file_ids)
+
 
     stats = db.query(
         func.min(BankTransaction.transaction_date),
@@ -809,7 +865,10 @@ def get_transaction_relationships(
     from app.files.file_model import File, MergedFileSource
     
     # Get details for all requested files
-    files = db.query(File).filter(File.id.in_(file_ids), File.case_id == case_id).all()
+    files_query = db.query(File).filter(File.id.in_(file_ids), File.case_id == case_id)
+    if hasattr(File, "document_type"):
+        files_query = files_query.filter(File.document_type == "BANK_STATEMENT")
+    files = files_query.all()
     if not files:
         return {"case_id": case_id, "filters": {}, "nodes": [], "edges": [], "transactions": [], "summary": {}}
     
@@ -837,7 +896,12 @@ def get_transaction_relationships(
         if getattr(f, "is_merged", False):
             sources = [
                 r[0] for r in db.query(MergedFileSource.source_file_id)
-                .filter(MergedFileSource.merged_file_id == f.id)
+                .join(File, MergedFileSource.source_file_id == File.id)
+                .filter(
+                    MergedFileSource.merged_file_id == f.id,
+                    File.case_id == case_id,
+                    File.document_type == "BANK_STATEMENT" if hasattr(File, "document_type") else True
+                )
                 .all()
             ]
             for sid in sources:
@@ -847,8 +911,14 @@ def get_transaction_relationships(
             file_to_node_map[f.id] = f.id
             query_file_ids.append(f.id)
     
+    if not query_file_ids:
+        return {"case_id": case_id, "filters": {}, "nodes": [], "edges": [], "transactions": [], "summary": {}}
+
     # Query transactions from valid files
-    query = db.query(BankTransaction).filter(BankTransaction.file_id.in_(query_file_ids))
+    query = db.query(BankTransaction).filter(
+        BankTransaction.case_id == case_id,
+        BankTransaction.file_id.in_(query_file_ids)
+    )
     
     if transaction_mode and transaction_mode.lower() != "all":
         query = query.filter(BankTransaction.mode.ilike(f"%{transaction_mode.strip()}%"))
@@ -979,9 +1049,12 @@ def get_counterparty_analysis(db: Session, case_id: int, file_ids: list[int]):
     from app.files.file_model import File, MergedFileSource
     
     # Check valid files
-    files = db.query(File).filter(File.id.in_(file_ids), File.case_id == case_id).all()
+    files_query = db.query(File).filter(File.id.in_(file_ids), File.case_id == case_id)
+    if hasattr(File, "document_type"):
+        files_query = files_query.filter(File.document_type == "BANK_STATEMENT")
+    files = files_query.all()
     if not files:
-        return {"error": "No valid files"}
+        return {"error": "No valid bank statement files"}
         
     valid_file_ids = [f.id for f in files]
     file_map = {f.id: f.original_filename for f in files}
@@ -993,7 +1066,12 @@ def get_counterparty_analysis(db: Session, case_id: int, file_ids: list[int]):
         if getattr(f, "is_merged", False):
             sources = [
                 r[0] for r in db.query(MergedFileSource.source_file_id)
-                .filter(MergedFileSource.merged_file_id == f.id)
+                .join(File, MergedFileSource.source_file_id == File.id)
+                .filter(
+                    MergedFileSource.merged_file_id == f.id,
+                    File.case_id == case_id,
+                    File.document_type == "BANK_STATEMENT" if hasattr(File, "document_type") else True
+                )
                 .all()
             ]
             for sid in sources:
@@ -1002,6 +1080,9 @@ def get_counterparty_analysis(db: Session, case_id: int, file_ids: list[int]):
         else:
             source_to_parent_map[f.id] = f.id
             query_file_ids.append(f.id)
+            
+    if not query_file_ids:
+        return {"error": "No valid bank statement files"}
     
     # Query grouped by counterparty AND file_id
     query = db.query(

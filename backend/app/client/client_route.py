@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 
 from app.client.client_controller import (
     create_client_controller,
+    delete_client_controller,
     get_client_controller,
     list_clients_controller,
+    update_client_controller,
     update_client_max_users_controller,
     update_client_status_controller,
 )
@@ -13,11 +15,13 @@ from app.client.client_schema import (
     ClientListResponse,
     ClientResponse,
     ClientUpdateMaxUsersRequest,
+    ClientUpdateRequest,
     ClientUpdateStatusRequest,
 )
 from app.core.database import get_db
 from app.core.roles import SUPERADMIN_ROLE
-from app.dependencies.auth import require_roles
+from app.dependencies.auth import get_current_user, require_roles
+from app.user.user_model import User
 
 router = APIRouter(
     prefix="/api/v1/clients",
@@ -127,5 +131,60 @@ def update_client_max_users_endpoint(
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        )
+
+
+@router.put(
+    "/{client_id}",
+    response_model=ClientResponse,
+    summary="Update client company profile and admin details",
+)
+@router.patch(
+    "/{client_id}",
+    response_model=ClientResponse,
+    include_in_schema=False,
+)
+def update_client_endpoint(
+    client_id: int,
+    data: ClientUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return update_client_controller(
+            db=db,
+            client_id=client_id,
+            data=data,
+            actor=current_user,
+        )
+    except ValueError as error:
+        status_code = status.HTTP_404_NOT_FOUND if "not found" in str(error).lower() else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(
+            status_code=status_code,
+            detail=str(error),
+        )
+
+
+@router.delete(
+    "/{client_id}",
+    response_model=dict,
+    summary="Safely delete a client company (only if no investigation dependencies)",
+)
+def delete_client_endpoint(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return delete_client_controller(
+            db=db,
+            client_id=client_id,
+            actor=current_user,
+        )
+    except ValueError as error:
+        status_code = status.HTTP_404_NOT_FOUND if "not found" in str(error).lower() else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(
+            status_code=status_code,
             detail=str(error),
         )

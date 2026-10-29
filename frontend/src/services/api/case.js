@@ -37,8 +37,23 @@ export function createCase({ case_name, description, io_id, assigned_to, client_
  * The JWT is automatically attached by apiRequest().
  * The backend determines which user's cases to return.
  */
-export function getCases(userId = null) {
-  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+export function getCases(userIdOrOptions = null, clientIdArg = null) {
+  let userId = null;
+  let clientId = null;
+
+  if (typeof userIdOrOptions === "object" && userIdOrOptions !== null) {
+    userId = userIdOrOptions.userId ?? userIdOrOptions.user_id ?? null;
+    clientId = userIdOrOptions.clientId ?? userIdOrOptions.client_id ?? null;
+  } else {
+    userId = userIdOrOptions;
+    clientId = clientIdArg;
+  }
+
+  const params = new URLSearchParams();
+  if (userId) params.append("user_id", userId);
+  if (clientId) params.append("client_id", clientId);
+
+  const query = params.toString() ? `?${params.toString()}` : "";
   return apiRequest(`/api/v1/cases/${query}`, {
     method: "GET",
   });

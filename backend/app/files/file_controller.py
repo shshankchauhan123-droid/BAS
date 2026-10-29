@@ -29,6 +29,9 @@ def upload_file_controller(
     file: UploadFile,
     case_id: int,
     user: User,
+    document_type: str = "BANK_STATEMENT",
+    target_client_id: int | None = None,
+    target_user_id: int | None = None,
 ) -> FileUploadResponse:
 
     uploaded_file = upload_file(
@@ -36,6 +39,9 @@ def upload_file_controller(
         file=file,
         case_id=case_id,
         user=user,
+        document_type=document_type,
+        target_client_id=target_client_id,
+        target_user_id=target_user_id,
     )
 
     return FileUploadResponse(
@@ -54,6 +60,7 @@ def get_case_files_controller(
     case_id: int,
     user: User,
     include_superseded: bool = False,
+    document_type: str | None = None,
 ) -> FileListResponse:
 
     files = get_case_files(
@@ -61,6 +68,7 @@ def get_case_files_controller(
         case_id=case_id,
         user=user,
         include_superseded=include_superseded,
+        document_type=document_type,
     )
 
     for f in files:

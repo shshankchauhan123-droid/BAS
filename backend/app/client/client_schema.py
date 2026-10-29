@@ -54,6 +54,41 @@ class ClientUpdateMaxUsersRequest(BaseModel):
     )
 
 
+class ClientUpdateRequest(BaseModel):
+    name: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=100,
+        description="Client company / organization name",
+    )
+    company_code: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=50,
+        description="Unique identifier / short code for the company",
+    )
+    max_users: int | None = Field(
+        default=None,
+        ge=1,
+        le=1000,
+        description="Maximum number of users allowed for this client",
+    )
+    is_active: bool | None = Field(
+        default=None,
+        description="Access status (True=Active, False=Inactive)",
+    )
+    admin_email: EmailStr | None = Field(
+        default=None,
+        description="Updated email for the primary Client Admin",
+    )
+    admin_username: str | None = Field(
+        default=None,
+        min_length=3,
+        max_length=50,
+        description="Updated username for the primary Client Admin",
+    )
+
+
 class ClientResponse(BaseModel):
     id: int
     name: str

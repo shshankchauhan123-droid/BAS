@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
@@ -30,43 +30,38 @@ function UserDashboard() {
   const [stats, setStats] = useState(null);
   const [statsError, setStatsError] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadDashboardData() {
-      try {
-        setLoading(true);
-        const [casesRes, ioRes, statsRes] = await Promise.allSettled([
-          canViewCases ? getCases() : Promise.resolve(null),
-          canViewIO ? getIOMasters() : Promise.resolve(null),
-          getDashboardStatistics(),
-        ]);
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [casesRes, ioRes, statsRes] = await Promise.allSettled([
+        canViewCases ? getCases() : Promise.resolve(null),
+        canViewIO ? getIOMasters() : Promise.resolve(null),
+        getDashboardStatistics(),
+      ]);
 
-        if (isMounted) {
-          if (casesRes.status === "fulfilled" && Array.isArray(casesRes.value?.data)) {
-            setCases(casesRes.value.data);
-          }
-          if (ioRes.status === "fulfilled" && Array.isArray(ioRes.value?.data)) {
-            setIoList(ioRes.value.data);
-          }
-          if (statsRes.status === "fulfilled" && statsRes.value) {
-            setStats(statsRes.value);
-            setStatsError(false);
-          } else {
-            setStatsError(true);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load dashboard data:", err);
-      } finally {
-        if (isMounted) setLoading(false);
+      if (casesRes.status === "fulfilled" && Array.isArray(casesRes.value?.data)) {
+        setCases(casesRes.value.data);
       }
+      if (ioRes.status === "fulfilled" && Array.isArray(ioRes.value?.data)) {
+        setIoList(ioRes.value.data);
+      }
+      if (statsRes.status === "fulfilled" && statsRes.value) {
+        setStats(statsRes.value);
+        setStatsError(false);
+      } else {
+        setStatsError(true);
+      }
+    } catch (err) {
+      console.error("Failed to load dashboard data:", err);
+      setStatsError(true);
+    } finally {
+      setLoading(false);
     }
-
-    loadDashboardData();
-    return () => {
-      isMounted = false;
-    };
   }, [canViewCases, canViewIO]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   // Safe data extraction for dashboard statistics (supports direct or nested .data response)
   const statsData =
@@ -80,7 +75,7 @@ function UserDashboard() {
    * Safely formats KPI statistics:
    * - Shows "..." when loading
    * - Shows "ERR" when an error occurred, stats is missing, or the property is missing/invalid
-   * - Valid 0 formatted as "00"
+   * - Genuine 0 formatted as "0"
    * - 1 to 99 zero-padded as "01", "02", ..., "99"
    * - > 99 displayed in full without truncation (e.g. "150", "2850")
    */
@@ -90,8 +85,7 @@ function UserDashboard() {
     if (val === undefined || val === null || val === "") return "ERR";
     const num = Number(val);
     if (isNaN(num)) return "ERR";
-    if (num < 0) return "00";
-    if (num === 0) return "00";
+    if (num <= 0) return "0";
     return num > 99 ? String(num) : String(num).padStart(2, "0");
   };
 
@@ -203,6 +197,7 @@ function UserDashboard() {
         .arthbodh-stagger-3 { animation-delay: 150ms; }
         .arthbodh-stagger-4 { animation-delay: 200ms; }
         .arthbodh-stagger-5 { animation-delay: 250ms; }
+        .arthbodh-stagger-6 { animation-delay: 300ms; }
 
         .arthbodh-card-elevate {
           transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms ease;
@@ -313,7 +308,7 @@ function UserDashboard() {
           </section>
 
           {/* =====================================================
-              ANALYSIS OVERVIEW — 4 DYNAMIC KPI CARDS
+              ANALYSIS OVERVIEW — 6 DYNAMIC KPI CARDS
           ====================================================== */}
           <section className="mb-8">
             <div className="mb-4 flex items-center justify-between">
@@ -323,12 +318,39 @@ function UserDashboard() {
                   Analysis Overview
                 </h2>
               </div>
-              <span className="text-[11px] font-semibold text-[#64748B]">
-                {loading ? "Refreshing..." : "Live System Metrics"}
-              </span>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={loadDashboardData}
+                  disabled={loading}
+                  title="Refresh statistics"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-2xs transition-colors hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-700 disabled:opacity-50"
+                >
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={loading ? "animate-spin text-emerald-600" : ""}
+                  >
+                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                    <path d="M16 21h5v-5" />
+                  </svg>
+                  <span>{loading ? "Refreshing..." : "Refresh"}</span>
+                </button>
+                <span className="text-[11px] font-semibold text-[#64748B]">
+                  Live System Metrics
+                </span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
               {/* 1. ANALYSIS CASES */}
               <div className="h-full arthbodh-animate-entrance arthbodh-stagger-1">
                 <AnalysisStat
@@ -448,6 +470,68 @@ function UserDashboard() {
                       <path d="M15 5L18 8L15 11" />
                       <path d="M20 16H6" />
                       <path d="M9 13L6 16L9 19" />
+                    </svg>
+                  }
+                />
+              </div>
+
+              {/* 5. NCRP STATEMENTS */}
+              <div className="h-full arthbodh-animate-entrance arthbodh-stagger-5">
+                <AnalysisStat
+                  title="NCRP Statements"
+                  value={formatStatValue(
+                    statsData?.ncrp_statements ??
+                      statsData?.ncrp_statement_count ??
+                      statsData?.ncrp_files_count
+                  )}
+                  description="Workbooks uploaded"
+                  theme="purple"
+                  icon={
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <path d="M14 2v6h6" />
+                      <line x1="8" y1="13" x2="16" y2="13" />
+                      <line x1="8" y1="17" x2="16" y2="17" />
+                      <line x1="12" y1="9" x2="12" y2="21" />
+                    </svg>
+                  }
+                />
+              </div>
+
+              {/* 6. NCRP TRANSACTIONS */}
+              <div className="h-full arthbodh-animate-entrance arthbodh-stagger-6">
+                <AnalysisStat
+                  title="NCRP Transactions"
+                  value={formatStatValue(
+                    statsData?.ncrp_transactions ??
+                      statsData?.ncrp_transaction_count
+                  )}
+                  description="Records imported"
+                  theme="violet"
+                  icon={
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="17 1 21 5 17 9" />
+                      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                      <polyline points="7 23 3 19 7 15" />
+                      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
                     </svg>
                   }
                 />
@@ -1013,6 +1097,16 @@ function AnalysisStat({
       badge: "border-indigo-200 bg-indigo-50 text-indigo-600",
       hoverBorder: "hover:border-indigo-300",
     },
+    purple: {
+      bar: "bg-purple-600",
+      badge: "border-purple-200 bg-purple-50 text-purple-700",
+      hoverBorder: "hover:border-purple-300",
+    },
+    violet: {
+      bar: "bg-violet-600",
+      badge: "border-violet-200 bg-violet-50 text-violet-700",
+      hoverBorder: "hover:border-violet-300",
+    },
     gold: {
       bar: "bg-[#D6B36A]",
       badge: "border-amber-200 bg-amber-50 text-amber-800",
@@ -1025,7 +1119,7 @@ function AnalysisStat({
   return (
     <div
       onClick={clickable && onClick ? onClick : undefined}
-      className={`arthbodh-card-elevate group relative flex h-full min-h-[148px] flex-col justify-between overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white p-4 sm:p-5 shadow-sm transition-all duration-200 ${
+      className={`arthbodh-card-elevate group relative flex h-full min-h-[148px] flex-col justify-between overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white p-4 sm:p-5 xl:p-4 2xl:p-5 shadow-sm transition-all duration-200 ${
         selectedTheme.hoverBorder
       } ${clickable && onClick ? "cursor-pointer" : ""}`}
     >

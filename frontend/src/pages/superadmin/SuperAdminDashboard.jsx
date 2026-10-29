@@ -6,6 +6,8 @@ import {
   createClient,
   updateClientStatus,
   updateClientMaxUsers,
+  updateClient,
+  deleteClient,
 } from "../../services/api/clients";
 import AuditLogTable from "../../components/audit/AuditLogTable";
 
@@ -31,6 +33,28 @@ export default function SuperAdminDashboard() {
     admin_email: "",
     admin_password: "",
   });
+
+  // Edit Client Profile Modal State
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    company_code: "",
+    max_users: 10,
+    is_active: true,
+    admin_email: "",
+    admin_username: "",
+  });
+  const [editClientLoading, setEditClientLoading] = useState(false);
+  const [editModalError, setEditModalError] = useState("");
+
+  // Delete Client Modal State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingClient, setDeletingClient] = useState(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteModalError, setDeleteModalError] = useState("");
+  const [deleteCanDeactivate, setDeleteCanDeactivate] = useState(false);
 
   // Edit Max Users Modal State
   const [editClient, setEditClient] = useState(null);
@@ -174,6 +198,109 @@ export default function SuperAdminDashboard() {
       setError(err?.message || "Failed to update seat limit.");
     } finally {
       setEditLoading(false);
+    }
+  };
+
+  const handleOpenEditModal = (client) => {
+    setEditingClient(client);
+    setEditFormData({
+      name: client.name || "",
+      company_code: client.company_code || "",
+      max_users: client.max_users || 10,
+      is_active: client.is_active ?? true,
+      admin_email: client.admin_email || "",
+      admin_username: client.admin_username || "",
+    });
+    setEditModalError("");
+    setEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingClient) return;
+
+    setEditClientLoading(true);
+    setEditModalError("");
+    setError("");
+    setSuccess("");
+
+    try {
+      const payload = {
+        name: editFormData.name.trim(),
+        company_code: editFormData.company_code.trim().toUpperCase(),
+        max_users: parseInt(editFormData.max_users, 10),
+        is_active: Boolean(editFormData.is_active),
+      };
+      if (editFormData.admin_email && editFormData.admin_email.trim()) {
+        payload.admin_email = editFormData.admin_email.trim().toLowerCase();
+      }
+      if (editFormData.admin_username && editFormData.admin_username.trim()) {
+        payload.admin_username = editFormData.admin_username.trim();
+      }
+
+      await updateClient(editingClient.id, payload);
+      setEditModalOpen(false);
+      setSuccess(`Client "${payload.name}" updated successfully.`);
+      await fetchClientsList();
+    } catch (err) {
+      setEditModalError(err?.message || "Failed to update client details.");
+    } finally {
+      setEditClientLoading(false);
+    }
+  };
+
+  const handleOpenDeleteModal = (client) => {
+    setDeletingClient(client);
+    setDeleteConfirmText("");
+    setDeleteModalError("");
+    setDeleteCanDeactivate(false);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingClient) return;
+    if (deleteConfirmText.trim() !== deletingClient.name.trim()) return;
+
+    setDeleteLoading(true);
+    setDeleteModalError("");
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await deleteClient(deletingClient.id);
+      setDeleteModalOpen(false);
+      setSuccess(res?.message || `Client "${deletingClient.name}" deleted successfully.`);
+      await fetchClientsList();
+    } catch (err) {
+      const msg = err?.message || "Failed to delete client.";
+      setDeleteModalError(msg);
+      if (
+        msg.toLowerCase().includes("deactivate") ||
+        msg.toLowerCase().includes("case") ||
+        msg.toLowerCase().includes("document") ||
+        msg.toLowerCase().includes("ncrp")
+      ) {
+        setDeleteCanDeactivate(true);
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleDeactivateInstead = async () => {
+    if (!deletingClient) return;
+    setDeleteLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      await updateClientStatus(deletingClient.id, false);
+      setDeleteModalOpen(false);
+      setSuccess(`Client "${deletingClient.name}" access has been deactivated.`);
+      await fetchClientsList();
+    } catch (err) {
+      setDeleteModalError(err?.message || "Failed to deactivate client.");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -730,18 +857,45 @@ export default function SuperAdminDashboard() {
                                 </div>
                               </td>
 
-                              {/* 6. Custom Actions */}
+                              {/* 6. Actions: Edit, Custom Limit, Delete */}
                               <td className="px-6 py-4 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditClient(client);
-                                    setNewMaxUsers(client.max_users);
-                                  }}
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-[#172554] hover:border-slate-300"
-                                >
-                                  Custom Limit
-                                </button>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditModal(client)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800"
+                                    title={`Edit details for ${client.name}`}
+                                  >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    <span>Edit</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditClient(client);
+                                      setNewMaxUsers(client.max_users);
+                                    }}
+                                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-[#172554] hover:border-slate-300"
+                                    title={`Adjust seat capacity for ${client.name}`}
+                                  >
+                                    Custom Limit
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenDeleteModal(client)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-600 shadow-2xs transition hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700"
+                                    title={`Delete client ${client.name}`}
+                                  >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -982,6 +1136,300 @@ export default function SuperAdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          EDIT CLIENT PROFILE & ADMIN MODAL
+      ========================================================== */}
+      {editModalOpen && editingClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4 overflow-y-auto py-10 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl text-[#172033]">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#059669]">
+                    Client Management
+                  </span>
+                  <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-700">
+                    ID #{editingClient.id}
+                  </span>
+                </div>
+                <h2 className="text-lg font-extrabold text-[#172554] mt-0.5">
+                  Edit Client: {editingClient.name}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {editModalError && (
+              <div className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-800">
+                <div className="flex items-center gap-2">
+                  <svg
+                    className="h-4 w-4 shrink-0 text-rose-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span>{editModalError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditModalError("")}
+                  className="text-rose-600 hover:text-rose-900 text-xs font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            <form onSubmit={handleEditSubmit} className="mt-5 space-y-4">
+              {/* Section 1: Company Profile */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#059669] mb-2.5">
+                  1. Company Profile
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Company Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editFormData.name}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Company Code *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editFormData.company_code}
+                      onChange={(e) => setEditFormData({ ...editFormData, company_code: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition uppercase"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Max User Limit (Seats) *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={editingClient.active_users || editingClient.current_users_count || 1}
+                      max={1000}
+                      value={editFormData.max_users}
+                      onChange={(e) => setEditFormData({ ...editFormData, max_users: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition"
+                    />
+                    <p className="mt-1 text-[10px] text-slate-500">
+                      Occupied: <strong className="text-slate-800">{editingClient.active_users || 0}</strong> seats
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Access Status *
+                    </label>
+                    <select
+                      value={editFormData.is_active ? "true" : "false"}
+                      onChange={(e) => setEditFormData({ ...editFormData, is_active: e.target.value === "true" })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition"
+                    >
+                      <option value="true">Active (Allowed to Log In)</option>
+                      <option value="false">Inactive (Access Blocked)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Primary Client Admin */}
+              <div className="pt-3 border-t border-slate-200">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#059669] mb-2.5">
+                  2. Primary Client Admin
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Admin Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={editFormData.admin_email}
+                      onChange={(e) => setEditFormData({ ...editFormData, admin_email: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Admin Username
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.admin_username}
+                      onChange={(e) => setEditFormData({ ...editFormData, admin_username: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(false)}
+                  className="w-1/3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editClientLoading}
+                  className="w-2/3 rounded-xl bg-[#059669] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm shadow-emerald-900/10 hover:bg-[#047857] transition disabled:opacity-50"
+                >
+                  {editClientLoading ? "Saving Changes..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          DELETE CLIENT CONFIRMATION MODAL
+      ========================================================== */}
+      {deleteModalOpen && deletingClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 overflow-y-auto py-10 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 sm:p-7 shadow-2xl text-[#172033]">
+            {/* Header */}
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 shadow-2xs">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
+                  Critical Action
+                </span>
+                <h3 className="text-base font-extrabold text-[#172554]">
+                  Delete Client Company
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Warning Details */}
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 text-xs text-slate-700 space-y-2">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="font-semibold text-slate-500">Target Client:</span>
+                <span className="font-extrabold text-[#172554]">{deletingClient.name}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-500">Client ID / Code:</span>
+                <span className="font-mono font-bold text-slate-700">#{deletingClient.id} ({deletingClient.company_code})</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-500">Assigned Seats / Occupied:</span>
+                <span className="font-bold text-slate-700">{deletingClient.max_users} seats ({deletingClient.active_users ?? deletingClient.current_users_count ?? 0} active)</span>
+              </div>
+            </div>
+
+            <p className="mt-3.5 text-xs text-slate-600 leading-relaxed">
+              Permanent deletion will remove this client organization. To safeguard critical legal evidence, clients with associated investigation cases, bank statements, or NCRP files cannot be permanently deleted.
+            </p>
+
+            {/* Error banner from backend */}
+            {deleteModalError && (
+              <div className="mt-3.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+                <p className="font-bold mb-1">Cannot Delete Client</p>
+                <p className="leading-relaxed">{deleteModalError}</p>
+                {deleteCanDeactivate && (
+                  <button
+                    type="button"
+                    onClick={handleDeactivateInstead}
+                    disabled={deleteLoading}
+                    className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                    Deactivate Client Instead (Safe)
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Confirmation typing requirement */}
+            <div className="mt-4">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Type <span className="font-mono text-rose-700 underline">{deletingClient.name}</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder={deletingClient.name}
+                disabled={deleteLoading}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50/70 px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-rose-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/15 transition"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2.5 pt-5 mt-5 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={deleteLoading}
+                className="w-1/3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleteLoading || deleteConfirmText.trim() !== deletingClient.name.trim()}
+                className="w-2/3 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm shadow-rose-900/10 hover:bg-rose-700 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {deleteLoading ? "Deleting Client..." : "Permanently Delete"}
+              </button>
+            </div>
           </div>
         </div>
       )}

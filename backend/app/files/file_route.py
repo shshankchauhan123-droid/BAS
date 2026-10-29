@@ -4,6 +4,7 @@ from fastapi import (
     Query,
     Depends,
     File as FastAPIFile,
+    Form,
     HTTPException,
     UploadFile,
     status,
@@ -51,17 +52,26 @@ router = APIRouter(
 def upload_file_route(
     case_id: int,
     file: UploadFile = FastAPIFile(...),
+    document_type: str = Form(default="BANK_STATEMENT"),
+    client_id: int | None = Form(default=None),
+    user_id: int | None = Form(default=None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
 
     try:
+        valid_doc_type = (document_type or "BANK_STATEMENT").strip().upper()
+        if valid_doc_type not in {"BANK_STATEMENT", "UNKNOWN"}:
+            valid_doc_type = "BANK_STATEMENT"
 
         return upload_file_controller(
             db=db,
             file=file,
             case_id=case_id,
             user=current_user,
+            document_type=valid_doc_type,
+            target_client_id=client_id,
+            target_user_id=user_id,
         )
 
     except PermissionError as error:
@@ -102,6 +112,10 @@ def get_case_files_route(
         default=False,
         description="Include superseded source files that have been merged",
     ),
+    document_type: str | None = Query(
+        default=None,
+        description="Filter by document type (e.g. BANK_STATEMENT)",
+    ),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -113,6 +127,7 @@ def get_case_files_route(
             case_id=case_id,
             user=current_user,
             include_superseded=include_superseded,
+            document_type=document_type,
         )
 
     except ValueError as error:

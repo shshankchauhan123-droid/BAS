@@ -59,3 +59,23 @@ export function updateClientMaxUsers(clientId, maxUsers) {
     body: JSON.stringify({ max_users: maxUsers }),
   });
 }
+
+/**
+ * Update an existing client company profile and admin details (SuperAdmin only).
+ */
+export function updateClient(clientId, clientData) {
+  return apiRequest(`/api/v1/clients/${clientId}`, {
+    method: "PUT",
+    body: JSON.stringify(clientData),
+  });
+}
+
+/**
+ * Delete a client company (SuperAdmin only).
+ * Permanent deletion succeeds only if client has no investigation data.
+ */
+export function deleteClient(clientId) {
+  return apiRequest(`/api/v1/clients/${clientId}`, {
+    method: "DELETE",
+  });
+}

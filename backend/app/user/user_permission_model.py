@@ -81,6 +81,36 @@ class UserPermission(Base):
         default=True,
     )
 
+    # STATEMENT ANALYSIS MODULES
+    can_bank_statement_analysis: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
+    can_ncrp_statement_analysis: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
+    # FACT SERVICES RIGHTS
+    can_gst_advance_search: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
+    can_cin_advance_search: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

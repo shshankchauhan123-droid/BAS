@@ -1537,7 +1537,7 @@ function CaseFileReport() {
 
       const [caseRes, filesRes] = await Promise.all([
         getCase(activeCaseId),
-        getCaseFiles(activeCaseId),
+        getCaseFiles(activeCaseId, false, "BANK_STATEMENT"),
       ]);
 
       const loadedCase = caseRes?.data || caseRes;
@@ -1546,7 +1546,9 @@ function CaseFileReport() {
         : Array.isArray(filesRes)
         ? filesRes
         : [];
-      const loadedFiles = rawFiles.filter((f) => !f.is_superseded);
+      const loadedFiles = rawFiles.filter(
+        (f) => !f.is_superseded && (!f.document_type || f.document_type === "BANK_STATEMENT") && f.document_type !== "UNKNOWN"
+      );
 
       setCaseData(loadedCase);
       setFiles(loadedFiles);

@@ -12,6 +12,7 @@ import {
 ============================================================ */
 
 import Login from "../pages/auth/Login";
+import ChangePassword from "../pages/auth/ChangePassword";
 
 /* ============================================================
    DASHBOARDS
@@ -36,7 +37,13 @@ import CaseReportsHub from "../pages/user/reports/CaseReportsHub";
 import TransactionRelationshipReport from "../pages/user/reports/TransactionRelationshipReport";
 import CaseFileReport from "../pages/user/reports/CaseFileReport";
 import DynamicReportDashboard from "../pages/user/analysis/DynamicReportDashboard";
-import ReportsOverview from "../pages/user/reports/ReportsOverview";
+import BankStatementUpload from "../pages/user/upload/BankStatementUpload";
+import NcrpStatementUpload from "../pages/user/upload/NcrpStatementUpload";
+import NcrpReportsHub from "../pages/user/reports/NcrpReportsHub";
+import NcrpTransactionReport from "../pages/user/reports/NcrpTransactionReport";
+import NcrpMoneyFlowReport from "../pages/user/reports/NcrpMoneyFlowReport";
+import GstAdvanceSearch from "../pages/user/reports/GstAdvanceSearch";
+import CinAdvanceSearch from "../pages/user/reports/CinAdvanceSearch";
 
 /* ============================================================
    ROUTE GUARDS & GLOBAL MODALS
@@ -95,6 +102,19 @@ function AppRoutes() {
             <PublicRoute>
               <Login />
             </PublicRoute>
+          }
+        />
+
+        {/* =====================================================
+            CHANGE PASSWORD (POST-LOGIN / ACCOUNT SECURITY)
+            Authentication required
+        ====================================================== */}
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePassword />
+            </ProtectedRoute>
           }
         />
 
@@ -284,6 +304,50 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
+        {/* =====================================================
+            BANK STATEMENT UPLOAD
+        ====================================================== */}
+        <Route
+          path="/dashboard/upload/bank-statement"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "superadmin", "admin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
+                <BankStatementUpload />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/upload/bank-statement"
+          element={<Navigate to="/dashboard/upload/bank-statement" replace />}
+        />
+
+        {/* =====================================================
+            NCRP STATEMENT UPLOAD
+        ====================================================== */}
+        <Route
+          path="/dashboard/upload/ncrp"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "superadmin", "admin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpStatementUpload />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/upload/ncrp"
+          element={<Navigate to="/dashboard/upload/ncrp" replace />}
+        />
      {/* =====================================================
             REPORT 1: FILE STATEMENT & TRANSACTIONS REPORT
         ====================================================== */}
@@ -292,7 +356,10 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports/transaction-relationships"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <TransactionRelationshipReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -303,7 +370,10 @@ function AppRoutes() {
           path="/reports/transaction-relationships"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <TransactionRelationshipReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -319,7 +389,10 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports/file-statement"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <CaseFileReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -330,7 +403,10 @@ function AppRoutes() {
           path="/dashboard/reports/file-statement"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <CaseFileReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -341,7 +417,10 @@ function AppRoutes() {
           path="/reports/file-statement"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <CaseFileReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -356,7 +435,10 @@ function AppRoutes() {
           path="/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <CaseReportsHub />
               </RoleRoute>
             </ProtectedRoute>
@@ -367,8 +449,235 @@ function AppRoutes() {
           path="/dashboard/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <CaseReportsHub />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            NCRP REPORTS HUB (Catalog of NCRP reports)
+        ====================================================== */}
+
+        <Route
+          path="/dashboard/cases/:caseId/reports/ncrp"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpReportsHub />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports/ncrp"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpReportsHub />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ncrp"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpReportsHub />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            FACT → GST ADVANCE SEARCH
+        ====================================================== */}
+
+        <Route
+          path="/reports/fact/gst"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+              >
+                <GstAdvanceSearch />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports/fact/gst"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+              >
+                <GstAdvanceSearch />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/gst"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+              >
+                <GstAdvanceSearch />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            FACT → CIN ADVANCE SEARCH
+        ====================================================== */}
+
+        <Route
+          path="/reports/fact/cin"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+              >
+                <CinAdvanceSearch />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports/fact/cin"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+              >
+                <CinAdvanceSearch />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/cin"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+              >
+                <CinAdvanceSearch />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            NCRP TRANSACTION REPORT
+        ====================================================== */}
+
+        <Route
+          path="/dashboard/cases/:caseId/reports/ncrp-transaction"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpTransactionReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports/ncrp-transaction"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpTransactionReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ncrp-transaction"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpTransactionReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            NCRP MONEY FLOW GRAPH REPORT
+        ====================================================== */}
+
+        <Route
+          path="/dashboard/cases/:caseId/reports/ncrp-money-flow"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpMoneyFlowReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports/ncrp-money-flow"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpMoneyFlowReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ncrp-money-flow"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpMoneyFlowReport />
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -382,7 +691,10 @@ function AppRoutes() {
           path="/analysis"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -393,7 +705,10 @@ function AppRoutes() {
           path="/dashboard/analysis"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -404,7 +719,10 @@ function AppRoutes() {
           path="/reports/timeline"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -415,7 +733,10 @@ function AppRoutes() {
           path="/dashboard/reports/timeline"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -426,7 +747,10 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports/timeline"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <DynamicReportDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -479,7 +803,10 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports/counterparty-intelligence"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <CounterpartyIntelligenceReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -490,7 +817,10 @@ function AppRoutes() {
           path="/reports/counterparty-intelligence"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <CounterpartyIntelligenceReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -501,7 +831,10 @@ function AppRoutes() {
           path="/dashboard/cases/:caseId/reports/financial-transaction-intelligence"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <FinancialTransactionIntelligenceReport />
               </RoleRoute>
             </ProtectedRoute>
@@ -511,7 +844,10 @@ function AppRoutes() {
           path="/reports/financial-transaction-intelligence"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "superadmin", "client_admin"]}>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_bank_statement_analysis"
+              >
                 <FinancialTransactionIntelligenceReport />
               </RoleRoute>
             </ProtectedRoute>

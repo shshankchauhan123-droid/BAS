@@ -25,17 +25,35 @@ def _format_user_response(user: User) -> UserResponse:
         perms_schema = UserPermissionsSchema.model_validate(user.permissions)
     elif str(user.role).lower() in {"superadmin", "client_admin"}:
         perms_schema = UserPermissionsSchema(
+            can_view_cases=True,
             can_create_case=True,
             can_upload_files=True,
-            can_update_files=True,
             can_delete_files=True,
+            can_view_reports=True,
+            can_view_io=True,
+            can_create_io=True,
+            can_update_io=True,
+            can_delete_io=True,
+            can_bank_statement_analysis=True,
+            can_ncrp_statement_analysis=True,
+            can_gst_advance_search=True,
+            can_cin_advance_search=True,
         )
     else:
         perms_schema = UserPermissionsSchema(
+            can_view_cases=True,
             can_create_case=True,
             can_upload_files=True,
-            can_update_files=True,
             can_delete_files=True,
+            can_view_reports=True,
+            can_view_io=True,
+            can_create_io=True,
+            can_update_io=True,
+            can_delete_io=True,
+            can_bank_statement_analysis=False,
+            can_ncrp_statement_analysis=False,
+            can_gst_advance_search=False,
+            can_cin_advance_search=False,
         )
 
     return UserResponse(

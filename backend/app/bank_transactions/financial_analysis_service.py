@@ -17,12 +17,17 @@ def get_financial_analysis(
     mode: str = None,
     counterparty_name: str = None
 ):
+    if file_ids is not None and len(file_ids) == 0:
+        return {"error": "No transactions found"}
+
     query = "SELECT * FROM bank_transactions WHERE case_id = :case_id"
     params = {"case_id": case_id}
     
     if file_ids:
-        query += " AND file_id = ANY(:file_ids)"
-        params["file_ids"] = file_ids
+        query += " AND file_id IN (SELECT id FROM files WHERE id IN :file_ids AND case_id = :case_id AND document_type = 'BANK_STATEMENT')"
+        params["file_ids"] = list(file_ids)
+    else:
+        query += " AND file_id IN (SELECT id FROM files WHERE case_id = :case_id AND document_type = 'BANK_STATEMENT')"
         
     if date_from:
         query += " AND transaction_date >= :date_from"
@@ -53,7 +58,12 @@ def get_financial_analysis(
         query += " AND UPPER(counterparty_name) = :counterparty_name"
         params["counterparty_name"] = counterparty_name.strip().upper()
         
-    df = pd.read_sql(text(query), db.bind, params=params)
+    stmt = text(query)
+    if file_ids:
+        from sqlalchemy import bindparam
+        stmt = stmt.bindparams(bindparam("file_ids", expanding=True))
+
+    df = pd.read_sql(stmt, db.bind, params=params)
     
     if df.empty:
         return {"error": "No transactions found"}

@@ -36,17 +36,38 @@ def get_cases(
     db: Session,
     user_id: int,
     target_user_id: int | None = None,
+    target_client_id: int | None = None,
 ):
     cases = service_get_cases(
         db=db,
         user_id=user_id,
         target_user_id=target_user_id,
+        target_client_id=target_client_id,
     )
+
+    total_cases = len(cases)
+    draft_cases = sum(1 for c in cases if str(getattr(c, "status", "")).upper() == "DRAFT")
+    in_progress_cases = sum(1 for c in cases if str(getattr(c, "status", "")).upper() == "IN_PROGRESS")
+    completed_cases = sum(1 for c in cases if str(getattr(c, "status", "")).upper() == "COMPLETED")
+    total_bank_statements = sum(getattr(c, "bank_statement_count", 0) for c in cases)
+    total_ncrp_workbooks = sum(getattr(c, "ncrp_count", 0) for c in cases)
+    total_documents = total_bank_statements + total_ncrp_workbooks
+
+    kpis = {
+        "total_cases": total_cases,
+        "draft_cases": draft_cases,
+        "in_progress_cases": in_progress_cases,
+        "completed_cases": completed_cases,
+        "total_bank_statements": total_bank_statements,
+        "total_ncrp_workbooks": total_ncrp_workbooks,
+        "total_documents": total_documents,
+    }
 
     return {
         "success": True,
         "message": "Cases fetched successfully",
         "total": len(cases),
+        "kpis": kpis,
         "data": cases,
     }
 

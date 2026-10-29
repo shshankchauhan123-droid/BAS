@@ -173,6 +173,10 @@ def create_or_update_user_permissions(
     can_create_io: bool = True,
     can_update_io: bool = True,
     can_delete_io: bool = True,
+    can_bank_statement_analysis: bool = False,
+    can_ncrp_statement_analysis: bool = False,
+    can_gst_advance_search: bool = False,
+    can_cin_advance_search: bool = False,
 ) -> UserPermission:
     permissions = get_user_permissions(
         db=db,
@@ -191,6 +195,10 @@ def create_or_update_user_permissions(
             can_create_io=can_create_io,
             can_update_io=can_update_io,
             can_delete_io=can_delete_io,
+            can_bank_statement_analysis=can_bank_statement_analysis,
+            can_ncrp_statement_analysis=can_ncrp_statement_analysis,
+            can_gst_advance_search=can_gst_advance_search,
+            can_cin_advance_search=can_cin_advance_search,
         )
 
         db.add(permissions)
@@ -205,6 +213,10 @@ def create_or_update_user_permissions(
         permissions.can_create_io = can_create_io
         permissions.can_update_io = can_update_io
         permissions.can_delete_io = can_delete_io
+        permissions.can_bank_statement_analysis = can_bank_statement_analysis
+        permissions.can_ncrp_statement_analysis = can_ncrp_statement_analysis
+        permissions.can_gst_advance_search = can_gst_advance_search
+        permissions.can_cin_advance_search = can_cin_advance_search
 
     db.flush()
 

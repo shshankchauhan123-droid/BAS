@@ -1815,7 +1815,7 @@ export default function TransactionRelationshipReport() {
       try {
         const [caseRes, filesRes] = await Promise.all([
           getCase(activeCaseId).catch(() => null),
-          getCaseFiles(activeCaseId),
+          getCaseFiles(activeCaseId, false, "BANK_STATEMENT"),
         ]);
         if (!isMounted) return;
 
@@ -1826,7 +1826,9 @@ export default function TransactionRelationshipReport() {
           ? filesRes
           : [];
 
-        const activeFiles = rawList.filter((f) => !f.is_superseded);
+        const activeFiles = rawList.filter(
+          (f) => !f.is_superseded && (!f.document_type || f.document_type === "BANK_STATEMENT") && f.document_type !== "UNKNOWN"
+        );
         setFiles(activeFiles);
 
         // If Super Admin and client/user not set yet (e.g. direct URL navigation), sync them!

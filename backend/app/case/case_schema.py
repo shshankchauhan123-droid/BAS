@@ -93,8 +93,21 @@ class CaseData(BaseModel):
     owner_client_name: Optional[str] = None
     owner_company_code: Optional[str] = None
     owner_client: Optional[CaseClientData] = None
+    bank_statement_count: int = 0
+    ncrp_count: int = 0
+    total_document_count: int = 0
     created_at: datetime
     updated_at: datetime
+
+
+class CaseKPIs(BaseModel):
+    total_cases: int = 0
+    draft_cases: int = 0
+    in_progress_cases: int = 0
+    completed_cases: int = 0
+    total_bank_statements: int = 0
+    total_ncrp_workbooks: int = 0
+    total_documents: int = 0
 
 
 class CaseResponse(BaseModel):
@@ -107,4 +120,5 @@ class CaseListResponse(BaseModel):
     success: bool
     message: str
     total: int
+    kpis: Optional[CaseKPIs] = None
     data: list[CaseData]

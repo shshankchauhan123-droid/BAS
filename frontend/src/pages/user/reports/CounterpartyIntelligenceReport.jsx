@@ -1286,7 +1286,7 @@ export default function CounterpartyIntelligenceReport() {
       try {
         const [caseRes, filesRes] = await Promise.all([
           getCase(selectedCaseId).catch(() => null),
-          getCaseFiles(selectedCaseId),
+          getCaseFiles(selectedCaseId, false, "BANK_STATEMENT"),
         ]);
         if (!isMounted) return;
 
@@ -1296,7 +1296,9 @@ export default function CounterpartyIntelligenceReport() {
           : Array.isArray(filesRes)
           ? filesRes
           : [];
-        const activeFiles = rawFiles.filter((f) => !f.is_superseded);
+        const activeFiles = rawFiles.filter(
+          (f) => !f.is_superseded && (!f.document_type || f.document_type === "BANK_STATEMENT") && f.document_type !== "UNKNOWN"
+        );
         setFiles(activeFiles);
 
         // If Super Admin and client/user not set yet (e.g. direct URL navigation), sync them!
