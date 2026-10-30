@@ -336,6 +336,10 @@ export default function NcrpReportsHub() {
       ? `/reports/ncrp-money-flow?caseId=${encodeURIComponent(activeCaseId)}`
       : "/reports/ncrp-money-flow";
 
+    const hierarchicalFlowRoute = activeCaseId
+      ? `/reports/ncrp-hierarchical-flow?caseId=${encodeURIComponent(activeCaseId)}`
+      : "/reports/ncrp-hierarchical-flow";
+
     return [
       {
         id: "ncrp-transaction-grid",
@@ -403,6 +407,41 @@ export default function NcrpReportsHub() {
               strokeLinejoin="round"
               strokeWidth="1.8"
               d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+            />
+          </svg>
+        ),
+      },
+      {
+        id: "ncrp-hierarchical-flow",
+        reportNumber: "03",
+        title: "NCRP Hierarchical Money Flow Report",
+        category: "ncrp-analysis",
+        categoryLabel: "NCRP ANALYSIS",
+        status: "available",
+        isReady: true,
+        route: hierarchicalFlowRoute,
+        description:
+          "Explore layer-wise NCRP transactions through an interactive account hierarchy. Click an account to expand subsequent transaction layers, inspect transfer amounts, and view account and transaction details in a side panel.",
+        features: [
+          "Interactive hierarchical DAG visualization (left-to-right layer flow)",
+          "Automatic suspect / starting source account identification",
+          "Progressive layer expansion on account selection",
+          "Aggregated transfer volume and transaction count on connections",
+          "Interactive 360° account profile slide-out panel",
+          "Cycle prevention and terminal layer indicators",
+        ],
+        icon: (
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+              d="M4 6h4v4H4V6zm12 0h4v4h-4V6zM4 14h4v4H4v-4zm12 0h4v4h-4v-4zm-8-5h8M6 10v4m12-4v4"
             />
           </svg>
         ),

@@ -158,7 +158,13 @@ export function getNcrpAccountProfile(fileId, account, options = {}) {
   const params = new URLSearchParams();
   params.append("account", account);
   if (options.caseId) params.append("case_id", options.caseId);
+  if (options.rootAccount || options.root_account) {
+    params.append("root_account", options.rootAccount || options.root_account);
+  }
   if (options.layer && options.layer !== "ALL") params.append("layer", options.layer);
+  if (options.moneyTransferOnly || options.money_transfer_only) {
+    params.append("money_transfer_only", "true");
+  }
 
   const queryString = params.toString() ? `?${params.toString()}` : "";
   return apiRequest(`/api/v1/ncrp/file/${fileId}/account-profile${queryString}`, {
@@ -180,4 +186,84 @@ export function getNcrpTraceNext(fileId, account, currentLayer = 1, options = {}
     method: "GET",
   });
 }
+
+/**
+ * Get hierarchical DAG money flow graph data from source suspect account
+ */
+export function getNcrpHierarchicalGraph(fileId, options = {}) {
+  let params = new URLSearchParams();
+  if (options.caseId) params.append("case_id", options.caseId);
+  if (options.rootAccount) params.append("root_account", options.rootAccount);
+  if (options.expandAccount) params.append("expand_account", options.expandAccount);
+  if (options.expandAll) params.append("expand_all", "true");
+  if (options.expandedAccounts) {
+    const expStr = Array.isArray(options.expandedAccounts)
+      ? options.expandedAccounts.join(",")
+      : options.expandedAccounts;
+    params.append("expanded_accounts", expStr);
+  }
+  if (options.search) params.append("search", options.search);
+  if (options.bankName && options.bankName !== "ALL") params.append("bank_name", options.bankName);
+  if (options.layer && options.layer !== "ALL") params.append("layer", options.layer);
+  if (options.minAmount !== undefined && options.minAmount !== "" && options.minAmount !== null) {
+    params.append("min_amount", options.minAmount);
+  }
+  if (options.maxAmount !== undefined && options.maxAmount !== "" && options.maxAmount !== null) {
+    params.append("max_amount", options.maxAmount);
+  }
+  if (options.dateFrom) params.append("date_from", options.dateFrom);
+  if (options.dateTo) params.append("date_to", options.dateTo);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/v1/ncrp/file/${fileId}/hierarchical-graph${queryString}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Get all distinct Layer 1 starting source accounts for an NCRP workbook
+ */
+export function getNcrpLayer1Sources(fileId, options = {}) {
+  const params = new URLSearchParams();
+  if (options.caseId) params.append("case_id", options.caseId);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/v1/ncrp/file/${fileId}/layer1-sources${queryString}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Get distinct receivers for a sender from Money Transfer To worksheet
+ */
+export function getNcrpSenderReceivers(fileId, senderAccount, options = {}) {
+  const params = new URLSearchParams();
+  params.append("sender_account", senderAccount);
+  if (options.caseId) params.append("case_id", options.caseId);
+  if (options.layer) params.append("layer", options.layer);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/v1/ncrp/file/${fileId}/receivers${queryString}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Get individual original Money Transfer To transactions for an aggregated edge
+ */
+export function getNcrpEdgeTransactions(fileId, sourceAccount, targetAccount, options = {}) {
+  const params = new URLSearchParams();
+  params.append("source_account", sourceAccount);
+  params.append("target_account", targetAccount);
+  if (options.caseId) params.append("case_id", options.caseId);
+  if (options.layer) params.append("layer", options.layer);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/v1/ncrp/file/${fileId}/edge-transactions${queryString}`, {
+    method: "GET",
+  });
+}
+
+
+
 

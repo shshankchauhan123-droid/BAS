@@ -270,30 +270,71 @@ class NcrpAccountProfileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     account: str
+    masked_account: str = ""
     bank: Optional[str] = None
     bank_name: Optional[str] = None
+    ifsc: Optional[str] = None
+    account_holder_name: Optional[str] = None
+    account_role: str = "Account"
+    layer_recorded: Optional[str] = None
+    layer_inferred: Optional[str] = None
+    ack_no: Optional[str] = None
     total_in_amount: float = 0.0
     total_out_amount: float = 0.0
     inflow_amount: float = 0.0
     outflow_amount: float = 0.0
+    net_flow: float = 0.0
     total_withdrawal_amount: float = 0.0
     withdrawal_amount: float = 0.0
     total_hold_amount: float = 0.0
     hold_amount: float = 0.0
     total_disputed_amount: float = 0.0
     disputed_amount: float = 0.0
+    recovery_amount: float = 0.0
     incoming_count: int = 0
     outgoing_count: int = 0
     withdrawal_count: int = 0
     hold_count: int = 0
+    distinct_utr_count: int = 0
+    distinct_linked_accounts_count: int = 0
+    first_observed_date: Optional[str] = None
+    last_observed_date: Optional[str] = None
+    has_hold: bool = False
+    hold_status: Optional[str] = None
     layers: List[str] = []
     senders: List[Dict[str, Any]] = []
     beneficiaries: List[Dict[str, Any]] = []
     receivers: List[Dict[str, Any]] = []
+    connected_accounts: List[Dict[str, Any]] = []
     withdrawals: List[Dict[str, Any]] = []
     holds: List[Dict[str, Any]] = []
     transactions: List[Dict[str, Any]] = []
     all_transactions: List[Dict[str, Any]] = []
+    # 6 NCRP Worksheet Categorized Records
+    money_transfers: List[Dict[str, Any]] = []
+    pos_withdrawals: List[Dict[str, Any]] = []
+    atm_withdrawals: List[Dict[str, Any]] = []
+    cheque_withdrawals: List[Dict[str, Any]] = []
+    hold_records: List[Dict[str, Any]] = []
+    other_records: List[Dict[str, Any]] = []
+
+    # Path-specific vs Account-wide Isolation fields
+    root_account: Optional[str] = None
+    is_path_isolated: bool = False
+    has_unrelated_activity: bool = False
+    unrelated_inflow: float = 0.0
+    unrelated_outflow: float = 0.0
+    unrelated_tx_count: int = 0
+    isolation_note: Optional[str] = None
+    account_wide_total_in: float = 0.0
+    account_wide_total_out: float = 0.0
+    account_wide_net_flow: float = 0.0
+    account_wide_tx_count: int = 0
+    account_wide_distinct_utr_count: int = 0
+    account_wide_connected_accounts_count: int = 0
+    account_wide_money_transfers: List[Dict[str, Any]] = []
+    unrelated_money_transfers: List[Dict[str, Any]] = []
+    unrelated_source_accounts: List[str] = []
 
 
 class NcrpTraceNextResponse(BaseModel):
@@ -312,3 +353,106 @@ class NcrpTraceNextResponse(BaseModel):
     message: str
     summary: Dict[str, Any] = {}
     next_layer_transactions: List[Dict[str, Any]] = []
+
+
+class NcrpHierarchicalNode(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    account: str
+    masked_account: str
+    bank: str
+    layer: str
+    layer_num: int
+    layer_recorded: Optional[str] = None
+    layer_inferred: Optional[str] = None
+    role: str = "Account"
+    is_source: bool = False
+    has_outgoing: bool = False
+    is_expanded: bool = False
+    hold_amount: float = 0.0
+    has_hold: bool = False
+    disputed_amount: float = 0.0
+    total_in: float = 0.0
+    total_out: float = 0.0
+    account_wide_total_in: Optional[float] = None
+    account_wide_total_out: Optional[float] = None
+    has_unrelated_activity: bool = False
+    tx_count: int = 0
+    ack_no: Optional[str] = None
+    ifsc: Optional[str] = None
+    account_holder: Optional[str] = None
+
+
+class NcrpHierarchicalEdge(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source: str
+    target: str
+    source_acc: str
+    target_acc: str
+    source_bank: Optional[str] = None
+    target_bank: Optional[str] = None
+    amount: float
+    disputed_amount: float = 0.0
+    layer: str
+    layer_num: int
+    tx_count: int = 1
+    utr: Optional[str] = None
+    date: Optional[str] = None
+    sheet_name: str
+    row_numbers: List[int] = []
+    transactions: List[Dict[str, Any]] = []
+
+
+class NcrpHierarchicalGraphResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    file_id: int
+    case_id: int
+    filename: Optional[str] = None
+    root_accounts: List[Dict[str, Any]] = []
+    selected_root: Optional[str] = None
+    nodes: List[NcrpHierarchicalNode] = []
+    edges: List[NcrpHierarchicalEdge] = []
+    available_layers: List[int] = []
+    available_banks: List[str] = []
+    available_acknowledgements: List[str] = []
+    max_layer: int = 1
+    total_amount: float = 0.0
+    total_disputed_amount: float = 0.0
+    total_transactions: int = 0
+    distinct_accounts_count: int = 0
+    has_outgoing: bool = True
+    message: Optional[str] = None
+
+
+class NcrpLayer1SourceAccount(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    account: str
+    raw_account: str
+    masked_account: str
+    bank: Optional[str] = None
+    action_taken_by_bank: Optional[str] = None
+    ack_no: Optional[str] = None
+    total_outgoing_amount: float = 0.0
+    total_disputed_amount: float = 0.0
+    outgoing_tx_count: int = 0
+    distinct_receivers_count: int = 0
+    distinct_utrs_count: int = 0
+    first_date: Optional[str] = None
+    last_date: Optional[str] = None
+    receivers: List[Dict[str, Any]] = []
+
+
+class NcrpLayer1SourcesResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    file_id: int
+    case_id: int
+    total_sources: int
+    sources: List[NcrpLayer1SourceAccount] = []
+
+

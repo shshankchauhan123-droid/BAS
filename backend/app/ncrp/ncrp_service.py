@@ -17,11 +17,16 @@ from app.ncrp.ncrp_repository import (
     get_ncrp_account_profile_data,
     get_ncrp_file_by_id,
     get_ncrp_files_by_case,
+    get_ncrp_hierarchical_graph_data,
+    get_ncrp_layer1_sources,
     get_ncrp_layer_activity_breakdown,
+
     get_ncrp_sankey_data,
     get_ncrp_transactions_by_file,
     repair_ncrp_file_transactions,
     trace_ncrp_account_forward,
+    get_ncrp_edge_transactions,
+    get_ncrp_sender_receivers,
 )
 from app.ncrp.ncrp_schema import NcrpUploadResponse, SheetSummaryResponse
 from app.user.user_model import User
@@ -787,6 +792,8 @@ def get_ncrp_account_profile_service(
     user: User,
     case_id: Optional[int] = None,
     layer: Optional[str] = None,
+    money_transfer_only: bool = False,
+    root_account: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Retrieve complete 360-degree account profile across worksheets with access control."""
     ncrp_file = get_ncrp_file_by_id(db=db, file_id=file_id)
@@ -810,6 +817,8 @@ def get_ncrp_account_profile_service(
         account=account,
         case_id=ncrp_file.case_id,
         layer=layer,
+        money_transfer_only=money_transfer_only,
+        root_account=root_account,
     )
 
 
@@ -820,6 +829,7 @@ def trace_ncrp_account_next_service(
     current_layer: int,
     user: User,
     case_id: Optional[int] = None,
+    money_transfer_only: bool = False,
 ) -> Dict[str, Any]:
     """Trace forward subsequent layer transactions for an account with access control."""
     ncrp_file = get_ncrp_file_by_id(db=db, file_id=file_id)
@@ -843,4 +853,155 @@ def trace_ncrp_account_next_service(
         account=account,
         current_layer=current_layer,
         case_id=ncrp_file.case_id,
+        money_transfer_only=money_transfer_only,
     )
+
+
+def get_ncrp_layer1_sources_service(
+    db: Session,
+    file_id: int,
+    user: User,
+    case_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Retrieve all distinct Layer 1 source accounts with access control."""
+    ncrp_file = get_ncrp_file_by_id(db=db, file_id=file_id)
+    if not ncrp_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"NCRP file with ID {file_id} not found.",
+        )
+
+    if case_id is not None and ncrp_file.case_id != case_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="NCRP file does not belong to specified case.",
+        )
+
+    validate_ncrp_case_access(db, ncrp_file.case_id, user, require_reports=True)
+
+    return get_ncrp_layer1_sources(
+        db=db,
+        file_id=file_id,
+        case_id=ncrp_file.case_id,
+    )
+
+
+def get_ncrp_hierarchical_graph_service(
+    db: Session,
+    file_id: int,
+    user: User,
+    case_id: Optional[int] = None,
+    root_account: Optional[str] = None,
+    expand_account: Optional[str] = None,
+    expand_all: bool = False,
+    expanded_accounts: Optional[List[str]] = None,
+    search: Optional[str] = None,
+    bank_name: Optional[str] = None,
+    layer: Optional[int] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Retrieve hierarchical DAG money flow graph data with access control."""
+    ncrp_file = get_ncrp_file_by_id(db=db, file_id=file_id)
+    if not ncrp_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"NCRP file with ID {file_id} not found.",
+        )
+
+    if case_id is not None and ncrp_file.case_id != case_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="NCRP file does not belong to specified case.",
+        )
+
+    validate_ncrp_case_access(db, ncrp_file.case_id, user, require_reports=True)
+
+    return get_ncrp_hierarchical_graph_data(
+        db=db,
+        file_id=file_id,
+        case_id=ncrp_file.case_id,
+        root_account=root_account,
+        expand_account=expand_account,
+        expand_all=expand_all,
+        expanded_accounts=expanded_accounts,
+        search=search,
+        bank_name=bank_name,
+        layer=layer,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+def get_ncrp_edge_transactions_service(
+    db: Session,
+    file_id: int,
+    source_account: str,
+    target_account: str,
+    user: User,
+    layer: Optional[int] = None,
+    case_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Retrieve individual Money Transfer To transactions for an aggregated edge with access control."""
+    ncrp_file = get_ncrp_file_by_id(db=db, file_id=file_id)
+    if not ncrp_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"NCRP file with ID {file_id} not found.",
+        )
+
+    if case_id is not None and ncrp_file.case_id != case_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="NCRP file does not belong to specified case.",
+        )
+
+    validate_ncrp_case_access(db, ncrp_file.case_id, user, require_reports=True)
+
+    return get_ncrp_edge_transactions(
+        db=db,
+        file_id=file_id,
+        source_account=source_account,
+        target_account=target_account,
+        layer=layer,
+        case_id=ncrp_file.case_id,
+    )
+
+
+def get_ncrp_sender_receivers_service(
+    db: Session,
+    file_id: int,
+    sender_account: str,
+    user: User,
+    layer: Optional[int] = None,
+    case_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Retrieve all distinct receivers for a sender from Money Transfer To worksheet with access control."""
+    ncrp_file = get_ncrp_file_by_id(db=db, file_id=file_id)
+    if not ncrp_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"NCRP file with ID {file_id} not found.",
+        )
+
+    if case_id is not None and ncrp_file.case_id != case_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="NCRP file does not belong to specified case.",
+        )
+
+    validate_ncrp_case_access(db, ncrp_file.case_id, user, require_reports=True)
+
+    return get_ncrp_sender_receivers(
+        db=db,
+        file_id=file_id,
+        sender_account=sender_account,
+        layer=layer,
+        case_id=ncrp_file.case_id,
+    )
+
+

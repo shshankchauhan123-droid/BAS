@@ -1,3 +1,4 @@
+from collections import Counter, deque
 from datetime import datetime
 import re
 from typing import Any, Dict, List, Optional
@@ -16,6 +17,19 @@ def normalize_account_identifier(val: Any) -> str:
     s = str(val).strip()
     s = re.sub(r"^[-_:\s]+", "", s).strip()
     return s
+
+
+def mask_account_number(val: Any) -> str:
+    """Mask account number showing first 2 and last 4 digits (e.g. 12XXXXXX3456).
+    If length is <= 6, show partial mask or string as-is."""
+    if not val:
+        return ""
+    s = str(val).strip()
+    if len(s) <= 4:
+        return s
+    if len(s) <= 6:
+        return s[:1] + "X" * (len(s) - 2) + s[-1:]
+    return s[:2] + "X" * (len(s) - 6) + s[-4:]
 
 
 def create_ncrp_file(db: Session, ncrp_file: NcrpFile) -> NcrpFile:
@@ -863,21 +877,118 @@ def get_ncrp_layer_activity_breakdown(
     }
 
 
+def get_ncrp_path_transactions(
+    all_mt_txs: List[NcrpTransaction],
+    root_account: str,
+) -> tuple:
+    """
+    Computes directed reachability and UTR traceability from root_account
+    in the Money Transfer To worksheet records.
+    Returns:
+      path_tx_ids: Set[int]
+      path_accounts: Set[str]
+      path_utrs: Set[str]
+    """
+    norm_root = normalize_account_identifier(root_account)
+    path_tx_ids = set()
+    path_accounts = {norm_root}
+    path_utrs = set()
+
+    for t in all_mt_txs:
+        raw = t.raw_data or {}
+        src = normalize_account_identifier(t.account_or_wallet_id)
+        dest = normalize_account_identifier(raw.get("Account No") or raw.get("account_no"))
+        l_str = str(t.layer or "1")
+        l_num = int("".join(c for c in l_str if c.isdigit()) or 1)
+        if l_num == 1 and src == norm_root:
+            path_tx_ids.add(t.id)
+            if dest:
+                path_accounts.add(dest)
+            for u in [
+                t.transaction_id_utr,
+                raw.get("source_utr"),
+                raw.get("Transaction ID / UTR Number"),
+                raw.get("Transaction Id / UTR Number"),
+            ]:
+                if u and str(u).strip():
+                    path_utrs.add(str(u).strip())
+
+    changed = True
+    while changed:
+        changed = False
+        for t in all_mt_txs:
+            if t.id in path_tx_ids:
+                continue
+            raw = t.raw_data or {}
+            src = normalize_account_identifier(t.account_or_wallet_id)
+            dest = normalize_account_identifier(raw.get("Account No") or raw.get("account_no"))
+            l_str = str(t.layer or "1")
+            l_num = int("".join(c for c in l_str if c.isdigit()) or 1)
+            if l_num <= 1:
+                continue
+
+            if src in path_accounts:
+                src_utr = str(raw.get("source_utr") or "").strip()
+                if src_utr:
+                    if src_utr in path_utrs:
+                        path_tx_ids.add(t.id)
+                        if dest:
+                            path_accounts.add(dest)
+                        for u in [
+                            t.transaction_id_utr,
+                            raw.get("Transaction ID / UTR Number"),
+                            raw.get("Transaction Id / UTR Number"),
+                        ]:
+                            if u and str(u).strip():
+                                path_utrs.add(str(u).strip())
+                        changed = True
+                else:
+                    path_tx_ids.add(t.id)
+                    if dest:
+                        path_accounts.add(dest)
+                    for u in [
+                        t.transaction_id_utr,
+                        raw.get("Transaction ID / UTR Number"),
+                        raw.get("Transaction Id / UTR Number"),
+                    ]:
+                        if u and str(u).strip():
+                            path_utrs.add(str(u).strip())
+                    changed = True
+
+    return path_tx_ids, path_accounts, path_utrs
+
+
 def get_ncrp_account_profile_data(
     db: Session,
     file_id: int,
     account: str,
     case_id: Optional[int] = None,
     layer: Optional[str] = None,
+    money_transfer_only: bool = False,
+    root_account: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Retrieve complete 360-degree account profile across all NCRP worksheets."""
+    """Retrieve complete 360-degree account profile, separating path-specific from account-wide metrics."""
     acc_norm = normalize_account_identifier(account)
     query = db.query(NcrpTransaction).filter(NcrpTransaction.ncrp_file_id == file_id)
     if case_id is not None:
         query = query.filter(NcrpTransaction.case_id == case_id)
+    if money_transfer_only:
+        query = query.filter(NcrpTransaction.sheet_name.ilike('%money%transfer%'))
     all_txs = query.order_by(NcrpTransaction.row_number.asc()).all()
 
+    # Precalculate path transactions if root_account is specified
+    path_tx_ids = None
+    if root_account:
+        all_mt_txs = [t for t in all_txs if categorize_ncrp_sheet(t.sheet_name) == "Money Transfer"]
+        p_ids, _, _ = get_ncrp_path_transactions(all_mt_txs, root_account)
+        path_tx_ids = p_ids
+
     account_bank = None
+    account_holder = None
+    account_ifsc = None
+    account_ack_no = None
+
+    # Path-specific sums (default primary KPIs)
     total_in_amount = 0.0
     total_out_amount = 0.0
     total_withdrawal_amount = 0.0
@@ -889,11 +1000,37 @@ def get_ncrp_account_profile_data(
     hold_txs = []
     all_account_txs = []
     layers_seen = set()
+    explicit_layers_seen = set()
+
+    # Account-wide sums across all branches
+    account_wide_total_in = 0.0
+    account_wide_total_out = 0.0
+    account_wide_money_transfers = []
+    unrelated_money_transfers = []
+    unrelated_incoming = []
+    unrelated_outgoing = []
+
+    # The 6 NCRP Worksheets collections
+    money_transfers = []
+    pos_withdrawals = []
+    atm_withdrawals = []
+    cheque_withdrawals = []
+    hold_records = []
+    other_records = []
 
     for t in all_txs:
         raw = t.raw_data or {}
         src = normalize_account_identifier(t.account_or_wallet_id)
         dest = normalize_account_identifier(raw.get("Account No") or raw.get("account_no"))
+        raw_account = normalize_account_identifier(
+            raw.get("Account No")
+            or raw.get("account_no")
+            or raw.get("Account Number")
+            or raw.get("Account No / Wallet / PG / PA ID")
+            or raw.get("Account No/ Wallet/ PG/ PA ID")
+            or raw.get("Beneficiary Account No")
+            or raw.get("Suspect Account No")
+        )
         cat = categorize_ncrp_sheet(t.sheet_name)
         amt = float(t.transaction_amount or 0.0)
         disp = float(t.disputed_amount or 0.0)
@@ -902,12 +1039,15 @@ def get_ncrp_account_profile_data(
         layer_label = f"Layer {l_num}"
 
         is_sender = (src == acc_norm)
-        is_receiver = (dest == acc_norm)
+        is_receiver = (dest == acc_norm or raw_account == acc_norm)
 
         if not is_sender and not is_receiver:
             continue
 
         layers_seen.add(layer_label)
+        if t.layer and str(t.layer).strip():
+            explicit_layers_seen.add(f"Layer {l_num}")
+
         if not account_bank:
             if is_sender:
                 account_bank = (
@@ -916,7 +1056,27 @@ def get_ncrp_account_profile_data(
                     or t.bank_name
                 )
             elif is_receiver:
-                account_bank = t.bank_name or raw.get("Bank/FIs")
+                account_bank = t.bank_name or raw.get("Bank/FIs") or raw.get("Action Taken By bank")
+
+        if not account_holder:
+            account_holder = (
+                raw.get("Account Holder Name")
+                or raw.get("Account Name")
+                or raw.get("Customer Name")
+                or raw.get("Name of Acc Holder")
+                or raw.get("name")
+            )
+        if not account_ifsc:
+            account_ifsc = raw.get("IFSC") or raw.get("ifsc") or raw.get("IFSC Code") or raw.get("Ifsc Code") or raw.get("Ifsc")
+        if not account_ack_no:
+            account_ack_no = t.acknowledgement_no or raw.get("Acknowledgement No") or raw.get("ack_no")
+
+        hold_val = float(raw.get("Put on Hold Amount") or raw.get("Put on hold Amount") or raw.get("Hold Amount") or amt or 0.0) if cat == "Hold Action" else 0.0
+        hold_dt = raw.get("Put on hold Date") or raw.get("Date of Action") or (str(t.transaction_date).split("T")[0] if t.transaction_date else None)
+        action_bank = raw.get("Action Taken By bank") or raw.get("action_taken_by_bank") or t.bank_name or "Bank / FI"
+        bank_action = raw.get("Action Taken") or raw.get("Action Taken by Bank") or "Account Lien / Freeze"
+
+        is_path_specific = (path_tx_ids is None or t.id in path_tx_ids)
 
         tx_summary = {
             "id": t.id,
@@ -925,100 +1085,277 @@ def get_ncrp_account_profile_data(
             "category": cat,
             "layer": layer_label,
             "layer_num": l_num,
+            "layer_recorded": f"Layer {l_num}" if t.layer else None,
+            "layer_inferred": f"Layer {l_num}",
             "date": str(t.transaction_date).split("T")[0] if t.transaction_date else None,
             "amount": amt,
             "disputed_amount": disp,
-            "utr": t.transaction_id_utr or raw.get("Transaction Id / UTR Number") or raw.get("source_utr"),
-            "ack_no": t.acknowledgement_no,
+            "utr": t.transaction_id_utr or raw.get("Transaction Id / UTR Number") or raw.get("source_utr") or raw.get("Reference No") or raw.get("Ref No"),
+            "ack_no": t.acknowledgement_no or raw.get("Acknowledgement No"),
+            "ifsc_code": raw.get("IFSC Code") or raw.get("ifsc_code") or raw.get("IFSC"),
             "sender_account": src,
-            "sender_bank": raw.get("Action Taken By bank") or raw.get("action_taken_by_bank") or t.bank_name,
-            "receiver_account": dest,
-            "receiver_bank": t.bank_name or raw.get("Bank/FIs"),
-            "remarks": raw.get("Remarks"),
-            "atm_id": raw.get("ATM ID") or raw.get("Place/Location of ATM"),
-            "merchant_name": raw.get("Merchant Name") or raw.get("MID"),
-            "cheque_no": raw.get("Cheque No"),
+            "sender_bank": raw.get("Action Taken By bank") or raw.get("action_taken_by_bank") or t.bank_name or "Source Bank",
+            "receiver_account": dest or raw_account,
+            "receiver_bank": t.bank_name or raw.get("Bank/FIs") or "Destination Bank",
+            "direction": "OUTGOING" if is_sender else "INCOMING",
+            "remarks": raw.get("Remarks") or ("Put on hold" if cat == "Hold Action" else None),
+            "atm_id": raw.get("ATM ID") or raw.get("Place/Location of ATM") or raw.get("Location") or "ATM Terminal",
+            "merchant_name": raw.get("Merchant Name") or raw.get("MID") or raw.get("Terminal ID") or "POS Merchant",
+            "cheque_no": raw.get("Cheque No") or raw.get("Cheque Number") or raw.get("Chq No") or "Cheque",
             "branch_location": raw.get("Branch Location"),
-            "hold_amount": float(raw.get("Put on Hold Amount") or raw.get("Put on hold Amount") or amt) if cat == "Hold Action" else 0.0,
-            "action_date": raw.get("Date of Action") or raw.get("Put on hold Date"),
+            "hold_amount": hold_val,
+            "action_date": hold_dt,
+            "action_taken": bank_action,
+            "hold_status": "Active Hold" if cat == "Hold Action" else None,
+            "is_path_specific": is_path_specific,
+            "raw_data": raw,
         }
         all_account_txs.append(tx_summary)
 
+        # Distribute into the 6 distinct NCRP worksheets collections
         if cat == "Money Transfer":
+            account_wide_money_transfers.append(tx_summary)
             if is_receiver:
-                total_in_amount += amt
-                total_disputed_amount += disp
-                incoming_txs.append(tx_summary)
+                account_wide_total_in += amt
             if is_sender:
-                total_out_amount += amt
-                total_disputed_amount += disp
-                outgoing_txs.append(tx_summary)
-        elif cat in ["ATM Withdrawal", "POS Withdrawal", "Cheque Withdrawal"]:
+                account_wide_total_out += amt
+
+            if is_path_specific:
+                money_transfers.append(tx_summary)
+                if is_receiver:
+                    total_in_amount += amt
+                    total_disputed_amount += disp
+                    incoming_txs.append(tx_summary)
+                if is_sender:
+                    total_out_amount += amt
+                    total_disputed_amount += disp
+                    outgoing_txs.append(tx_summary)
+            else:
+                unrelated_money_transfers.append(tx_summary)
+                if is_receiver:
+                    unrelated_incoming.append(tx_summary)
+                if is_sender:
+                    unrelated_outgoing.append(tx_summary)
+        elif cat == "POS Withdrawal":
+            pos_withdrawals.append(tx_summary)
+            withdrawal_txs.append(tx_summary)
             total_withdrawal_amount += amt
             total_disputed_amount += disp
+        elif cat == "ATM Withdrawal":
+            atm_withdrawals.append(tx_summary)
             withdrawal_txs.append(tx_summary)
-        elif cat == "Hold Action":
-            h_val = tx_summary["hold_amount"]
-            total_hold_amount += h_val
+            total_withdrawal_amount += amt
             total_disputed_amount += disp
+        elif cat == "Cheque Withdrawal":
+            cheque_withdrawals.append(tx_summary)
+            withdrawal_txs.append(tx_summary)
+            total_withdrawal_amount += amt
+            total_disputed_amount += disp
+        elif cat == "Hold Action":
+            hold_records.append(tx_summary)
             hold_txs.append(tx_summary)
+            total_hold_amount += hold_val
+            total_disputed_amount += disp
         else:
+            other_records.append(tx_summary)
             total_out_amount += amt
             total_disputed_amount += disp
 
-    # Group connected counterparties
+    # If no root_account was provided, account-wide equals path-specific
+    if path_tx_ids is None:
+        account_wide_total_in = total_in_amount
+        account_wide_total_out = total_out_amount
+        account_wide_money_transfers = list(money_transfers)
+
+    # Group connected counterparties for the active path
     senders_map: Dict[str, Dict[str, Any]] = {}
     for tx in incoming_txs:
         s_acc = tx["sender_account"]
-        if s_acc not in senders_map:
-            senders_map[s_acc] = {
-                "account": s_acc,
-                "bank": tx["sender_bank"] or "Source Bank",
-                "amount": 0.0,
-                "count": 0,
-            }
-        senders_map[s_acc]["amount"] += tx["amount"]
-        senders_map[s_acc]["count"] += 1
+        if s_acc and s_acc != acc_norm:
+            if s_acc not in senders_map:
+                senders_map[s_acc] = {
+                    "account": s_acc,
+                    "bank": tx["sender_bank"] or "Source Bank",
+                    "amount": 0.0,
+                    "count": 0,
+                }
+            senders_map[s_acc]["amount"] += tx["amount"]
+            senders_map[s_acc]["count"] += 1
 
     receivers_map: Dict[str, Dict[str, Any]] = {}
     for tx in outgoing_txs:
         r_acc = tx["receiver_account"]
-        if r_acc not in receivers_map:
-            receivers_map[r_acc] = {
-                "account": r_acc,
-                "bank": tx["receiver_bank"] or "Destination Bank",
+        if r_acc and r_acc != acc_norm:
+            if r_acc not in receivers_map:
+                receivers_map[r_acc] = {
+                    "account": r_acc,
+                    "bank": tx["receiver_bank"] or "Destination Bank",
+                    "amount": 0.0,
+                    "count": 0,
+                }
+            receivers_map[r_acc]["amount"] += tx["amount"]
+            receivers_map[r_acc]["count"] += 1
+
+    # Distinct UTRs and dates for the active path
+    path_tx_list = incoming_txs + outgoing_txs + withdrawal_txs + hold_txs
+    distinct_utrs = set(tx["utr"] for tx in (path_tx_list if path_tx_ids is not None else all_account_txs) if tx.get("utr"))
+    dates = [tx["date"] for tx in (path_tx_list if path_tx_ids is not None else all_account_txs) if tx.get("date")]
+    first_date = min(dates) if dates else None
+    last_date = max(dates) if dates else None
+
+    connected_map: Dict[str, Dict[str, Any]] = {}
+    for tx in incoming_txs:
+        s_acc = tx["sender_account"]
+        if not s_acc or s_acc == acc_norm:
+            continue
+        if s_acc not in connected_map:
+            connected_map[s_acc] = {
+                "account": s_acc,
+                "masked_account": mask_account_number(s_acc),
+                "bank": tx["sender_bank"] or "Source Bank",
+                "role": "Sender",
+                "direction": "Incoming",
                 "amount": 0.0,
-                "count": 0,
+                "tx_count": 0,
+                "layer": tx.get("layer") or "Layer 1",
             }
-        receivers_map[r_acc]["amount"] += tx["amount"]
-        receivers_map[r_acc]["count"] += 1
+        connected_map[s_acc]["amount"] += tx["amount"]
+        connected_map[s_acc]["tx_count"] += 1
+
+    for tx in outgoing_txs:
+        r_acc = tx["receiver_account"]
+        if not r_acc or r_acc == acc_norm:
+            continue
+        if r_acc not in connected_map:
+            connected_map[r_acc] = {
+                "account": r_acc,
+                "masked_account": mask_account_number(r_acc),
+                "bank": tx["receiver_bank"] or "Destination Bank",
+                "role": "Receiver",
+                "direction": "Outgoing",
+                "amount": 0.0,
+                "tx_count": 0,
+                "layer": tx.get("layer") or "Layer 2",
+            }
+        else:
+            if connected_map[r_acc]["role"] == "Sender":
+                connected_map[r_acc]["role"] = "Sender & Receiver"
+                connected_map[r_acc]["direction"] = "Bidirectional"
+        connected_map[r_acc]["amount"] += tx["amount"]
+        connected_map[r_acc]["tx_count"] += 1
+
+    for c in connected_map.values():
+        c["amount"] = round(c["amount"], 2)
+
+    connected_accounts_list = sorted(connected_map.values(), key=lambda x: -x["amount"])
+    has_hold_flag = len(hold_records) > 0 or total_hold_amount > 0
+    hold_status_str = "Active Hold" if has_hold_flag else "No Hold"
+
+    if len(incoming_txs) == 0 and len(outgoing_txs) > 0:
+        role_label = "Source / Origin"
+    elif len(incoming_txs) > 0 and len(outgoing_txs) > 0:
+        role_label = "Intermediate Sender"
+    elif len(incoming_txs) > 0 and len(outgoing_txs) == 0:
+        role_label = "Receiver / Beneficiary"
+    elif len(withdrawal_txs) > 0 and len(outgoing_txs) == 0:
+        role_label = "Withdrawal Account"
+    elif has_hold_flag:
+        role_label = "Hold / Lien Account"
+    else:
+        role_label = "Account"
+
+    sorted_layers = sorted(list(layers_seen))
+    primary_layer = sorted_layers[0] if sorted_layers else "Layer 1"
+    recorded_layer_str = sorted(list(explicit_layers_seen))[0] if explicit_layers_seen else None
+    net_flow_val = round(total_in_amount - total_out_amount, 2)
+
+    unrelated_inflow = round(sum(t["amount"] for t in unrelated_incoming), 2)
+    unrelated_outflow = round(sum(t["amount"] for t in unrelated_outgoing), 2)
+    has_unrelated_activity = len(unrelated_money_transfers) > 0
+    unrelated_source_accounts = sorted(list({t["sender_account"] for t in unrelated_incoming if t.get("sender_account")}))
+    isolation_note = (
+        f"Branch Isolation: ₹{unrelated_inflow:,.2f} from unrelated source(s) "
+        f"({', '.join(unrelated_source_accounts) if unrelated_source_accounts else 'other branch'}) "
+        f"is excluded from this active investigation path."
+    ) if has_unrelated_activity else None
+
+    # Account-wide counterparty count
+    all_counterparties = set()
+    for t in account_wide_money_transfers:
+        s = t.get("sender_account")
+        d = t.get("receiver_account")
+        if s and s != acc_norm:
+            all_counterparties.add(s)
+        if d and d != acc_norm:
+            all_counterparties.add(d)
 
     return {
         "account": account,
+        "masked_account": mask_account_number(account),
         "bank": account_bank or "Bank / FI",
         "bank_name": account_bank or "Bank / FI",
+        "ifsc": account_ifsc,
+        "account_holder_name": account_holder,
+        "account_role": role_label,
+        "layer_recorded": recorded_layer_str or primary_layer,
+        "layer_inferred": primary_layer,
+        "ack_no": str(account_ack_no) if account_ack_no else None,
+        # Path-specific Primary KPIs
         "total_in_amount": round(total_in_amount, 2),
         "total_out_amount": round(total_out_amount, 2),
         "inflow_amount": round(total_in_amount, 2),
         "outflow_amount": round(total_out_amount, 2),
+        "net_flow": net_flow_val,
         "total_withdrawal_amount": round(total_withdrawal_amount, 2),
         "withdrawal_amount": round(total_withdrawal_amount, 2),
         "total_hold_amount": round(total_hold_amount, 2),
         "hold_amount": round(total_hold_amount, 2),
         "total_disputed_amount": round(total_disputed_amount, 2),
         "disputed_amount": round(total_disputed_amount, 2),
+        "recovery_amount": round(total_hold_amount, 2),
         "incoming_count": len(incoming_txs),
         "outgoing_count": len(outgoing_txs),
         "withdrawal_count": len(withdrawal_txs),
-        "hold_count": len(hold_txs),
-        "layers": sorted(list(layers_seen)),
+        "hold_count": len(hold_records),
+        "distinct_utr_count": len(distinct_utrs),
+        "distinct_linked_accounts_count": len(connected_map),
+        "first_observed_date": first_date,
+        "last_observed_date": last_date,
+        "has_hold": has_hold_flag,
+        "hold_status": hold_status_str,
+        "layers": sorted_layers,
         "senders": sorted(senders_map.values(), key=lambda x: -x["amount"]),
         "beneficiaries": sorted(receivers_map.values(), key=lambda x: -x["amount"]),
         "receivers": sorted(receivers_map.values(), key=lambda x: -x["amount"]),
+        "connected_accounts": connected_accounts_list,
         "withdrawals": withdrawal_txs,
-        "holds": hold_txs,
+        "holds": hold_records,
         "transactions": all_account_txs,
         "all_transactions": all_account_txs,
+        # Section C: 6 Categorized NCRP Worksheets Records (Path Specific for Money Transfer)
+        "money_transfers": money_transfers,
+        "pos_withdrawals": pos_withdrawals,
+        "atm_withdrawals": atm_withdrawals,
+        "cheque_withdrawals": cheque_withdrawals,
+        "hold_records": hold_records,
+        "other_records": other_records,
+        # Path-Specific vs Account-Wide Breakdown
+        "root_account": root_account,
+        "is_path_isolated": bool(root_account),
+        "has_unrelated_activity": has_unrelated_activity,
+        "unrelated_inflow": unrelated_inflow,
+        "unrelated_outflow": unrelated_outflow,
+        "unrelated_tx_count": len(unrelated_money_transfers),
+        "isolation_note": isolation_note,
+        "account_wide_total_in": round(account_wide_total_in, 2),
+        "account_wide_total_out": round(account_wide_total_out, 2),
+        "account_wide_net_flow": round(account_wide_total_in - account_wide_total_out, 2),
+        "account_wide_tx_count": len(account_wide_money_transfers),
+        "account_wide_distinct_utr_count": len(set(tx["utr"] for tx in all_account_txs if tx.get("utr"))),
+        "account_wide_connected_accounts_count": len(all_counterparties),
+        "account_wide_money_transfers": account_wide_money_transfers,
+        "unrelated_money_transfers": unrelated_money_transfers,
+        "unrelated_source_accounts": unrelated_source_accounts,
     }
 
 
@@ -1028,12 +1365,15 @@ def trace_ncrp_account_forward(
     account: str,
     current_layer: int,
     case_id: Optional[int] = None,
+    money_transfer_only: bool = False,
 ) -> Dict[str, Any]:
-    """Find subsequent forward layer transactions (transfers, withdrawals, holds) for an account."""
+    """Find subsequent forward layer transactions for an account."""
     acc_norm = normalize_account_identifier(account)
     query = db.query(NcrpTransaction).filter(NcrpTransaction.ncrp_file_id == file_id)
     if case_id is not None:
         query = query.filter(NcrpTransaction.case_id == case_id)
+    if money_transfer_only:
+        query = query.filter(NcrpTransaction.sheet_name.ilike('%money%transfer%'))
     all_txs = query.order_by(NcrpTransaction.row_number.asc()).all()
 
     subsequent_layers_map: Dict[int, List[Dict[str, Any]]] = {}
@@ -1121,3 +1461,795 @@ def trace_ncrp_account_forward(
         },
         "next_layer_transactions": next_txs,
     }
+
+
+def get_ncrp_layer1_sources(
+    db: Session,
+    file_id: int,
+    case_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Retrieve all distinct Layer 1 source accounts from Money Transfer To worksheet with outgoing KPIs."""
+    query = db.query(NcrpTransaction).filter(
+        NcrpTransaction.ncrp_file_id == file_id,
+        NcrpTransaction.sheet_name.ilike('%money%transfer%')
+    )
+    if case_id is not None:
+        query = query.filter(NcrpTransaction.case_id == case_id)
+    all_txs = query.order_by(NcrpTransaction.row_number.asc()).all()
+
+    if not all_txs:
+        return {
+            "file_id": file_id,
+            "case_id": case_id or 0,
+            "total_sources": 0,
+            "sources": [],
+        }
+
+    # Identify transactions recorded in Layer 1
+    l1_txs = []
+    for t in all_txs:
+        l_str = str(t.layer or "1")
+        l_num = int("".join(c for c in l_str if c.isdigit()) or 1)
+        if l_num == 1:
+            l1_txs.append(t)
+
+    # Fallback to earliest layer if no explicit Layer 1 rows
+    if not l1_txs:
+        earliest_l = min(
+            (int("".join(c for c in str(t.layer or "1") if c.isdigit()) or 1) for t in all_txs),
+            default=1,
+        )
+        for t in all_txs:
+            l_str = str(t.layer or "1")
+            l_num = int("".join(c for c in l_str if c.isdigit()) or 1)
+            if l_num == earliest_l:
+                l1_txs.append(t)
+
+    sources_map: Dict[str, Dict[str, Any]] = {}
+    for t in l1_txs:
+        raw = t.raw_data or {}
+        raw_src = (
+            t.account_or_wallet_id
+            or raw.get("Account No./ (Wallet /PG/PA) Id")
+            or raw.get("account_or_wallet_id")
+            or ""
+        )
+        norm_src = normalize_account_identifier(raw_src)
+        if not norm_src:
+            continue
+
+        dest = normalize_account_identifier(raw.get("Account No") or raw.get("account_no"))
+        amt = float(t.transaction_amount or 0.0)
+        disp = float(t.disputed_amount or 0.0)
+        bank = (
+            raw.get("Action Taken By bank")
+            or raw.get("action_taken_by_bank")
+            or t.bank_name
+            or raw.get("Bank/FIs")
+            or "Unknown Bank"
+        )
+        ack = t.acknowledgement_no or raw.get("Acknowledgement No")
+        dt = str(t.transaction_date).split("T")[0] if t.transaction_date else None
+
+        if norm_src not in sources_map:
+            sources_map[norm_src] = {
+                "account": norm_src,
+                "raw_account": str(raw_src).strip(),
+                "masked_account": mask_account_number(norm_src),
+                "bank": bank,
+                "action_taken_by_bank": raw.get("Action Taken By bank"),
+                "ack_no": str(ack) if ack else None,
+                "total_outgoing_amount": 0.0,
+                "total_disputed_amount": 0.0,
+                "outgoing_tx_count": 0,
+                "distinct_receivers_count": 0,
+                "distinct_utrs_count": 0,
+                "first_date": None,
+                "last_date": None,
+                "receivers_set": set(),
+                "utrs_set": set(),
+                "receivers": [],
+                "total_transfers": 0,
+                "total_amount": 0.0,
+            }
+
+        s = sources_map[norm_src]
+        s["outgoing_tx_count"] += 1
+        s["total_transfers"] += 1
+        s["total_outgoing_amount"] += amt
+        s["total_amount"] += amt
+        s["total_disputed_amount"] += disp
+        if (not s["bank"] or s["bank"] == "Unknown Bank") and bank:
+            s["bank"] = bank
+        if not s["ack_no"] and ack:
+            s["ack_no"] = str(ack)
+        if dt:
+            if not s["first_date"] or dt < s["first_date"]:
+                s["first_date"] = dt
+            if not s["last_date"] or dt > s["last_date"]:
+                s["last_date"] = dt
+        if t.transaction_id_utr:
+            s["utrs_set"].add(t.transaction_id_utr)
+        if dest:
+            s["receivers_set"].add(dest)
+            s["receivers"].append({
+                "account": dest,
+                "masked_account": mask_account_number(dest),
+                "bank": t.bank_name or raw.get("Bank/FIs"),
+                "amount": round(amt, 2),
+                "utr": t.transaction_id_utr,
+                "date": dt,
+                "sheet_name": t.sheet_name,
+                "row_number": t.row_number,
+            })
+
+    for s in sources_map.values():
+        s["distinct_receivers_count"] = len(s.pop("receivers_set"))
+        s["distinct_utrs_count"] = len(s.pop("utrs_set"))
+        s["total_outgoing_amount"] = round(s["total_outgoing_amount"], 2)
+        s["total_amount"] = round(s["total_amount"], 2)
+        s["total_disputed_amount"] = round(s["total_disputed_amount"], 2)
+
+    sources_list = list(sources_map.values())
+    sources_list.sort(
+        key=lambda x: (
+            -(x["distinct_receivers_count"] > 0),
+            -x["total_outgoing_amount"],
+            -x["outgoing_tx_count"],
+        )
+    )
+
+    return {
+        "file_id": file_id,
+        "case_id": case_id or 0,
+        "total_sources": len(sources_list),
+        "sources": sources_list,
+    }
+
+
+def get_ncrp_hierarchical_graph_data(
+    db: Session,
+    file_id: int,
+    case_id: Optional[int] = None,
+    root_account: Optional[str] = None,
+    expand_account: Optional[str] = None,
+    expand_all: bool = False,
+    expanded_accounts: Optional[List[str]] = None,
+    search: Optional[str] = None,
+    bank_name: Optional[str] = None,
+    layer: Optional[int] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Retrieve hierarchical DAG graph data for NCRP layer-wise money flow analysis."""
+    file_obj = db.query(NcrpFile).filter(NcrpFile.id == file_id).first()
+    filename = file_obj.original_filename if file_obj else f"File #{file_id}"
+
+    query = db.query(NcrpTransaction).filter(
+        NcrpTransaction.ncrp_file_id == file_id,
+        NcrpTransaction.sheet_name.ilike('%money%transfer%')
+    )
+    if case_id is not None:
+        query = query.filter(NcrpTransaction.case_id == case_id)
+    all_txs = query.order_by(NcrpTransaction.row_number.asc()).all()
+
+    if not all_txs:
+        return {
+            "file_id": file_id,
+            "case_id": case_id or 0,
+            "filename": filename,
+            "root_accounts": [],
+            "selected_root": None,
+            "nodes": [],
+            "edges": [],
+            "available_layers": [],
+            "available_banks": [],
+            "available_acknowledgements": [],
+            "max_layer": 1,
+            "total_amount": 0.0,
+            "total_disputed_amount": 0.0,
+            "total_transactions": 0,
+            "distinct_accounts_count": 0,
+            "has_outgoing": False,
+            "message": "No transaction records found in this workbook.",
+        }
+
+    # 1. First pass: Aggregate overall workbook KPIs and account metadata
+    all_distinct_accounts = set()
+    available_layers_set = set()
+    available_banks_set = set()
+    available_acks_set = set()
+    total_tx_volume = 0.0
+    total_disputed_volume = 0.0
+
+    acc_metadata: Dict[str, Dict[str, Any]] = {}
+
+    def get_or_create_acc_meta(acc_num: str) -> Dict[str, Any]:
+        if acc_num not in acc_metadata:
+            acc_metadata[acc_num] = {
+                "account": acc_num,
+                "masked_account": mask_account_number(acc_num),
+                "bank": None,
+                "holder_name": None,
+                "ifsc": None,
+                "ack_no": None,
+                "hold_amount": 0.0,
+                "has_hold": False,
+                "disputed_amount": 0.0,
+                "total_in": 0.0,
+                "total_out": 0.0,
+                "tx_count": 0,
+                "layer_recorded": None,
+                "layer_inferred": None,
+            }
+        return acc_metadata[acc_num]
+
+    # Candidate root discovery tracking
+    layer1_senders: Counter = Counter()
+    layer1_receivers: set = set()
+    all_senders: Counter = Counter()
+    all_receivers: set = set()
+
+    # Group money transfer edges
+    outgoing_transfers: Dict[str, List[Dict[str, Any]]] = {}
+
+    for t in all_txs:
+        raw = t.raw_data or {}
+        src = normalize_account_identifier(t.account_or_wallet_id)
+        dest = normalize_account_identifier(raw.get("Account No") or raw.get("account_no"))
+        cat = categorize_ncrp_sheet(t.sheet_name)
+        amt = float(t.transaction_amount or 0.0)
+        disp = float(t.disputed_amount or 0.0)
+        l_str = str(t.layer or "1")
+        l_num = int("".join(c for c in l_str if c.isdigit()) or 1)
+
+        available_layers_set.add(l_num)
+        if t.bank_name:
+            available_banks_set.add(t.bank_name)
+        if raw.get("Bank/FIs"):
+            available_banks_set.add(raw.get("Bank/FIs"))
+        if raw.get("Action Taken By bank"):
+            available_banks_set.add(raw.get("Action Taken By bank"))
+        if t.acknowledgement_no:
+            available_acks_set.add(str(t.acknowledgement_no))
+
+        total_disputed_volume += disp
+
+        if src:
+            all_distinct_accounts.add(src)
+            s_meta = get_or_create_acc_meta(src)
+            s_meta["tx_count"] += 1
+            s_meta["disputed_amount"] += disp
+            if t.layer and str(t.layer).strip() and not s_meta.get("layer_recorded"):
+                s_meta["layer_recorded"] = f"Layer {l_num}"
+            if not s_meta["bank"]:
+                s_meta["bank"] = (
+                    raw.get("Action Taken By bank")
+                    or raw.get("action_taken_by_bank")
+                    or t.bank_name
+                )
+            if not s_meta["ifsc"]:
+                s_meta["ifsc"] = raw.get("IFSC") or raw.get("ifsc") or raw.get("IFSC Code")
+            if not s_meta["holder_name"]:
+                s_meta["holder_name"] = (
+                    raw.get("Account Holder Name")
+                    or raw.get("Account Name")
+                    or raw.get("Customer Name")
+                    or raw.get("Name of Acc Holder")
+                )
+            if not s_meta["ack_no"]:
+                s_meta["ack_no"] = t.acknowledgement_no or raw.get("Acknowledgement No")
+
+        if dest:
+            all_distinct_accounts.add(dest)
+            d_meta = get_or_create_acc_meta(dest)
+            d_meta["tx_count"] += 1
+            d_meta["disputed_amount"] += disp
+            if t.layer and str(t.layer).strip() and not d_meta.get("layer_recorded"):
+                d_meta["layer_recorded"] = f"Layer {l_num}"
+            if not d_meta["bank"]:
+                d_meta["bank"] = t.bank_name or raw.get("Bank/FIs")
+            if not d_meta["ifsc"]:
+                d_meta["ifsc"] = raw.get("IFSC") or raw.get("ifsc") or raw.get("IFSC Code")
+            if not d_meta["holder_name"]:
+                d_meta["holder_name"] = (
+                    raw.get("Account Holder Name")
+                    or raw.get("Account Name")
+                    or raw.get("Customer Name")
+                    or raw.get("Name of Acc Holder")
+                )
+            if not d_meta["ack_no"]:
+                d_meta["ack_no"] = t.acknowledgement_no or raw.get("Acknowledgement No")
+
+        if cat == "Hold Action":
+            h_val = float(raw.get("Put on Hold Amount") or raw.get("Put on hold Amount") or amt)
+            target_acc = dest or src
+            if target_acc:
+                t_meta = get_or_create_acc_meta(target_acc)
+                t_meta["has_hold"] = True
+                t_meta["hold_amount"] += h_val
+
+        if cat == "Money Transfer":
+            total_tx_volume += amt
+            if src:
+                all_senders[src] += amt
+                s_meta = get_or_create_acc_meta(src)
+                s_meta["total_out"] += amt
+                if l_num == 1:
+                    layer1_senders[src] += amt
+            if dest:
+                all_receivers.add(dest)
+                d_meta = get_or_create_acc_meta(dest)
+                d_meta["total_in"] += amt
+                if l_num == 1:
+                    layer1_receivers.add(dest)
+
+            if src and dest:
+                if src not in outgoing_transfers:
+                    outgoing_transfers[src] = []
+                outgoing_transfers[src].append({
+                    "src": src,
+                    "dest": dest,
+                    "src_bank": raw.get("Action Taken By bank") or t.bank_name,
+                    "dest_bank": t.bank_name or raw.get("Bank/FIs"),
+                    "amount": amt,
+                    "disputed_amount": disp,
+                    "layer_num": l_num,
+                    "layer": f"Layer {l_num}",
+                    "utr": t.transaction_id_utr or raw.get("Transaction Id / UTR Number") or raw.get("source_utr"),
+                    "date": str(t.transaction_date).split("T")[0] if t.transaction_date else None,
+                    "sheet_name": t.sheet_name,
+                    "row_number": t.row_number,
+                    "ack_no": t.acknowledgement_no,
+                    "tx_id": t.id,
+                })
+
+    # 2. Identify candidate root / suspect accounts from Layer 1 sources
+    l1_sources_data = get_ncrp_layer1_sources(db=db, file_id=file_id, case_id=case_id)
+    root_accounts_list = l1_sources_data.get("sources", [])
+
+    if not root_accounts_list:
+        candidate_keys = [s for s in layer1_senders.keys() if s not in layer1_receivers]
+        if not candidate_keys:
+            candidate_keys = [s for s in all_senders.keys() if s not in all_receivers]
+        if not candidate_keys:
+            candidate_keys = [s for s, _ in all_senders.most_common()]
+        if not candidate_keys and all_distinct_accounts:
+            candidate_keys = list(all_distinct_accounts)
+
+        for r_acc in candidate_keys:
+            r_meta = acc_metadata.get(r_acc, {})
+            root_accounts_list.append({
+                "account": r_acc,
+                "raw_account": r_acc,
+                "masked_account": mask_account_number(r_acc),
+                "bank": r_meta.get("bank") or "Primary Bank",
+                "action_taken_by_bank": r_meta.get("bank"),
+                "ack_no": r_meta.get("ack_no"),
+                "total_outgoing_amount": round(all_senders.get(r_acc, 0.0), 2),
+                "total_disputed_amount": round(r_meta.get("disputed_amount", 0.0), 2),
+                "outgoing_tx_count": len(outgoing_transfers.get(r_acc, [])),
+                "distinct_receivers_count": len({tx["dest"] for tx in outgoing_transfers.get(r_acc, []) if tx.get("dest")}),
+                "distinct_utrs_count": len({tx["utr"] for tx in outgoing_transfers.get(r_acc, []) if tx.get("utr")}),
+                "total_transfers": len(outgoing_transfers.get(r_acc, [])),
+                "total_amount": round(all_senders.get(r_acc, 0.0), 2),
+                "receivers": [],
+            })
+
+    chosen_root = None
+    if root_account:
+        norm_req_root = normalize_account_identifier(root_account)
+        if norm_req_root in acc_metadata or any(r["account"] == norm_req_root for r in root_accounts_list):
+            chosen_root = norm_req_root
+
+    # If only 1 root exists and no root specified, auto-select it
+    if not chosen_root and len(root_accounts_list) == 1:
+        chosen_root = root_accounts_list[0]["account"]
+
+    # If no root chosen yet (multiple starting sources available and user has not picked one):
+    if not chosen_root:
+        return {
+            "file_id": file_id,
+            "case_id": case_id or 0,
+            "filename": filename,
+            "root_accounts": root_accounts_list,
+            "selected_root": None,
+            "nodes": [],
+            "edges": [],
+            "available_layers": sorted(list(available_layers_set)),
+            "available_banks": sorted(list(available_banks_set)),
+            "available_acknowledgements": sorted(list(available_acks_set)),
+            "max_layer": 1,
+            "total_amount": round(total_tx_volume, 2),
+            "total_disputed_amount": round(total_disputed_volume, 2),
+            "total_transactions": len(all_txs),
+            "distinct_accounts_count": len(all_distinct_accounts),
+            "has_outgoing": True,
+            "message": "Please select a Layer 1 starting account to begin investigation.",
+        }
+
+    # 3. Setup expansion set
+    expanded_set = set()
+    if chosen_root:
+        expanded_set.add(chosen_root)
+
+    # Path-specific transactions and account flows for the chosen root
+    path_tx_ids = None
+    path_in_by_acc: Counter = Counter()
+    path_out_by_acc: Counter = Counter()
+    if chosen_root:
+        all_mt_txs = [t for t in all_txs if categorize_ncrp_sheet(t.sheet_name) == "Money Transfer"]
+        path_tx_ids, _, _ = get_ncrp_path_transactions(all_mt_txs, chosen_root)
+        for t in all_mt_txs:
+            if t.id in path_tx_ids:
+                raw_t = t.raw_data or {}
+                s_acc = normalize_account_identifier(t.account_or_wallet_id)
+                d_acc = normalize_account_identifier(raw_t.get("Account No") or raw_t.get("account_no"))
+                amt_t = float(t.transaction_amount or 0.0)
+                if s_acc:
+                    path_out_by_acc[s_acc] += amt_t
+                if d_acc:
+                    path_in_by_acc[d_acc] += amt_t
+
+    if expand_all:
+        for acc in outgoing_transfers.keys():
+            expanded_set.add(acc)
+    else:
+        if expanded_accounts:
+            for acc in expanded_accounts:
+                expanded_set.add(normalize_account_identifier(acc))
+        if expand_account:
+            expanded_set.add(normalize_account_identifier(expand_account))
+
+    terminal_message = None
+    has_outgoing_flag = True
+    if expand_account:
+        norm_exp = normalize_account_identifier(expand_account)
+        exp_out = [
+            tx for tx in outgoing_transfers.get(norm_exp, [])
+            if path_tx_ids is None or tx.get("tx_id") in path_tx_ids
+        ]
+        if not exp_out:
+            has_outgoing_flag = False
+            terminal_message = "No further linked transactions available for this account."
+
+    # 4. BFS Traversal starting from chosen_root
+    nodes_map: Dict[str, Dict[str, Any]] = {}
+    edges_map: Dict[str, Dict[str, Any]] = {}
+
+    if chosen_root:
+        queue = deque([(chosen_root, 1)])
+        visited_nodes = {chosen_root: 1}
+
+        while queue:
+            curr_acc, curr_layer = queue.popleft()
+
+            curr_meta = acc_metadata.get(curr_acc, {})
+            raw_out_txs = outgoing_transfers.get(curr_acc, [])
+            out_txs = [
+                tx for tx in raw_out_txs
+                if path_tx_ids is None or tx.get("tx_id") in path_tx_ids
+            ]
+            has_forward = len(out_txs) > 0
+
+            node_in = path_in_by_acc.get(curr_acc, 0.0) if path_tx_ids is not None else curr_meta.get("total_in", 0.0)
+            node_out = path_out_by_acc.get(curr_acc, 0.0) if path_tx_ids is not None else curr_meta.get("total_out", 0.0)
+            acc_wide_in = curr_meta.get("total_in", 0.0)
+            acc_wide_out = curr_meta.get("total_out", 0.0)
+            has_unrelated = (acc_wide_in > node_in + 0.01) or (acc_wide_out > node_out + 0.01)
+
+            if curr_acc not in nodes_map:
+                if curr_acc == chosen_root:
+                    role_str = "Source / Origin"
+                elif has_forward and node_in > 0:
+                    role_str = "Intermediate Sender"
+                elif has_forward:
+                    role_str = "Sender"
+                elif curr_meta.get("has_hold"):
+                    role_str = "Hold / Lien Account"
+                else:
+                    role_str = "Receiver / Beneficiary"
+
+                nodes_map[curr_acc] = {
+                    "id": f"node-{curr_acc}",
+                    "account": curr_acc,
+                    "masked_account": mask_account_number(curr_acc),
+                    "bank": curr_meta.get("bank") or "Bank / FI",
+                    "layer": f"Layer {curr_layer}",
+                    "layer_num": curr_layer,
+                    "layer_recorded": curr_meta.get("layer_recorded"),
+                    "layer_inferred": f"Layer {curr_layer}",
+                    "role": role_str,
+                    "is_source": (curr_acc == chosen_root),
+                    "has_outgoing": has_forward,
+                    "is_expanded": (curr_acc in expanded_set),
+                    "hold_amount": round(curr_meta.get("hold_amount", 0.0), 2),
+                    "has_hold": curr_meta.get("has_hold", False),
+                    "disputed_amount": round(curr_meta.get("disputed_amount", 0.0), 2),
+                    "total_in": round(node_in, 2),
+                    "total_out": round(node_out, 2),
+                    "account_wide_total_in": round(acc_wide_in, 2),
+                    "account_wide_total_out": round(acc_wide_out, 2),
+                    "has_unrelated_activity": has_unrelated,
+                    "tx_count": curr_meta.get("tx_count", 0),
+                    "ack_no": str(curr_meta.get("ack_no")) if curr_meta.get("ack_no") else None,
+                    "ifsc": curr_meta.get("ifsc"),
+                    "account_holder": curr_meta.get("holder_name"),
+                }
+            else:
+                nodes_map[curr_acc]["is_expanded"] = (curr_acc in expanded_set)
+
+            if curr_acc in expanded_set:
+                for tx in out_txs:
+                    dest_acc = tx["dest"]
+                    if not dest_acc or dest_acc == curr_acc:
+                        continue
+
+                    if min_amount is not None and tx["amount"] < min_amount:
+                        continue
+                    if max_amount is not None and tx["amount"] > max_amount:
+                        continue
+
+                    edge_key = f"{curr_acc}->{dest_acc}@{curr_layer}"
+                    if edge_key not in edges_map:
+                        edges_map[edge_key] = {
+                            "id": f"edge-{curr_acc}-{dest_acc}-{curr_layer}",
+                            "source": f"node-{curr_acc}",
+                            "target": f"node-{dest_acc}",
+                            "source_acc": curr_acc,
+                            "target_acc": dest_acc,
+                            "source_bank": curr_meta.get("bank") or tx["src_bank"] or "Source Bank",
+                            "target_bank": acc_metadata.get(dest_acc, {}).get("bank") or tx["dest_bank"] or "Destination Bank",
+                            "amount": 0.0,
+                            "disputed_amount": 0.0,
+                            "layer": f"Layer {curr_layer}",
+                            "layer_num": curr_layer,
+                            "tx_count": 0,
+                            "utr": tx["utr"],
+                            "date": tx["date"],
+                            "sheet_name": tx["sheet_name"],
+                            "row_numbers": [],
+                            "transactions": [],
+                        }
+
+                    edges_map[edge_key]["amount"] += tx["amount"]
+                    edges_map[edge_key]["disputed_amount"] += tx["disputed_amount"]
+                    edges_map[edge_key]["tx_count"] += 1
+                    edges_map[edge_key]["row_numbers"].append(tx["row_number"])
+                    edges_map[edge_key]["transactions"].append(tx)
+
+                    next_layer = curr_layer + 1
+                    dest_meta = acc_metadata.get(dest_acc, {})
+                    dest_raw_out = outgoing_transfers.get(dest_acc, [])
+                    dest_out = [
+                        tx for tx in dest_raw_out
+                        if path_tx_ids is None or tx.get("tx_id") in path_tx_ids
+                    ]
+                    dest_has_forward = len(dest_out) > 0
+
+                    dest_in = path_in_by_acc.get(dest_acc, 0.0) if path_tx_ids is not None else dest_meta.get("total_in", 0.0)
+                    dest_out_amt = path_out_by_acc.get(dest_acc, 0.0) if path_tx_ids is not None else dest_meta.get("total_out", 0.0)
+                    dest_acc_wide_in = dest_meta.get("total_in", 0.0)
+                    dest_acc_wide_out = dest_meta.get("total_out", 0.0)
+                    dest_has_unrelated = (dest_acc_wide_in > dest_in + 0.01) or (dest_acc_wide_out > dest_out_amt + 0.01)
+
+                    if dest_acc not in nodes_map:
+                        dest_role = (
+                            "Intermediate Sender" if (dest_has_forward and dest_in > 0)
+                            else "Sender" if dest_has_forward
+                            else "Hold / Lien Account" if dest_meta.get("has_hold")
+                            else "Receiver / Beneficiary"
+                        )
+                        nodes_map[dest_acc] = {
+                            "id": f"node-{dest_acc}",
+                            "account": dest_acc,
+                            "masked_account": mask_account_number(dest_acc),
+                            "bank": dest_meta.get("bank") or tx["dest_bank"] or "Bank / FI",
+                            "layer": f"Layer {next_layer}",
+                            "layer_num": next_layer,
+                            "layer_recorded": dest_meta.get("layer_recorded") or (f"Layer {tx['layer_num']}" if tx.get("layer_num") else None),
+                            "layer_inferred": f"Layer {next_layer}",
+                            "role": dest_role,
+                            "is_source": False,
+                            "has_outgoing": dest_has_forward,
+                            "is_expanded": (dest_acc in expanded_set),
+                            "hold_amount": round(dest_meta.get("hold_amount", 0.0), 2),
+                            "has_hold": dest_meta.get("has_hold", False),
+                            "disputed_amount": round(dest_meta.get("disputed_amount", 0.0), 2),
+                            "total_in": round(dest_in, 2),
+                            "total_out": round(dest_out_amt, 2),
+                            "account_wide_total_in": round(dest_acc_wide_in, 2),
+                            "account_wide_total_out": round(dest_acc_wide_out, 2),
+                            "has_unrelated_activity": dest_has_unrelated,
+                            "tx_count": dest_meta.get("tx_count", 0),
+                            "ack_no": str(dest_meta.get("ack_no")) if dest_meta.get("ack_no") else None,
+                            "ifsc": dest_meta.get("ifsc"),
+                            "account_holder": dest_meta.get("holder_name"),
+                        }
+
+                    if dest_acc not in visited_nodes:
+                        visited_nodes[dest_acc] = next_layer
+                        queue.append((dest_acc, next_layer))
+
+    for e in edges_map.values():
+        e["amount"] = round(e["amount"], 2)
+        e["disputed_amount"] = round(e["disputed_amount"], 2)
+
+    node_list = list(nodes_map.values())
+    edge_list = list(edges_map.values())
+    max_observed_layer = max([n["layer_num"] for n in node_list], default=1)
+
+    return {
+        "file_id": file_id,
+        "case_id": case_id or 0,
+        "filename": filename,
+        "root_accounts": root_accounts_list,
+        "selected_root": chosen_root,
+        "nodes": node_list,
+        "edges": edge_list,
+        "available_layers": sorted(list(available_layers_set)),
+        "available_banks": sorted(list(available_banks_set)),
+        "available_acknowledgements": sorted(list(available_acks_set)),
+        "max_layer": max_observed_layer,
+        "total_amount": round(total_tx_volume, 2),
+        "total_disputed_amount": round(total_disputed_volume, 2),
+        "total_transactions": len(all_txs),
+        "distinct_accounts_count": len(all_distinct_accounts),
+        "has_outgoing": has_outgoing_flag,
+        "message": terminal_message,
+    }
+
+
+def get_ncrp_edge_transactions(
+    db: Session,
+    file_id: int,
+    source_account: str,
+    target_account: str,
+    layer: Optional[int] = None,
+    case_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Retrieve individual original Money Transfer To transaction records belonging to an aggregated edge."""
+    src_norm = normalize_account_identifier(source_account)
+    dest_norm = normalize_account_identifier(target_account)
+
+    query = db.query(NcrpTransaction).filter(
+        NcrpTransaction.ncrp_file_id == file_id,
+        NcrpTransaction.sheet_name.ilike('%money%transfer%')
+    )
+    if case_id is not None:
+        query = query.filter(NcrpTransaction.case_id == case_id)
+    all_txs = query.order_by(NcrpTransaction.row_number.asc()).all()
+
+    matched_txs = []
+    total_amt = 0.0
+    total_disp = 0.0
+
+    for t in all_txs:
+        raw = t.raw_data or {}
+        src = normalize_account_identifier(t.account_or_wallet_id)
+        dest = normalize_account_identifier(raw.get("Account No") or raw.get("account_no"))
+        l_str = str(t.layer or "1")
+        l_num = int("".join(c for c in l_str if c.isdigit()) or 1)
+
+        if layer is not None and l_num != layer:
+            continue
+
+        if src == src_norm and dest == dest_norm:
+            amt = float(t.transaction_amount or 0.0)
+            disp = float(t.disputed_amount or 0.0)
+            total_amt += amt
+            total_disp += disp
+
+            matched_txs.append({
+                "id": t.id,
+                "row_number": t.row_number,
+                "sheet_name": t.sheet_name,
+                "acknowledgement_no": t.acknowledgement_no or raw.get("Acknowledgement No") or raw.get("Acknowledgement No."),
+                "source_account": src,
+                "source_bank": raw.get("Action Taken By bank") or raw.get("action_taken_by_bank") or t.bank_name or "Source Bank",
+                "receiver_account": dest,
+                "receiver_bank": t.bank_name or raw.get("Bank/FIs") or "Destination Bank",
+                "receiver_ifsc": raw.get("Ifsc Code") or raw.get("IFSC Code") or raw.get("IFSC") or raw.get("ifsc"),
+                "transaction_amount": amt,
+                "disputed_amount": disp,
+                "layer": f"Layer {l_num}",
+                "layer_num": l_num,
+                "utr": t.transaction_id_utr or raw.get("Transaction ID / UTR Number") or raw.get("Transaction Id / UTR Number") or raw.get("source_utr"),
+                "date": str(t.transaction_date).split("T")[0] if t.transaction_date else None,
+                "raw_data": raw,
+            })
+
+    return {
+        "file_id": file_id,
+        "case_id": case_id or 0,
+        "source_account": source_account,
+        "target_account": target_account,
+        "layer": layer,
+        "total_amount": round(total_amt, 2),
+        "total_disputed_amount": round(total_disp, 2),
+        "transaction_count": len(matched_txs),
+        "transactions": matched_txs,
+    }
+
+
+def get_ncrp_sender_receivers(
+    db: Session,
+    file_id: int,
+    sender_account: str,
+    layer: Optional[int] = None,
+    case_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Retrieve all distinct receivers and aggregated transfers for a sender from Money Transfer To worksheet."""
+    src_norm = normalize_account_identifier(sender_account)
+
+    query = db.query(NcrpTransaction).filter(
+        NcrpTransaction.ncrp_file_id == file_id,
+        NcrpTransaction.sheet_name.ilike('%money%transfer%')
+    )
+    if case_id is not None:
+        query = query.filter(NcrpTransaction.case_id == case_id)
+    all_txs = query.order_by(NcrpTransaction.row_number.asc()).all()
+
+    receivers_map: Dict[str, Dict[str, Any]] = {}
+    total_outflow = 0.0
+
+    for t in all_txs:
+        raw = t.raw_data or {}
+        src = normalize_account_identifier(t.account_or_wallet_id)
+        dest = normalize_account_identifier(raw.get("Account No") or raw.get("account_no"))
+        l_str = str(t.layer or "1")
+        l_num = int("".join(c for c in l_str if c.isdigit()) or 1)
+
+        if layer is not None and l_num != layer:
+            continue
+
+        if src == src_norm and dest:
+            amt = float(t.transaction_amount or 0.0)
+            disp = float(t.disputed_amount or 0.0)
+            total_outflow += amt
+
+            if dest not in receivers_map:
+                receivers_map[dest] = {
+                    "account": dest,
+                    "masked_account": mask_account_number(dest),
+                    "bank": t.bank_name or raw.get("Bank/FIs") or "Destination Bank",
+                    "ifsc": raw.get("Ifsc Code") or raw.get("IFSC Code") or raw.get("IFSC") or raw.get("ifsc"),
+                    "layer": f"Layer {l_num}",
+                    "layer_num": l_num,
+                    "total_amount": 0.0,
+                    "disputed_amount": 0.0,
+                    "transaction_count": 0,
+                    "transactions": [],
+                }
+
+            r = receivers_map[dest]
+            r["total_amount"] += amt
+            r["disputed_amount"] += disp
+            r["transaction_count"] += 1
+            r["transactions"].append({
+                "id": t.id,
+                "row_number": t.row_number,
+                "utr": t.transaction_id_utr or raw.get("Transaction ID / UTR Number") or raw.get("Transaction Id / UTR Number") or raw.get("source_utr"),
+                "date": str(t.transaction_date).split("T")[0] if t.transaction_date else None,
+                "amount": amt,
+                "disputed_amount": disp,
+            })
+
+    for r in receivers_map.values():
+        r["total_amount"] = round(r["total_amount"], 2)
+        r["disputed_amount"] = round(r["disputed_amount"], 2)
+
+    receivers_list = sorted(receivers_map.values(), key=lambda x: -x["total_amount"])
+
+    return {
+        "file_id": file_id,
+        "case_id": case_id or 0,
+        "sender_account": sender_account,
+        "layer": layer,
+        "total_receivers": len(receivers_list),
+        "total_outflow": round(total_outflow, 2),
+        "receivers": receivers_list,
+    }
+

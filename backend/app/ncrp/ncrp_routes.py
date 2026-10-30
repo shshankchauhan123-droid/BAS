@@ -22,6 +22,8 @@ from app.ncrp.ncrp_repository import (
 from app.ncrp.ncrp_schema import (
     NcrpAccountProfileResponse,
     NcrpFileResponse,
+    NcrpHierarchicalGraphResponse,
+    NcrpLayer1SourcesResponse,
     NcrpLayerActivityResponse,
     NcrpReconcileResponse,
     NcrpSankeyResponse,
@@ -35,12 +37,16 @@ from app.ncrp.ncrp_service import (
     get_case_ncrp_files_service,
     get_ncrp_account_profile_service,
     get_ncrp_file_service,
+    get_ncrp_hierarchical_graph_service,
+    get_ncrp_layer1_sources_service,
     get_ncrp_layer_activity_service,
     get_ncrp_sankey_service,
     process_ncrp_upload,
     reconcile_ncrp_file_service,
     repair_ncrp_file_service,
     trace_ncrp_account_next_service,
+    get_ncrp_edge_transactions_service,
+    get_ncrp_sender_receivers_service,
     validate_ncrp_case_access,
     view_ncrp_file_service,
 )
@@ -348,6 +354,8 @@ def get_ncrp_account_profile_route(
     account: str = Query(..., description="Account or Wallet ID to inspect"),
     case_id: Optional[int] = Query(default=None, description="Optional case validation"),
     layer: Optional[str] = Query(default=None, description="Optional layer filter"),
+    money_transfer_only: bool = Query(default=False, description="Restrict profile data strictly to Money Transfer To records"),
+    root_account: Optional[str] = Query(default=None, description="Root starting account for path isolation"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -359,6 +367,8 @@ def get_ncrp_account_profile_route(
         user=current_user,
         case_id=case_id,
         layer=layer,
+        money_transfer_only=money_transfer_only,
+        root_account=root_account,
     )
 
 
@@ -372,6 +382,7 @@ def trace_ncrp_account_next_route(
     account: str = Query(..., description="Account number to trace forward"),
     current_layer: int = Query(default=1, ge=1, description="Current layer number"),
     case_id: Optional[int] = Query(default=None, description="Optional case validation"),
+    money_transfer_only: bool = Query(default=False, description="Restrict forward trace strictly to Money Transfer To records"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -383,6 +394,120 @@ def trace_ncrp_account_next_route(
         current_layer=current_layer,
         user=current_user,
         case_id=case_id,
+        money_transfer_only=money_transfer_only,
     )
+
+
+@router.get(
+    "/file/{file_id}/layer1-sources",
+    response_model=NcrpLayer1SourcesResponse,
+    summary="Get all distinct Layer 1 starting source accounts for an NCRP workbook",
+)
+def get_ncrp_layer1_sources_route(
+    file_id: int,
+    case_id: Optional[int] = Query(None, description="Optional case ID for scope validation"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve all distinct Layer 1 source accounts with outgoing transaction volumes and receiver counts."""
+    return get_ncrp_layer1_sources_service(
+        db=db,
+        file_id=file_id,
+        user=current_user,
+        case_id=case_id,
+    )
+
+
+@router.get(
+    "/file/{file_id}/hierarchical-graph",
+    response_model=NcrpHierarchicalGraphResponse,
+    summary="Get NCRP Hierarchical Money Flow DAG Graph",
+)
+def get_ncrp_hierarchical_graph_route(
+    file_id: int,
+    case_id: Optional[int] = Query(None, description="Optional case ID for scope validation"),
+    root_account: Optional[str] = Query(None, description="Selected root source account"),
+    expand_account: Optional[str] = Query(None, description="Account to expand in the next layer"),
+    expand_all: bool = Query(False, description="Whether to expand all layers"),
+    expanded_accounts: Optional[str] = Query(None, description="Comma-separated list of currently expanded accounts"),
+    search: Optional[str] = Query(None, description="Search term for account/IFSC/bank"),
+    bank_name: Optional[str] = Query(None, description="Filter by bank name"),
+    layer: Optional[int] = Query(None, description="Filter by max layer depth"),
+    min_amount: Optional[float] = Query(None, description="Filter by minimum transfer amount"),
+    max_amount: Optional[float] = Query(None, description="Filter by maximum transfer amount"),
+    date_from: Optional[str] = Query(None, description="Filter from transaction date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter to transaction date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve hierarchical DAG graph data representing layer-wise money flow from suspect account."""
+    exp_list = [a.strip() for a in expanded_accounts.split(",") if a.strip()] if expanded_accounts else None
+    return get_ncrp_hierarchical_graph_service(
+        db=db,
+        file_id=file_id,
+        user=current_user,
+        case_id=case_id,
+        root_account=root_account,
+        expand_account=expand_account,
+        expand_all=expand_all,
+        expanded_accounts=exp_list,
+        search=search,
+        bank_name=bank_name,
+        layer=layer,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+@router.get(
+    "/file/{file_id}/receivers",
+    summary="Get distinct receiver accounts for a sender from Money Transfer To worksheet",
+)
+def get_ncrp_sender_receivers_route(
+    file_id: int,
+    sender_account: str = Query(..., description="Sender account number or wallet ID"),
+    layer: Optional[int] = Query(None, description="Optional filter by layer"),
+    case_id: Optional[int] = Query(None, description="Optional case validation"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve all distinct receivers and aggregated transfers for a sender from Money Transfer To worksheet."""
+    return get_ncrp_sender_receivers_service(
+        db=db,
+        file_id=file_id,
+        sender_account=sender_account,
+        layer=layer,
+        case_id=case_id,
+        user=current_user,
+    )
+
+
+@router.get(
+    "/file/{file_id}/edge-transactions",
+    summary="Get individual original Money Transfer To transactions for an aggregated edge",
+)
+def get_ncrp_edge_transactions_route(
+    file_id: int,
+    source_account: str = Query(..., description="Source/sender account number"),
+    target_account: str = Query(..., description="Target/receiver account number"),
+    layer: Optional[int] = Query(None, description="Optional filter by layer"),
+    case_id: Optional[int] = Query(None, description="Optional case validation"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve individual original Money Transfer To transaction records belonging to an aggregated edge."""
+    return get_ncrp_edge_transactions_service(
+        db=db,
+        file_id=file_id,
+        source_account=source_account,
+        target_account=target_account,
+        layer=layer,
+        case_id=case_id,
+        user=current_user,
+    )
+
+
 
 
