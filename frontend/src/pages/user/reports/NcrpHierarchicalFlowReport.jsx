@@ -330,6 +330,212 @@ function SearchableSelect({
   );
 }
 
+/**
+ * Compact Starting Account Dropdown component for the Graph Toolbar
+ */
+function StartingAccountDropdown({
+  accounts = [],
+  selectedAccount = "",
+  onSelect,
+  disabled = false,
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    const handleDocClick = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleDocClick);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleDocClick);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    } else {
+      setSearchTerm("");
+    }
+  }, [isOpen]);
+
+  const currentAccount = useMemo(() => {
+    return accounts.find((a) => String(a.account) === String(selectedAccount));
+  }, [accounts, selectedAccount]);
+
+  const filteredAccounts = useMemo(() => {
+    if (!searchTerm.trim()) return accounts;
+    const q = searchTerm.toLowerCase().trim();
+    return accounts.filter((a) => {
+      const acc = String(a.account || "").toLowerCase();
+      const raw = String(a.raw_account || "").toLowerCase();
+      const bank = String(a.bank || "").toLowerCase();
+      const ack = String(a.ack_no || "").toLowerCase();
+      return acc.includes(q) || raw.includes(q) || bank.includes(q) || ack.includes(q);
+    });
+  }, [accounts, searchTerm]);
+
+  return (
+    <div className="relative inline-block text-left" ref={dropdownRef}>
+      <button
+        type="button"
+        disabled={disabled || accounts.length === 0}
+        onClick={() => setIsOpen((prev) => !prev)}
+        className={`group flex items-center justify-between gap-2 rounded-xl border px-3 py-1.5 text-xs transition-all duration-200 outline-none min-w-[210px] sm:min-w-[260px] max-w-[340px] ${
+          disabled || accounts.length === 0
+            ? "cursor-not-allowed border-[#E2E8F0] bg-slate-100 text-[#94A3B8]"
+            : isOpen
+            ? "border-purple-600 bg-white ring-2 ring-purple-600/20 shadow-xs"
+            : "border-[#DCE5EF] bg-white text-[#172554] hover:border-purple-300 shadow-2xs"
+        }`}
+        title={currentAccount ? `${currentAccount.account} (${currentAccount.bank || "Unknown Bank"})` : "Select Starting Account"}
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-700 border border-purple-200">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </span>
+          {currentAccount ? (
+            <div className="flex flex-col min-w-0 text-left">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="font-mono font-bold text-[#172554] truncate">
+                  {currentAccount.masked_account || maskAccountNumber(currentAccount.account)}
+                </span>
+                <span className="text-[10px] text-[#64748B] truncate">
+                  • {currentAccount.bank || "Unknown Bank"}
+                </span>
+              </div>
+              {(currentAccount.total_outgoing_amount || currentAccount.total_amount) && (
+                <span className="text-[10px] font-semibold text-purple-700 truncate">
+                  ₹{formatIndianCurrency(currentAccount.total_outgoing_amount || currentAccount.total_amount)}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[#94A3B8] truncate">
+              {accounts.length > 0 ? `Select Account (${accounts.length})` : "No Starting Accounts"}
+            </span>
+          )}
+        </div>
+
+        <svg
+          className={`h-4 w-4 shrink-0 text-[#94A3B8] transition-transform duration-200 ${
+            isOpen ? "rotate-180 text-purple-600" : ""
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && !disabled && accounts.length > 0 && (
+        <div className="absolute left-0 top-full mt-1.5 z-50 w-80 sm:w-96 rounded-2xl border border-[#E2E8F0] bg-white p-2.5 shadow-xl animate-in fade-in zoom-in-95 duration-100">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 px-1">
+            <span className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
+              Starting Layer 1 Accounts ({accounts.length})
+            </span>
+          </div>
+
+          {accounts.length > 3 && (
+            <div className="relative mb-2">
+              <svg
+                className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94A3B8]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search account, bank, ACK..."
+                className="w-full rounded-xl border border-[#DCE5EF] bg-slate-50 py-1.5 pl-8 pr-2.5 text-xs text-[#172554] placeholder:text-[#94A3B8] focus:bg-white focus:outline-none focus:border-purple-600"
+              />
+            </div>
+          )}
+
+          <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+            {filteredAccounts.length > 0 ? (
+              filteredAccounts.map((src) => {
+                const isSelected = String(src.account) === String(selectedAccount);
+                const amount = src.total_outgoing_amount || src.total_amount || 0;
+                const transfersCount = src.outgoing_tx_count || src.total_transfers || 0;
+
+                return (
+                  <button
+                    key={src.account}
+                    type="button"
+                    onClick={() => {
+                      onSelect(src.account);
+                      setIsOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between gap-2 rounded-xl p-2.5 text-left text-xs transition-colors ${
+                      isSelected
+                        ? "bg-purple-50 text-purple-900 border border-purple-200 font-bold"
+                        : "hover:bg-slate-50 text-[#172554] border border-transparent"
+                    }`}
+                  >
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-[#172554]">
+                          {src.masked_account || maskAccountNumber(src.account)}
+                        </span>
+                        {isSelected && (
+                          <span className="rounded bg-purple-600 px-1.5 py-0.2 text-[9px] font-bold text-white uppercase">
+                            Active Root
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-[#64748B] mt-0.5 truncate">
+                        <span className="truncate">{src.bank || "Unknown Bank"}</span>
+                        {src.ack_no && (
+                          <span className="truncate font-mono text-[10px] text-slate-400">
+                            • ACK: {src.ack_no}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end shrink-0 pl-2">
+                      {amount > 0 && (
+                        <span className="font-bold text-purple-700 text-xs">
+                          ₹{formatIndianCurrency(amount)}
+                        </span>
+                      )}
+                      {transfersCount > 0 && (
+                        <span className="text-[10px] text-[#64748B]">
+                          {transfersCount} transfer{transfersCount > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="py-4 text-center text-xs text-[#94A3B8]">
+                No starting accounts found matching &quot;{searchTerm}&quot;
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NcrpHierarchicalFlowReport() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -358,46 +564,18 @@ export default function NcrpHierarchicalFlowReport() {
   const requestCounterRef = useRef(0);
   const isExpandingRef = useRef(false);
 
-  // Filters & Controls
-  const [searchQuery, setSearchQuery] = useState("");
-  const [bankFilter, setBankFilter] = useState("ALL");
-  const [minAmount, setMinAmount] = useState("");
-
-  // Drawer Panel
+  // Profile Panel & Full-Screen States
   const [drawerAccount, setDrawerAccount] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isProfilePanelOpen, setIsProfilePanelOpen] = useState(false); // Default: closed
+  const [isFullScreen, setIsFullScreen] = useState(false); // Full-screen mode
+  const [fitTrigger, setFitTrigger] = useState(0);
 
   // Protected safe access arrays
   const nodes = useMemo(() => (Array.isArray(graphData?.nodes) ? graphData.nodes : []), [graphData?.nodes]);
   const edges = useMemo(() => (Array.isArray(graphData?.edges) ? graphData.edges : []), [graphData?.edges]);
   const rootAccounts = useMemo(() => (Array.isArray(graphData?.root_accounts) ? graphData.root_accounts : []), [graphData?.root_accounts]);
   const availableLayers = useMemo(() => (Array.isArray(graphData?.available_layers) ? graphData.available_layers : []), [graphData?.available_layers]);
-  const availableBanks = useMemo(() => (Array.isArray(graphData?.available_banks) ? graphData.available_banks : []), [graphData?.available_banks]);
-
-  // Layer 1 Starting Account Selection state
-  const [sourceSearchQuery, setSourceSearchQuery] = useState("");
-  const [isStartingAccountSelectorOpen, setIsStartingAccountSelectorOpen] = useState(true);
-  const [revealedSourceAccounts, setRevealedSourceAccounts] = useState({});
-
-  const toggleRevealSourceAccount = (account, e) => {
-    if (e) e.stopPropagation();
-    setRevealedSourceAccounts((prev) => ({
-      ...prev,
-      [account]: !prev[account],
-    }));
-  };
-
-  const filteredRootAccounts = useMemo(() => {
-    if (!sourceSearchQuery.trim()) return rootAccounts;
-    const q = sourceSearchQuery.toLowerCase().trim();
-    return rootAccounts.filter((r) => {
-      const acc = String(r.account || "").toLowerCase();
-      const raw = String(r.raw_account || "").toLowerCase();
-      const bank = String(r.bank || "").toLowerCase();
-      const ack = String(r.ack_no || "").toLowerCase();
-      return acc.includes(q) || raw.includes(q) || bank.includes(q) || ack.includes(q);
-    });
-  }, [rootAccounts, sourceSearchQuery]);
 
   const handleSelectStartingAccount = (account) => {
     if (!account) return;
@@ -412,6 +590,46 @@ export default function NcrpHierarchicalFlowReport() {
       isExpandingAction: false,
     });
   };
+
+  // Toggle Account Profile panel
+  const handleToggleProfile = () => {
+    if (window.innerWidth < 1024) {
+      setIsDrawerOpen(true);
+    } else {
+      setIsProfilePanelOpen((prev) => !prev);
+      setTimeout(() => {
+        setFitTrigger((prev) => prev + 1);
+        window.dispatchEvent(new Event("resize"));
+      }, 250);
+    }
+  };
+
+  // Handle Full-Screen Escape key and body scroll lock
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && isFullScreen) {
+        setIsFullScreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullScreen]);
+
+  useEffect(() => {
+    if (isFullScreen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    const timer = setTimeout(() => {
+      setFitTrigger((prev) => prev + 1);
+      window.dispatchEvent(new Event("resize"));
+    }, 200);
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = "";
+    };
+  }, [isFullScreen]);
 
 
   // 1. Fetch accessible cases
@@ -527,9 +745,6 @@ export default function NcrpHierarchicalFlowReport() {
           rootAccount: rootToUse || undefined,
           expandedAccounts: expandedToUse,
           expandAll: expandAllToUse,
-          bankName: bankFilter !== "ALL" ? bankFilter : undefined,
-          minAmount: minAmount !== "" ? Number(minAmount) : undefined,
-          search: searchQuery || undefined,
         });
 
         // Ignore stale asynchronous responses
@@ -587,7 +802,7 @@ export default function NcrpHierarchicalFlowReport() {
         }
       }
     },
-    [selectedFileId, selectedCaseId, selectedRootAccount, expandedAccounts, expandAll, bankFilter, minAmount, searchQuery]
+    [selectedFileId, selectedCaseId, selectedRootAccount, expandedAccounts, expandAll]
   );
 
   // Trigger fetch when primary selection dependencies change
@@ -598,7 +813,7 @@ export default function NcrpHierarchicalFlowReport() {
       setGraphData({ ...INITIAL_GRAPH_STATE });
       setGraphError(null);
     }
-  }, [selectedFileId, selectedCaseId, selectedRootAccount, expandAll, bankFilter]);
+  }, [selectedFileId, selectedCaseId, selectedRootAccount, expandAll]);
 
   // Keep selected root aligned if rootAccounts list changes
   useEffect(() => {
@@ -928,7 +1143,7 @@ export default function NcrpHierarchicalFlowReport() {
                 <span className="font-bold text-purple-700">
                   {selectedRootAccount
                     ? `${maskAccountNumber(selectedRootAccount)}`
-                    : `${rootAccounts.length} Sources (Select below)`}
+                    : `${rootAccounts.length} Sources (Select in toolbar)`}
                 </span>
               </div>
             )}
@@ -1016,457 +1231,253 @@ export default function NcrpHierarchicalFlowReport() {
           </div>
         </div>
 
-        {/* DEDICATED SECTION: Select Starting Account — Layer 1 */}
-        {selectedFileId && rootAccounts.length > 0 && (
-          <div className="rounded-2xl border border-purple-200/80 bg-white p-4 sm:p-5 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#F1F5F9]">
-              <div className="flex items-start gap-2.5">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-purple-100 text-purple-700 border border-purple-200 shrink-0 mt-0.5">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
+        {/* GRAPH WORKSPACE & TOOLBAR CONTAINER */}
+        <div
+          className={
+            isFullScreen
+              ? "fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col p-4 sm:p-5 overflow-hidden animate-in fade-in duration-200"
+              : "space-y-4"
+          }
+        >
+          {/* INVESTIGATION TOOLBAR */}
+          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-3 sm:p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            {/* Left Controls: Starting Account Dropdown, Expand All, Reset */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Starting Account Dropdown */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-[#172554] whitespace-nowrap">
+                  Starting Account:
                 </span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-black text-[#172554] tracking-tight">
-                      Select Starting Account — Layer 1
-                    </h2>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                      {rootAccounts.length} source{rootAccounts.length > 1 ? "s" : ""}
-                    </span>
+                <StartingAccountDropdown
+                  accounts={rootAccounts}
+                  selectedAccount={selectedRootAccount}
+                  onSelect={handleSelectStartingAccount}
+                  disabled={!selectedFileId || rootAccounts.length === 0}
+                />
+              </div>
+
+              <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+
+              {/* Expand All Layers */}
+              <button
+                type="button"
+                onClick={handleExpandAll}
+                disabled={expandAll || nodes.length === 0 || !selectedRootAccount}
+                className="px-3 py-1.5 text-xs font-bold rounded-xl border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white disabled:opacity-40 transition-colors flex items-center gap-1.5 shadow-2xs"
+                title="Expand all downstream layers"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+                <span>Expand All Layers</span>
+              </button>
+
+              {/* Reset to Root */}
+              <button
+                type="button"
+                onClick={handleResetToRoot}
+                disabled={(expandedAccounts.length === 0 && !expandAll) || !selectedRootAccount}
+                className="px-3 py-1.5 text-xs font-bold rounded-xl border border-[#DCE5EF] bg-white text-[#64748B] hover:text-[#172554] hover:bg-slate-50 disabled:opacity-40 transition-colors flex items-center gap-1.5 shadow-2xs"
+                title="Collapse all layers back to Layer 1 root"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Reset to Root</span>
+              </button>
+            </div>
+
+            {/* Right Controls: Account Profile Toggle & Full Screen Toggle */}
+            <div className="flex items-center gap-2">
+              {/* Account Profile Toggle */}
+              <button
+                type="button"
+                onClick={handleToggleProfile}
+                className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all duration-200 flex items-center gap-1.5 shadow-2xs ${
+                  isProfilePanelOpen
+                    ? "border-purple-600 bg-purple-600 text-white shadow-xs"
+                    : "border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100"
+                }`}
+                title={isProfilePanelOpen ? "Close Forensic Account Profile" : "Open Forensic Account Profile"}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>Account Profile</span>
+                {isProfilePanelOpen && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-white ml-0.5" />
+                )}
+              </button>
+
+              {/* Full Screen Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsFullScreen((prev) => !prev)}
+                className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all duration-200 flex items-center gap-1.5 shadow-2xs ${
+                  isFullScreen
+                    ? "border-purple-600 bg-purple-600 text-white shadow-xs"
+                    : "border-[#DCE5EF] bg-white text-[#172554] hover:bg-slate-50 hover:border-purple-300"
+                }`}
+                title={isFullScreen ? "Exit Full Screen (Esc)" : "Full Screen View"}
+              >
+                {isFullScreen ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span>Exit Full Screen</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    <span>Full Screen</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* MAIN WORKSPACE: GRAPH CANVAS + TOGGLEABLE RIGHT PANEL */}
+          <div className={`flex flex-col lg:flex-row gap-4 items-start w-full transition-all duration-300 ${
+            isFullScreen ? "flex-1 min-h-0 h-full" : ""
+          }`}>
+            {/* Central Interactive Graph Area */}
+            <div className={`w-full min-w-0 relative transition-all duration-300 ${
+              isFullScreen ? "flex-1 h-full min-h-0" : "flex-1 h-[680px]"
+            }`}>
+              {!selectedFileId ? (
+                /* Condition 1: No file selected */
+                <div className="h-full w-full rounded-2xl border border-dashed border-[#CBD5E1] bg-white flex flex-col items-center justify-center p-8 text-center">
+                  <div className="h-12 w-12 rounded-2xl bg-purple-50 border border-purple-200 text-purple-700 flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
                   </div>
-                  <p className="text-xs text-[#64748B] mt-0.5">
-                    Select a Layer 1 sender or suspect account to trace its outward money flow and all connected receiver accounts.
+                  <h3 className="text-sm font-bold text-[#172554]">
+                    No NCRP Workbook Selected
+                  </h3>
+                  <p className="text-xs text-[#64748B] max-w-sm mt-1">
+                    Select a case and an imported NCRP Excel workbook from the selectors above to render the hierarchical money flow network.
                   </p>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2.5 self-end sm:self-auto w-full sm:w-auto">
-                {/* Search bar inside Layer 1 selector */}
-                <div className="relative flex-1 sm:w-64">
-                  <input
-                    type="text"
-                    value={sourceSearchQuery}
-                    onChange={(e) => setSourceSearchQuery(e.target.value)}
-                    placeholder="Search account, bank, ACK..."
-                    className="w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border border-[#DCE5EF] bg-slate-50 focus:bg-white focus:outline-none focus:border-purple-500"
-                  />
-                  <svg className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#94A3B8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+              ) : loadingGraph && nodes.length === 0 ? (
+                /* Condition 2: Initial loading state when graph is not yet populated */
+                <div className="h-full w-full rounded-2xl border border-[#E2E8F0] bg-white flex flex-col items-center justify-center space-y-3">
+                  <div className="h-10 w-10 rounded-full border-3 border-purple-600 border-t-transparent animate-spin" />
+                  <p className="text-xs font-bold text-[#172554]">
+                    Computing hierarchical money flow DAG...
+                  </p>
+                  <p className="text-[11px] text-[#64748B]">
+                    Traversing sender-to-receiver edges from root suspect
+                  </p>
                 </div>
-
-                {selectedRootAccount && (
+              ) : graphError && nodes.length === 0 ? (
+                /* Condition 3: Failed request state */
+                <div className="h-full w-full rounded-2xl border border-rose-200 bg-white flex flex-col items-center justify-center p-8 text-center space-y-3">
+                  <div className="h-12 w-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center justify-center">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#172554]">
+                    Failed to Load Graph Data
+                  </h3>
+                  <p className="text-xs text-rose-600 max-w-md">
+                    {graphError}
+                  </p>
                   <button
                     type="button"
-                    onClick={() => setIsStartingAccountSelectorOpen((prev) => !prev)}
-                    className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-[#DCE5EF] bg-slate-50 text-[#64748B] hover:text-[#172554] hover:bg-slate-100 transition-colors shrink-0"
-                    title={isStartingAccountSelectorOpen ? "Collapse selector" : "Expand selector"}
+                    onClick={() => fetchGraph()}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-sm"
                   >
-                    {isStartingAccountSelectorOpen ? "Collapse" : "Change Source"}
+                    Retry Loading Graph
                   </button>
-                )}
-              </div>
-            </div>
-
-            {/* Active investigation pill if collapsed */}
-            {!isStartingAccountSelectorOpen && selectedRootAccount && (
-              <div className="flex items-center justify-between p-3 rounded-xl bg-purple-50/70 border border-purple-200 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-purple-900">Active Starting Source:</span>
-                  <span className="font-mono font-bold text-purple-700">{maskAccountNumber(selectedRootAccount)}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsStartingAccountSelectorOpen(true)}
-                  className="font-bold text-purple-700 hover:text-purple-900 underline"
-                >
-                  Switch Starting Account
-                </button>
-              </div>
-            )}
-
-            {/* Cards Grid */}
-            {isStartingAccountSelectorOpen && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 pt-1">
-                {filteredRootAccounts.length > 0 ? (
-                  filteredRootAccounts.map((src) => {
-                    const isSelected = src.account === selectedRootAccount;
-                    const isRevealed = !!revealedSourceAccounts[src.account];
-                    const receiversCount = src.distinct_receivers_count ?? src.receivers?.length ?? 0;
-                    const transfersCount = src.outgoing_tx_count || src.total_transfers || 0;
-                    const totalOutflow = src.total_outgoing_amount || src.total_amount || 0;
-
-                    return (
-                      <div
-                        key={src.account}
-                        onClick={() => handleSelectStartingAccount(src.account)}
-                        className={`rounded-2xl p-4 border transition-all duration-200 flex flex-col justify-between cursor-pointer ${
-                          isSelected
-                            ? "border-purple-600 bg-purple-50/40 ring-2 ring-purple-600/30 shadow-md"
-                            : "border-[#E2E8F0] bg-white hover:border-purple-300 hover:shadow-md"
-                        }`}
-                      >
-                        <div>
-                          {/* Card Top: Masked ID, Reveal, Copy, Badge */}
-                          <div className="flex items-center justify-between pb-2 border-b border-[#F1F5F9]">
-                            <div className="flex items-center gap-1 min-w-0">
-                              <span className="font-mono text-xs font-bold text-[#172554] tracking-tight truncate">
-                                {isRevealed ? src.account : src.masked_account || maskAccountNumber(src.account)}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={(e) => toggleRevealSourceAccount(src.account, e)}
-                                className="p-1 text-[#94A3B8] hover:text-[#172554] transition-colors"
-                                title={isRevealed ? "Mask Account" : "Reveal Account"}
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  {isRevealed ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
-                                  ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                  )}
-                                </svg>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigator.clipboard.writeText(String(src.account));
-                                  Swal.fire({
-                                    icon: "success",
-                                    title: "Account Copied",
-                                    text: String(src.account),
-                                    toast: true,
-                                    position: "top-end",
-                                    showConfirmButton: false,
-                                    timer: 2000,
-                                  });
-                                }}
-                                className="p-1 text-[#94A3B8] hover:text-purple-700 transition-colors"
-                                title="Copy account number"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                              </button>
-                            </div>
-
-                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                              isSelected
-                                ? "bg-purple-600 text-white shadow-xs"
-                                : "bg-purple-50 text-purple-700 border border-purple-200"
-                            }`}>
-                              {isSelected ? "Active Root" : "Layer 1 Source"}
-                            </span>
-                          </div>
-
-                          {/* Bank Name & Ack */}
-                          <div className="py-2 space-y-1">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-[#172554] truncate">
-                              <svg className="w-3.5 h-3.5 text-purple-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
-                              <span className="truncate">{src.bank || "Unknown Bank"}</span>
-                            </div>
-                            {src.ack_no && (
-                              <div className="text-[10px] text-[#64748B] flex items-center gap-1">
-                                <span className="font-semibold text-[#94A3B8]">ACK:</span>
-                                <span className="font-mono truncate">{src.ack_no}</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Metrics Grid */}
-                          <div className="grid grid-cols-3 gap-2 py-2 px-2.5 rounded-xl bg-slate-50 border border-slate-100 text-center my-1">
-                            <div>
-                              <span className="text-[9px] font-semibold text-[#64748B] block">Total Outflow</span>
-                              <span className="text-xs font-bold text-purple-700 block truncate">
-                                ₹{formatIndianCurrency(totalOutflow)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-[9px] font-semibold text-[#64748B] block">Transfers</span>
-                              <span className="text-xs font-bold text-[#172554] block">
-                                {transfersCount}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-[9px] font-semibold text-[#64748B] block">Receivers</span>
-                              <span className="text-xs font-bold text-emerald-700 block">
-                                {receiversCount}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Card Selection Action Button */}
-                        <div className="pt-2">
-                          {isSelected ? (
-                            <div className="w-full py-1.5 px-3 rounded-xl bg-purple-600 text-white font-bold text-xs text-center flex items-center justify-center gap-1.5 shadow-xs">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                              </svg>
-                              <span>Active Investigation Starting Account</span>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSelectStartingAccount(src.account);
-                              }}
-                              className="w-full py-1.5 px-3 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 border border-purple-200"
-                            >
-                              <span>Investigate This Account</span>
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="col-span-full py-6 text-center text-xs text-[#94A3B8]">
-                    No Layer 1 source accounts found matching &quot;{sourceSearchQuery}&quot;.
+              ) : !selectedRootAccount ? (
+                /* Condition 4A: Prompt to select a starting account from toolbar */
+                <div className="h-full w-full rounded-2xl border border-purple-200 bg-white flex flex-col items-center justify-center p-8 text-center space-y-3">
+                  <div className="h-14 w-14 rounded-2xl bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center shadow-xs">
+                    <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* INVESTIGATION TOOLBAR & FILTERS */}
-        <div className="rounded-2xl border border-[#E2E8F0] bg-white p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Search Input */}
-            <div className="relative w-48 sm:w-60">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Highlight account, IFSC, bank..."
-                className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-[#DCE5EF] bg-slate-50 focus:bg-white focus:outline-none focus:border-purple-500"
-              />
-              <svg className="w-3.5 h-3.5 absolute left-2.5 top-3 text-[#94A3B8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-
-            {/* Bank Filter Dropdown */}
-            {availableBanks.length > 0 && (
-              <select
-                value={bankFilter}
-                onChange={(e) => setBankFilter(e.target.value)}
-                className="text-xs py-2 px-3 rounded-xl border border-[#DCE5EF] bg-slate-50 text-[#172554] focus:outline-none focus:border-purple-500"
-              >
-                <option value="ALL">All Banks ({availableBanks.length})</option>
-                {availableBanks.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-            )}
-
-            {/* Min Amount Threshold */}
-            <div className="flex items-center gap-1.5">
-              <input
-                type="number"
-                value={minAmount}
-                onChange={(e) => setMinAmount(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    fetchGraph();
-                  }
-                }}
-                placeholder="Min Transfer (₹)"
-                className="w-32 text-xs py-2 px-3 rounded-xl border border-[#DCE5EF] bg-slate-50 focus:bg-white focus:outline-none focus:border-purple-500"
-              />
-              {minAmount && (
-                <button
-                  type="button"
-                  onClick={() => fetchGraph()}
-                  className="px-2 py-1.5 text-xs font-bold rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200"
-                  title="Apply amount filter"
-                >
-                  Apply
-                </button>
+                  <h3 className="text-base font-bold text-[#172554]">
+                    Select a Starting Account Above
+                  </h3>
+                  <p className="text-xs text-[#64748B] max-w-md">
+                    This investigation contains {rootAccounts.length} distinct Layer 1 source accounts. Please select one from the <strong>&quot;Starting Account&quot;</strong> dropdown in the toolbar above to load its transaction hierarchy and connected accounts.
+                  </p>
+                  {rootAccounts.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectStartingAccount(rootAccounts[0].account)}
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-sm"
+                    >
+                      Investigate First Source ({maskAccountNumber(rootAccounts[0].account)})
+                    </button>
+                  )}
+                </div>
+              ) : nodes.length === 0 ? (
+                /* Condition 4: Empty graph state (no records found) */
+                <div className="h-full w-full rounded-2xl border border-[#E2E8F0] bg-white flex flex-col items-center justify-center p-8 text-center space-y-3">
+                  <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 text-[#64748B] flex items-center justify-center">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#172554]">
+                    No transaction records found
+                  </h3>
+                  <p className="text-xs text-[#64748B] max-w-md">
+                    The selected NCRP workbook does not contain layer-wise money transfer transactions for this starting account.
+                  </p>
+                </div>
+              ) : (
+                /* Condition 5: Successful Graph render with live nodes & edges */
+                <>
+                  {isExpanding && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full bg-purple-900/90 text-white text-xs font-semibold shadow-lg backdrop-blur-sm flex items-center gap-2 animate-in fade-in duration-200">
+                      <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      <span>Expanding layer...</span>
+                    </div>
+                  )}
+                  <NcrpHierarchicalGraph
+                    nodes={nodes}
+                    edges={edges}
+                    selectedRoot={selectedRootAccount || graphData?.selected_root}
+                    selectedAccount={drawerAccount}
+                    expandedAccounts={expandedAccounts}
+                    onNodeClick={handleNodeClick}
+                    onSelectAccount={handleSelectAccount}
+                    onExpandAccount={handleExpandAccount}
+                    onTerminalClick={handleTerminalClick}
+                    isLoading={isExpanding}
+                    fitTrigger={fitTrigger}
+                  />
+                </>
               )}
             </div>
-          </div>
 
-          {/* Layer Depth Quick Controls */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleExpandAll}
-              disabled={expandAll || nodes.length === 0}
-              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white disabled:opacity-40 transition-colors"
-            >
-              Expand All Layers
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResetToRoot}
-              disabled={expandedAccounts.length === 0 && !expandAll}
-              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-[#DCE5EF] bg-white text-[#64748B] hover:text-[#172554] hover:bg-slate-50 disabled:opacity-40 transition-colors"
-            >
-              Reset to Root
-            </button>
-
-            {/* Mobile Account Details Toggle */}
-            <button
-              type="button"
-              onClick={() => setIsDrawerOpen(true)}
-              className="lg:hidden px-3 py-1.5 text-xs font-bold rounded-xl border border-purple-200 bg-purple-50 text-purple-700 flex items-center gap-1.5 hover:bg-purple-600 hover:text-white transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <span>{drawerAccount ? "View Profile" : "Account Profile"}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* MAIN WORKSPACE: GRAPH CANVAS + FIXED DEDICATED RIGHT PANEL ON DESKTOP */}
-        <div className="flex flex-col lg:flex-row gap-4 items-start w-full">
-          {/* Central Interactive Graph Area */}
-          <div className="flex-1 w-full min-w-0 h-[680px] relative">
-            {!selectedFileId ? (
-              /* Condition 1: No file selected */
-              <div className="h-full w-full rounded-2xl border border-dashed border-[#CBD5E1] bg-white flex flex-col items-center justify-center p-8 text-center">
-                <div className="h-12 w-12 rounded-2xl bg-purple-50 border border-purple-200 text-purple-700 flex items-center justify-center mb-3">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-sm font-bold text-[#172554]">
-                  No NCRP Workbook Selected
-                </h3>
-                <p className="text-xs text-[#64748B] max-w-sm mt-1">
-                  Select a case and an imported NCRP Excel workbook from the selectors above to render the hierarchical money flow network.
-                </p>
-              </div>
-            ) : loadingGraph && nodes.length === 0 ? (
-              /* Condition 2: Initial loading state when graph is not yet populated */
-              <div className="h-full w-full rounded-2xl border border-[#E2E8F0] bg-white flex flex-col items-center justify-center space-y-3">
-                <div className="h-10 w-10 rounded-full border-3 border-purple-600 border-t-transparent animate-spin" />
-                <p className="text-xs font-bold text-[#172554]">
-                  Computing hierarchical money flow DAG...
-                </p>
-                <p className="text-[11px] text-[#64748B]">
-                  Traversing sender-to-receiver edges from root suspect
-                </p>
-              </div>
-            ) : graphError && nodes.length === 0 ? (
-              /* Condition 3: Failed request state */
-              <div className="h-full w-full rounded-2xl border border-rose-200 bg-white flex flex-col items-center justify-center p-8 text-center space-y-3">
-                <div className="h-12 w-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center justify-center">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <h3 className="text-sm font-bold text-[#172554]">
-                  Failed to Load Graph Data
-                </h3>
-                <p className="text-xs text-rose-600 max-w-md">
-                  {graphError}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => fetchGraph()}
-                  className="px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-sm"
-                >
-                  Retry Loading Graph
-                </button>
-              </div>
-            ) : !selectedRootAccount ? (
-              /* Condition 4A: Prompt to select a starting account from the list above */
-              <div className="h-full w-full rounded-2xl border border-purple-200 bg-white flex flex-col items-center justify-center p-8 text-center space-y-3">
-                <div className="h-14 w-14 rounded-2xl bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center shadow-xs">
-                  <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-                <h3 className="text-base font-bold text-[#172554]">
-                  Select a Layer 1 Starting Account Above
-                </h3>
-                <p className="text-xs text-[#64748B] max-w-md">
-                  This investigation contains {rootAccounts.length} distinct Layer 1 source accounts. Please select one of the cards in the <strong>&quot;Select Starting Account — Layer 1&quot;</strong> section above to load its transaction hierarchy and all connected receiver accounts.
-                </p>
-              </div>
-            ) : nodes.length === 0 ? (
-              /* Condition 4: Empty graph state (no records found or filtered out) */
-              <div className="h-full w-full rounded-2xl border border-[#E2E8F0] bg-white flex flex-col items-center justify-center p-8 text-center space-y-3">
-                <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 text-[#64748B] flex items-center justify-center">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                  </svg>
-                </div>
-                <h3 className="text-sm font-bold text-[#172554]">
-                  No transaction records found
-                </h3>
-                <p className="text-xs text-[#64748B] max-w-md">
-                  {searchQuery || bankFilter !== "ALL" || minAmount
-                    ? "No transactions match your active search and filter criteria."
-                    : "The selected NCRP workbook does not contain layer-wise money transfer transactions."}
-                </p>
-                {(searchQuery || bankFilter !== "ALL" || minAmount) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setBankFilter("ALL");
-                      setMinAmount("");
-                    }}
-                    className="px-3.5 py-1.5 text-xs font-bold rounded-xl border border-[#DCE5EF] bg-slate-50 text-[#172554] hover:bg-slate-100 transition-colors"
-                  >
-                    Clear All Filters
-                  </button>
-                )}
-              </div>
-            ) : (
-              /* Condition 5: Successful Graph render with live nodes & edges */
-              <>
-                {isExpanding && (
-                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full bg-purple-900/90 text-white text-xs font-semibold shadow-lg backdrop-blur-sm flex items-center gap-2 animate-in fade-in duration-200">
-                    <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    <span>Expanding layer...</span>
-                  </div>
-                )}
-                <NcrpHierarchicalGraph
-                  nodes={nodes}
-                  edges={edges}
-                  selectedRoot={selectedRootAccount || graphData?.selected_root}
-                  selectedAccount={drawerAccount}
-                  expandedAccounts={expandedAccounts}
-                  onNodeClick={handleNodeClick}
+            {/* Collapsible / Toggleable Right-Side Information Panel on Desktop */}
+            {isProfilePanelOpen && (
+              <div className={`hidden lg:block w-[460px] xl:w-[500px] shrink-0 sticky top-2 transition-all duration-300 animate-in fade-in slide-in-from-right-4 ${
+                isFullScreen ? "h-full overflow-y-auto" : ""
+              }`}>
+                <NcrpAccountPanel
+                  account={drawerAccount}
+                  rootAccount={selectedRootAccount || graphData?.selected_root}
+                  fileId={selectedFileId}
+                  caseId={selectedCaseId}
+                  onExpandInGraph={handleExpandAccount}
                   onSelectAccount={handleSelectAccount}
-                  onExpandAccount={handleExpandAccount}
-                  onTerminalClick={handleTerminalClick}
-                  searchQuery={searchQuery}
-                  bankFilter={bankFilter}
-                  isLoading={isExpanding}
+                  onClose={() => setIsProfilePanelOpen(false)}
+                  isCollapsible={true}
+                  moneyTransferOnly={true}
                 />
-              </>
+              </div>
             )}
-          </div>
-
-          {/* Fixed Dedicated Right-Side Information Panel on Desktop */}
-          <div className="hidden lg:block w-[460px] xl:w-[500px] shrink-0 sticky top-2">
-            <NcrpAccountPanel
-              account={drawerAccount}
-              rootAccount={selectedRootAccount || graphData?.selected_root}
-              fileId={selectedFileId}
-              caseId={selectedCaseId}
-              onExpandInGraph={handleExpandAccount}
-              onSelectAccount={handleSelectAccount}
-              onClose={() => setDrawerAccount(null)}
-              isCollapsible={false}
-              moneyTransferOnly={true}
-            />
           </div>
         </div>
       </main>

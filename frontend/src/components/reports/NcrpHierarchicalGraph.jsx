@@ -31,6 +31,7 @@ export default function NcrpHierarchicalGraph({
   bankFilter = "ALL",
   isLoading = false,
   onTerminalClick,
+  fitTrigger = null,
 }) {
   const containerRef = useRef(null);
   const [zoom, setZoom] = useState(1);
@@ -195,6 +196,16 @@ export default function NcrpHierarchicalGraph({
     setPan({ x: 40, y: 40 });
   };
 
+  // Re-fit graph when fitTrigger changes (e.g. side panel toggles or full-screen enters/exits)
+  useEffect(() => {
+    if (fitTrigger && safeNodes.length > 0) {
+      const timer = setTimeout(() => {
+        handleFitToScreen();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [fitTrigger, safeNodes.length]);
+
   const toggleRevealAccount = (acc, e) => {
     e.stopPropagation();
 
@@ -207,7 +218,7 @@ export default function NcrpHierarchicalGraph({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full min-h-[580px] bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
+      className="relative w-full h-full min-h-[460px] bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

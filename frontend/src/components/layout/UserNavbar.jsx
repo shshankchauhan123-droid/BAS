@@ -23,6 +23,8 @@ function UserNavbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [headerDropdownOpen, setHeaderDropdownOpen] = useState(false);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [userDetails, setUserDetails] = useState(user || null);
   const [userLoading, setUserLoading] = useState(false);
 
@@ -113,25 +115,30 @@ function UserNavbar() {
     };
   }, [userId, user]);
 
-  // ADJUST MAIN CONTENT WHEN SIDEBAR COLLAPSES
+  // ADJUST MAIN CONTENT WHEN SIDEBAR COLLAPSES (also manages top-header offset)
   useEffect(() => {
-    const previousPadding = document.body.style.paddingLeft;
+    const previousPaddingLeft = document.body.style.paddingLeft;
+    const previousPaddingTop = document.body.style.paddingTop;
     const previousTransition = document.body.style.transition;
 
+    const TOP_HEADER_HEIGHT = 64;
+
     const updateLayout = () => {
-      document.body.style.paddingLeft =
-        window.innerWidth >= 1024 ? `${sidebarWidth}px` : "0px";
+      const isDesktop = window.innerWidth >= 1024;
+      document.body.style.paddingLeft = isDesktop ? `${sidebarWidth}px` : "0px";
+      document.body.style.paddingTop = isDesktop ? `${TOP_HEADER_HEIGHT}px` : "0px";
     };
 
     document.body.style.transition =
-      "padding-left 280ms cubic-bezier(0.16, 1, 0.3, 1)";
+      "padding-left 280ms cubic-bezier(0.16, 1, 0.3, 1), padding-top 280ms cubic-bezier(0.16, 1, 0.3, 1)";
 
     updateLayout();
     window.addEventListener("resize", updateLayout);
 
     return () => {
       window.removeEventListener("resize", updateLayout);
-      document.body.style.paddingLeft = previousPadding;
+      document.body.style.paddingLeft = previousPaddingLeft;
+      document.body.style.paddingTop = previousPaddingTop;
       document.body.style.transition = previousTransition;
     };
   }, [sidebarWidth]);
@@ -142,6 +149,8 @@ function UserNavbar() {
       if (event.key === "Escape") {
         setProfileModalOpen(false);
         setMobileMenuOpen(false);
+        setHeaderDropdownOpen(false);
+        setHelpModalOpen(false);
       }
     };
 
@@ -151,6 +160,29 @@ function UserNavbar() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  // CLOSE HEADER DROPDOWN ON OUTSIDE CLICK
+  useEffect(() => {
+    if (!headerDropdownOpen) return;
+
+    const handleOutsideClick = (event) => {
+      const dropdown = document.getElementById("bas-header-dropdown");
+      const trigger = document.getElementById("bas-header-profile-btn");
+      if (
+        dropdown &&
+        !dropdown.contains(event.target) &&
+        trigger &&
+        !trigger.contains(event.target)
+      ) {
+        setHeaderDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [headerDropdownOpen]);
 
   // PREVENT BODY SCROLL WHEN MOBILE DRAWER IS OPEN
   useEffect(() => {
@@ -1034,6 +1066,325 @@ function UserNavbar() {
     );
   };
 
+  // HELP MODAL
+  const HelpModal = () => {
+    if (!helpModalOpen) return null;
+
+    return (
+      <div
+        className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm sm:p-6"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            setHelpModalOpen(false);
+          }
+        }}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bas-help-title"
+          className="my-auto flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl"
+        >
+          {/* HELP MODAL HEADER */}
+          <div className="flex items-center justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-blue-50 px-5 py-4 sm:px-7">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50">
+                <svg
+                  className="h-5 w-5 text-emerald-700"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M12 17v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <circle cx="12" cy="8" r="0.75" fill="currentColor" stroke="currentColor" strokeWidth="0.5" />
+                </svg>
+              </div>
+              <div>
+                <h2
+                  id="bas-help-title"
+                  className="text-lg font-bold text-blue-950 sm:text-xl"
+                >
+                  Help &amp; Support
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  ARTHBODH — Banking Analytical System
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setHelpModalOpen(false)}
+              aria-label="Close help"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+
+          {/* HELP MODAL BODY */}
+          <div className="overflow-y-auto p-5 sm:p-7">
+            {/* About BAS */}
+            <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-white p-5">
+              <h3 className="mb-2 text-sm font-bold text-blue-950">About BAS</h3>
+              <p className="text-sm leading-relaxed text-slate-600">
+                <span className="font-semibold text-emerald-800">ARTHBODH</span> is a
+                Banking Analytical System designed for bank statement analysis,
+                transaction intelligence, and financial investigation reports.
+                It provides centralized tools for managing cases, uploading
+                bank and NCRP statements, and generating detailed financial
+                intelligence reports.
+              </p>
+            </div>
+
+            {/* What you can do */}
+            <div className="mt-5">
+              <h3 className="mb-3 text-sm font-bold text-blue-950">Key Features</h3>
+              <ul className="space-y-2.5">
+                {[
+                  { label: "Bank Statement Analysis", desc: "Upload and analyze bank statements across multiple accounts." },
+                  { label: "Transaction Intelligence", desc: "Identify patterns, counterparties, and financial relationships." },
+                  { label: "Financial Investigation Reports", desc: "Generate NCRP, GST, CIN, and case-level investigation reports." },
+                  { label: "Case Management", desc: "Create, manage, and track investigation cases end-to-end." },
+                ].map((feature) => (
+                  <li key={feature.label} className="flex items-start gap-3">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600" />
+                    <span className="text-sm text-slate-600">
+                      <span className="font-semibold text-slate-800">{feature.label}:</span>{" "}
+                      {feature.desc}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Support */}
+            <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <svg
+                  className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">
+                    Need assistance or have a technical issue?
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700">
+                    Please contact your system administrator for access issues,
+                    permission changes, or technical support.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* HELP MODAL FOOTER */}
+          <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-7">
+            <button
+              type="button"
+              onClick={() => setHelpModalOpen(false)}
+              className="rounded-xl bg-emerald-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900"
+            >
+              Close
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  };
+
+  // USER TOP HEADER (desktop only — hidden on mobile which has its own top bar)
+  const UserTopHeader = () => {
+    const leftOffset = sidebarCollapsed ? 84 : 272;
+
+    return (
+      <>
+        {/* Scoped dropdown animation */}
+        <style>{`
+          @keyframes basHeaderDropdownIn {
+            from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0)   scale(1); }
+          }
+          .bas-header-dropdown-enter {
+            animation: basHeaderDropdownIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+        `}</style>
+
+        <header
+          className="fixed top-0 right-0 z-40 hidden h-[64px] items-center justify-end border-b border-slate-200 bg-white px-6 shadow-sm lg:flex"
+          style={{
+            left: `${leftOffset}px`,
+            transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+          aria-label="Top application header"
+        >
+          {/* RIGHT-ALIGNED CONTROLS: Date -> Welcome -> Profile */}
+          <div className="relative flex items-center gap-4 sm:gap-5">
+            {/* Date badge */}
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold tracking-wider text-slate-500 shrink-0">
+              <svg className="h-3.5 w-3.5 text-emerald-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+            </span>
+
+            {/* Welcome message */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="h-4 w-0.5 rounded-full bg-emerald-500" />
+              <p className="whitespace-nowrap text-sm text-slate-500">
+                Welcome,{" "}
+                <span className="font-bold text-blue-950">
+                  {userLoading ? "Loading..." : displayUsername}
+                </span>
+              </p>
+            </div>
+
+            {/* Icon-only profile button */}
+            <button
+              id="bas-header-profile-btn"
+              type="button"
+              title="User menu"
+              aria-label="User menu"
+              aria-expanded={headerDropdownOpen}
+              aria-haspopup="true"
+              onClick={() => setHeaderDropdownOpen((prev) => !prev)}
+              className={[
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-all duration-200 select-none",
+                headerDropdownOpen
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700 shadow-sm"
+                  : "border-slate-200 bg-white text-slate-500 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 shadow-xs",
+              ].join(" ")}
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M5 20v-1.5a7 7 0 0 1 14 0V20H5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            {/* DROPDOWN MENU */}
+            {headerDropdownOpen && (
+              <div
+                id="bas-header-dropdown"
+                role="menu"
+                aria-label="Profile menu"
+                className="bas-header-dropdown-enter absolute right-0 top-[calc(100%+10px)] z-[200] w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+              >
+                {/* Dropdown user info card */}
+                <div className="flex items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-white px-4 py-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-lg font-bold text-emerald-800">
+                    {userInitial}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-blue-950">
+                      {displayUsername}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {displayEmail !== "-" ? displayEmail : formattedRole}
+                    </p>
+                    <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-bold tracking-wider text-emerald-800">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      {formattedRole}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Dropdown items */}
+                <div className="p-1.5">
+                  {/* Profile */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setHeaderDropdownOpen(false);
+                      setProfileModalOpen(true);
+                    }}
+                    className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-700 transition-all duration-150 hover:bg-emerald-50 hover:text-emerald-900"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition group-hover:border-emerald-200 group-hover:bg-emerald-100 group-hover:text-emerald-700">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+                        <path d="M5 20v-1.5a7 7 0 0 1 14 0V20H5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                    <span className="font-semibold">Profile</span>
+                  </button>
+
+                  {/* Help */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setHeaderDropdownOpen(false);
+                      setHelpModalOpen(true);
+                    }}
+                    className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-700 transition-all duration-150 hover:bg-emerald-50 hover:text-emerald-900"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition group-hover:border-emerald-200 group-hover:bg-emerald-100 group-hover:text-emerald-700">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+                        <path d="M12 17v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        <circle cx="12" cy="8" r="0.75" fill="currentColor" stroke="currentColor" strokeWidth="0.5" />
+                      </svg>
+                    </span>
+                    <span className="font-semibold">Help</span>
+                  </button>
+
+                  {/* Divider */}
+                  <div className="mx-3 my-1 h-px bg-slate-100" />
+
+                  {/* Logout */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setHeaderDropdownOpen(false);
+                      handleLogout();
+                    }}
+                    className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition-all duration-150 hover:bg-rose-50 hover:text-rose-700"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 transition group-hover:border-rose-200 group-hover:bg-rose-100 group-hover:text-rose-600">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path
+                          d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M18 15l3-3m0 0l-3-3m3 3H9"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    <span className="font-semibold">Logout</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </header>
+      </>
+    );
+  };
+
   // SIDEBAR NAVIGATION ITEMS COMPONENT
   const SidebarNavItems = ({ mobile = false }) => {
     const isCollapsed = sidebarCollapsed && !mobile;
@@ -1496,77 +1847,17 @@ function UserNavbar() {
         </button>
       </div>
 
-      {/* SYSTEM STATUS */}
-      <div
-        title="System online & healthy"
-        className={[
-          "mx-3 mt-4 flex items-center rounded-xl border border-emerald-100 bg-emerald-50/80 transition-all",
-          sidebarCollapsed
-            ? "justify-center p-2.5"
-            : "gap-2.5 px-3 py-3",
-        ].join(" ")}
-      >
-        <span className="relative flex h-2.5 w-2.5 shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-600" />
-        </span>
-
-        {!sidebarCollapsed && (
-          <span className="truncate whitespace-nowrap text-xs font-bold tracking-wider text-emerald-800">
-            SYSTEM ONLINE
-          </span>
-        )}
-      </div>
-
       {/* NAVIGATION MENU */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-5">
-        {!sidebarCollapsed && (
-          <p className="mb-3 px-3 text-xs font-bold uppercase tracking-widest text-slate-400">
-            Main Menu
-          </p>
-        )}
-
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-4 pb-5">
         <SidebarNavItems />
       </div>
 
-      {/* USER PROFILE AND LOGOUT */}
+      {/* SIDEBAR FOOTER */}
       <div className="border-t border-slate-200/80 p-3">
-        <div
-          className={
-            sidebarCollapsed
-              ? "flex flex-col items-center gap-2.5"
-              : "flex flex-col gap-2.5"
-          }
-        >
-          <ProfileButton />
-
-          <button
-            type="button"
-            title={sidebarCollapsed ? "Logout" : undefined}
-            aria-label="Logout"
-            onClick={handleLogout}
-            className={[
-              "flex items-center rounded-xl border border-red-100",
-              "text-sm font-semibold text-slate-600 transition-all duration-200 hover:bg-rose-50 hover:text-rose-600",
-              sidebarCollapsed
-                ? "mx-auto h-11 w-11 justify-center"
-                : "w-full gap-3 px-4 py-3",
-            ].join(" ")}
-          >
-            <LogoutIcon />
-            {!sidebarCollapsed && (
-              <span className="whitespace-nowrap">Logout</span>
-            )}
-          </button>
-        </div>
-
-        {/* SIDEBAR FOOTER */}
         {!sidebarCollapsed && (
-          <div className="mt-3 border-t border-slate-100 pt-2 text-center">
-            <p className="text-center text-xs text-slate-400">
-              ARTHBODH Financial Intelligence
-            </p>
-          </div>
+          <p className="text-center text-xs text-slate-400">
+            ARTHBODH Financial Intelligence
+          </p>
         )}
       </div>
     </aside>
@@ -1764,7 +2055,9 @@ function UserNavbar() {
       `}</style>
       {DesktopSidebar()}
       {MobileNavigation()}
+      {UserTopHeader()}
       {UserProfileModal()}
+      {HelpModal()}
     </>
   );
 }
