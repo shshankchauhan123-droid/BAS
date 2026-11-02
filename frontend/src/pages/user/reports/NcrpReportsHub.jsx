@@ -340,6 +340,10 @@ export default function NcrpReportsHub() {
       ? `/reports/ncrp-hierarchical-flow?caseId=${encodeURIComponent(activeCaseId)}`
       : "/reports/ncrp-hierarchical-flow";
 
+    const holdRecoveryRoute = activeCaseId
+      ? `/reports/ncrp-hold-recovery?caseId=${encodeURIComponent(activeCaseId)}`
+      : "/reports/ncrp-hold-recovery";
+
     return [
       {
         id: "ncrp-transaction-grid",
@@ -442,6 +446,43 @@ export default function NcrpReportsHub() {
               strokeLinejoin="round"
               strokeWidth="1.8"
               d="M4 6h4v4H4V6zm12 0h4v4h-4V6zM4 14h4v4H4v-4zm12 0h4v4h-4v-4zm-8-5h8M6 10v4m12-4v4"
+            />
+          </svg>
+        ),
+      },
+      {
+        id: "ncrp-hold-recovery",
+        reportNumber: "04",
+        title: "NCRP Hold Recovery Report",
+        category: "ncrp-analysis",
+        categoryLabel: "NCRP ANALYSIS",
+        status: "available",
+        isReady: true,
+        route: holdRecoveryRoute,
+        description:
+          "Analyze fraud exposure, bank-confirmed holds, withdrawal activity, recovery progress and unsecured amounts across NCRP investigation layers.",
+        features: [
+          "Fraud exposure overview (8 key metrics)",
+          "Hold and recovery status allocation",
+          "Layer-wise hold coverage decay across 9 layers",
+          "Institutional hold recovery compliance matrix",
+          "POS, ATM and cheque withdrawal analysis",
+          "Recovery tracking and legal distinction audit",
+          "Priority investigation follow-up actions",
+          "High-resolution vector PDF export",
+        ],
+        icon: (
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
             />
           </svg>
         ),

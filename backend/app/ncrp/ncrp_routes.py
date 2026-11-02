@@ -31,6 +31,7 @@ from app.ncrp.ncrp_schema import (
     NcrpTransactionPaginatedResponse,
     NcrpTransactionResponse,
     NcrpUploadResponse,
+    NcrpHoldRecoveryReportResponse,
 )
 from app.ncrp.ncrp_service import (
     delete_ncrp_file_service,
@@ -47,6 +48,7 @@ from app.ncrp.ncrp_service import (
     trace_ncrp_account_next_service,
     get_ncrp_edge_transactions_service,
     get_ncrp_sender_receivers_service,
+    get_ncrp_hold_recovery_report_service,
     validate_ncrp_case_access,
     view_ncrp_file_service,
 )
@@ -507,6 +509,27 @@ def get_ncrp_edge_transactions_route(
         case_id=case_id,
         user=current_user,
     )
+
+
+@router.get(
+    "/file/{file_id}/hold-recovery-report",
+    response_model=NcrpHoldRecoveryReportResponse,
+    summary="Get comprehensive NCRP Hold Recovery Report data across all 6 worksheets",
+)
+def get_ncrp_hold_recovery_report_route(
+    file_id: int,
+    case_id: Optional[int] = Query(None, description="Optional case validation"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve full audit data including fraud exposure, verified holds, bank matrix, withdrawals, and priority actions."""
+    return get_ncrp_hold_recovery_report_service(
+        db=db,
+        file_id=file_id,
+        user=current_user,
+        case_id=case_id,
+    )
+
 
 
 

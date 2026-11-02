@@ -456,3 +456,187 @@ class NcrpLayer1SourcesResponse(BaseModel):
     sources: List[NcrpLayer1SourceAccount] = []
 
 
+# =============================================================================
+# NCRP REPORT 04: HOLD RECOVERY REPORT SCHEMAS
+# =============================================================================
+
+
+class KpiCardDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    value: float
+    formatted_value: str
+    label: str
+    description: str
+    calculation_basis: str
+    verification_status: str
+
+
+class FraudExposureOverview(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    reported_fraud_amount: KpiCardDetail
+    reconciled_fraud_exposure: KpiCardDetail
+    trace_linked_volume: KpiCardDetail
+    amount_on_hold: KpiCardDetail
+    hold_coverage: KpiCardDetail
+    actual_recovered_amount: KpiCardDetail
+    unsecured_gap: KpiCardDetail
+    total_withdrawn_amount: KpiCardDetail
+
+
+class HoldAllocationCategory(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    category: str
+    amount: float
+    percentage: float
+    count: int
+    description: str
+    status: str
+
+
+class HoldAllocationSection(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    verified_hold_amount: float
+    partially_secured_amount: float
+    unsecured_amount: float
+    actual_recovered_amount: float
+    recovery_pending_amount: float
+    reported_lien_amount: float
+    categories: List[HoldAllocationCategory] = []
+
+
+class LayerHoldCoverageItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    layer: str
+    layer_num: int
+    accounts_count: int
+    tx_count: int
+    disputed_amount: float
+    verified_hold_amount: float
+    reported_lien_amount: float
+    hold_coverage_pct: float
+    unsecured_amount: float
+    withdrawals_amount: float
+    has_hold: bool
+    status: str
+    key_findings: str
+
+
+class BankComplianceItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    bank_name: str
+    accounts_count: int
+    disputed_exposure: float
+    verified_hold_amount: float
+    reported_lien_amount: float
+    actual_recovered_amount: float
+    pending_recovery_amount: float
+    unsecured_gap: float
+    hold_coverage_pct: float
+    latest_reported_action: Optional[str] = None
+    last_action_date: Optional[str] = None
+    verification_status: str
+    notes: Optional[str] = None
+
+
+class WithdrawalMethodSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    method: str
+    amount: float
+    record_count: int
+    percentage: float
+
+
+class WithdrawalRecordItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    method: str
+    bank: str
+    account: str
+    amount: float
+    disputed_amount: float
+    date: Optional[str] = None
+    utr: Optional[str] = None
+    ack_no: Optional[str] = None
+    details: Optional[str] = None
+    remarks: Optional[str] = None
+    layer: Optional[str] = None
+    row_number: int
+
+
+class WithdrawalSection(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    total_amount: float
+    total_count: int
+    methods: List[WithdrawalMethodSummary] = []
+    records: List[WithdrawalRecordItem] = []
+
+
+class RecoveryRecordItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    account: str
+    bank: str
+    recovered_amount: float
+    recovery_date: Optional[str] = None
+    bank_confirmation: Optional[str] = None
+    recipient_reference: Optional[str] = None
+    supporting_evidence: Optional[str] = None
+    verification_status: str
+
+
+class RecoveryEvidenceSection(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    has_explicit_recovery: bool
+    status_message: str
+    recovery_initiated_amount: float = 0.0
+    recovery_pending_amount: float = 0.0
+    recovery_completed_amount: float = 0.0
+    notes: str
+    records: List[RecoveryRecordItem] = []
+
+
+class PriorityFollowUpItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    priority: str
+    account: str
+    bank: str
+    layer: str
+    disputed_amount: float
+    verified_hold_amount: float
+    unsecured_gap: float
+    investigation_reason: str
+    recommended_action: str
+    risk_score: Optional[float] = None
+    hold_coverage_pct: Optional[float] = None
+
+
+class NcrpHoldRecoveryReportResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    file_id: int
+    case_id: int
+    filename: str
+    acknowledgement_no: Optional[str] = None
+    generated_at: str
+    overview: FraudExposureOverview
+    hold_allocation: HoldAllocationSection
+    layer_coverage: List[LayerHoldCoverageItem] = []
+    bank_matrix: List[BankComplianceItem] = []
+    withdrawals: WithdrawalSection
+    recovery_evidence: RecoveryEvidenceSection
+    priority_actions: List[PriorityFollowUpItem] = []
+
+
+

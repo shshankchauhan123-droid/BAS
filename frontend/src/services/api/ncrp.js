@@ -264,6 +264,20 @@ export function getNcrpEdgeTransactions(fileId, sourceAccount, targetAccount, op
   });
 }
 
+/**
+ * Get comprehensive NCRP Hold Recovery Report data across all 6 worksheets
+ */
+export function getNcrpHoldRecoveryReport(fileId, options = {}) {
+  const params = new URLSearchParams();
+  if (options.caseId) params.append("case_id", options.caseId);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/v1/ncrp/file/${fileId}/hold-recovery-report${queryString}`, {
+    method: "GET",
+  });
+}
+
+
 
 
 
