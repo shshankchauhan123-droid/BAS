@@ -640,3 +640,29 @@ class NcrpHoldRecoveryReportResponse(BaseModel):
 
 
 
+
+
+class NcrpInvestigationPriorityReportResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="allow")
+
+    file_id: int
+    case_id: int
+    filename: str
+    acknowledgement_no: Optional[str] = None
+    generated_at: str
+    report_title: Optional[str] = "NCRP Investigation Priority Report"
+    overview: Dict[str, Any] = {}
+    priority_distribution: Dict[str, Any] = {}
+    layer_heatmap: List[Dict[str, Any]] = []
+    layer_risk_heatmap: List[Dict[str, Any]] = []
+    high_priority_items: List[Dict[str, Any]] = []
+    cash_out_analysis: Dict[str, Any] = {}
+    cash_withdrawals: Dict[str, Any] = {}
+    investigation_gaps: List[Dict[str, Any]] = []
+    recommended_actions: List[Dict[str, Any]] = []
+    investigation_risk_heatmap: Dict[str, Any] = {}
+    risk_heatmap: Dict[str, Any] = {}
+    investigation_summary: Dict[str, Any] = {}
+    graph_data: Dict[str, Any] = {}
+    flow_graph: Dict[str, Any] = {}
+    methodology: Dict[str, Any] = {}

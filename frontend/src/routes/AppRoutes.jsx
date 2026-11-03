@@ -44,6 +44,7 @@ import NcrpTransactionReport from "../pages/user/reports/NcrpTransactionReport";
 import NcrpMoneyFlowReport from "../pages/user/reports/NcrpMoneyFlowReport";
 import NcrpHierarchicalFlowReport from "../pages/user/reports/NcrpHierarchicalFlowReport";
 import NcrpHoldRecoveryReport from "../pages/user/reports/NcrpHoldRecoveryReport";
+import NcrpInvestigationPriorityReport from "../pages/user/reports/NcrpInvestigationPriorityReport";
 import GstAdvanceSearch from "../pages/user/reports/GstAdvanceSearch";
 import CinAdvanceSearch from "../pages/user/reports/CinAdvanceSearch";
 
@@ -772,6 +773,51 @@ function AppRoutes() {
                 requiredPermission="can_ncrp_statement_analysis"
               >
                 <NcrpHoldRecoveryReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            REPORT 05 - NCRP INVESTIGATION PRIORITY REPORT
+        ====================================================== */}
+        <Route
+          path="/dashboard/cases/:caseId/reports/ncrp-investigation-priority"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpInvestigationPriorityReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports/ncrp-investigation-priority"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpInvestigationPriorityReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ncrp-investigation-priority"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpInvestigationPriorityReport />
               </RoleRoute>
             </ProtectedRoute>
           }

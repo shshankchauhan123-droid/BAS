@@ -281,3 +281,16 @@ export function getNcrpHoldRecoveryReport(fileId, options = {}) {
 
 
 
+
+/**
+ * Get comprehensive NCRP Investigation Priority Report data across all 6 worksheets
+ */
+export function getNcrpInvestigationPriorityReport(fileId, options = {}) {
+  const params = new URLSearchParams();
+  if (options.caseId) params.append("case_id", options.caseId);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/v1/ncrp/file/${fileId}/investigation-priority-report${queryString}`, {
+    method: "GET",
+  });
+}

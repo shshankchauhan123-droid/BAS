@@ -534,3 +534,27 @@ def get_ncrp_hold_recovery_report_route(
 
 
 
+
+
+from app.ncrp.ncrp_schema import NcrpInvestigationPriorityReportResponse
+from app.ncrp.ncrp_service import get_ncrp_investigation_priority_report_service
+
+
+@router.get(
+    "/file/{file_id}/investigation-priority-report",
+    response_model=NcrpInvestigationPriorityReportResponse,
+    summary="Get comprehensive NCRP Investigation Priority Report data across all 6 worksheets",
+)
+def get_ncrp_investigation_priority_report_route(
+    file_id: int,
+    case_id: Optional[int] = Query(None, description="Optional case validation"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve full audit data including priority scoring, evidence breakdown, bank gaps, cash dispersals, and recommended actions."""
+    return get_ncrp_investigation_priority_report_service(
+        db=db,
+        file_id=file_id,
+        user=current_user,
+        case_id=case_id,
+    )

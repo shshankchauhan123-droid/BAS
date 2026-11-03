@@ -11,11 +11,17 @@ from app.ncrp.ncrp_model import NcrpFile, NcrpTransaction
 
 def normalize_account_identifier(val: Any) -> str:
     """Normalize account/wallet identifiers by stripping leading placeholder delimiters
-    like '-:', '_:', ':', while strictly preserving leading zeros for string account numbers."""
+    like '-:', '_:', ':', converting scientific notation (e.g. 5.01E+13),
+    while strictly preserving leading zeros for string account numbers."""
     if val is None:
         return ""
     s = str(val).strip()
     s = re.sub(r"^[-_:\s]+", "", s).strip()
+    if re.match(r"^[-+]?\d*\.?\d+[eE][-+]?\d+$", s):
+        try:
+            s = str(int(float(s)))
+        except Exception:
+            pass
     return s
 
 

@@ -344,6 +344,10 @@ export default function NcrpReportsHub() {
       ? `/reports/ncrp-hold-recovery?caseId=${encodeURIComponent(activeCaseId)}`
       : "/reports/ncrp-hold-recovery";
 
+    const priorityReportRoute = activeCaseId
+      ? `/reports/ncrp-investigation-priority?caseId=${encodeURIComponent(activeCaseId)}`
+      : "/reports/ncrp-investigation-priority";
+
     return [
       {
         id: "ncrp-transaction-grid",
@@ -487,6 +491,44 @@ export default function NcrpReportsHub() {
           </svg>
         ),
       },
+      {
+        id: "ncrp-investigation-priority",
+        reportNumber: "05",
+        title: "NCRP Investigation Priority Report",
+        category: "ncrp-analysis",
+        categoryLabel: "NCRP ANALYSIS",
+        status: "available",
+        isReady: true,
+        route: priorityReportRoute,
+        description:
+          "Automated 0–100 forensic prioritization scoring across all 6 NCRP worksheets to identify critical cash-outs, unverified gaps, and evidence-grounded action steps.",
+        features: [
+          "Explainable 0–100 priority scoring across 5 weighted factors",
+          "Non-double-counting exposure breakdown & triage tiers",
+          "Layer-wise risk heatmap & missing evidence tracking",
+          "Ranked suspect accounts & fund-flow triage table",
+          "Cash dispersal analysis (ATM, POS, Cheque & Transfers)",
+          "Bank-wise investigation gaps & missing evidence audit",
+          "Evidence-backed prioritized recommended investigation actions",
+          "Excel (.xlsx) and vector PDF export utilities",
+        ],
+        icon: (
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+              d="M13 10V3L4 14h7v7l9-11h-7z"
+            />
+          </svg>
+        ),
+      },
+
     ];
   }, [activeCaseId]);
 
