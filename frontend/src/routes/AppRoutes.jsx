@@ -45,6 +45,7 @@ import NcrpMoneyFlowReport from "../pages/user/reports/NcrpMoneyFlowReport";
 import NcrpHierarchicalFlowReport from "../pages/user/reports/NcrpHierarchicalFlowReport";
 import NcrpHoldRecoveryReport from "../pages/user/reports/NcrpHoldRecoveryReport";
 import NcrpInvestigationPriorityReport from "../pages/user/reports/NcrpInvestigationPriorityReport";
+import NcrpFundFlowTraceabilityReport from "../pages/user/reports/NcrpFundFlowTraceabilityReport";
 import GstAdvanceSearch from "../pages/user/reports/GstAdvanceSearch";
 import CinAdvanceSearch from "../pages/user/reports/CinAdvanceSearch";
 
@@ -818,6 +819,49 @@ function AppRoutes() {
                 requiredPermission="can_ncrp_statement_analysis"
               >
                 <NcrpInvestigationPriorityReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            REPORT 06 - NCRP FUND FLOW TRACEABILITY REPORT
+        ====================================================== */}
+        <Route
+          path="/dashboard/cases/:caseId/reports/ncrp-fund-flow-traceability"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpFundFlowTraceabilityReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/reports/ncrp-fund-flow-traceability"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpFundFlowTraceabilityReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/ncrp-fund-flow-traceability"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpFundFlowTraceabilityReport />
               </RoleRoute>
             </ProtectedRoute>
           }

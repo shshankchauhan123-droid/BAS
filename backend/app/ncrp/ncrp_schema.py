@@ -666,3 +666,24 @@ class NcrpInvestigationPriorityReportResponse(BaseModel):
     graph_data: Dict[str, Any] = {}
     flow_graph: Dict[str, Any] = {}
     methodology: Dict[str, Any] = {}
+
+
+class NcrpFundFlowTraceabilityReportResponse(BaseModel):
+    """Schema for Report 06: NCRP Fund Flow Traceability Report."""
+    model_config = ConfigDict(from_attributes=True, extra="allow")
+
+    file_id: int
+    case_id: int
+    filename: str
+    generated_at: str
+    report_title: Optional[str] = "NCRP Fund Flow Traceability Report"
+    starting_accounts: List[Dict[str, Any]] = []
+    selected_starting_account: Optional[str] = "ALL"
+    summary_kpis: Dict[str, Any] = {}
+    graph: Dict[str, Any] = {}
+    accounts_summary: List[Dict[str, Any]] = []
+    transactions: List[Dict[str, Any]] = []
+    terminal_accounts: List[Dict[str, Any]] = []
+    broken_links_and_gaps: List[Dict[str, Any]] = []
+    suggested_actions: List[Dict[str, Any]] = []
+

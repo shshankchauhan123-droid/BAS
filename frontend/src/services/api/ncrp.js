@@ -294,3 +294,20 @@ export function getNcrpInvestigationPriorityReport(fileId, options = {}) {
     method: "GET",
   });
 }
+
+/**
+ * Get comprehensive NCRP Fund Flow Traceability Report data across all worksheets
+ */
+export function getNcrpFundFlowTraceabilityReport(fileId, options = {}) {
+  const params = new URLSearchParams();
+  if (options.caseId) params.append("case_id", options.caseId);
+  if (options.startingAccount && options.startingAccount !== "ALL") {
+    params.append("starting_account", options.startingAccount);
+  }
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/v1/ncrp/file/${fileId}/fund-flow-traceability${queryString}`, {
+    method: "GET",
+  });
+}
+

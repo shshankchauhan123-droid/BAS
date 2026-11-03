@@ -1068,3 +1068,38 @@ def get_ncrp_investigation_priority_report_service(
         file_id=file_id,
         case_id=ncrp_file.case_id,
     )
+
+
+from app.ncrp.ncrp_traceability_service import get_ncrp_fund_flow_traceability_report_data
+
+
+def get_ncrp_fund_flow_traceability_service(
+    db: Session,
+    file_id: int,
+    user: User,
+    case_id: Optional[int] = None,
+    starting_account: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Retrieve comprehensive analytical data for the NCRP Fund Flow Traceability Report with access control."""
+    ncrp_file = get_ncrp_file_by_id(db=db, file_id=file_id)
+    if not ncrp_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"NCRP file with ID {file_id} not found.",
+        )
+
+    if case_id is not None and ncrp_file.case_id != case_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"NCRP file {file_id} does not belong to case {case_id}.",
+        )
+
+    validate_ncrp_case_access(db, ncrp_file.case_id, user, require_reports=True)
+
+    return get_ncrp_fund_flow_traceability_report_data(
+        db=db,
+        file_id=file_id,
+        case_id=ncrp_file.case_id,
+        starting_account=starting_account,
+    )
+

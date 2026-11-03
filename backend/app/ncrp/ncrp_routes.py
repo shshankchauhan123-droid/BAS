@@ -558,3 +558,30 @@ def get_ncrp_investigation_priority_report_route(
         user=current_user,
         case_id=case_id,
     )
+
+
+from app.ncrp.ncrp_schema import NcrpFundFlowTraceabilityReportResponse
+from app.ncrp.ncrp_service import get_ncrp_fund_flow_traceability_service
+
+
+@router.get(
+    "/file/{file_id}/fund-flow-traceability",
+    response_model=NcrpFundFlowTraceabilityReportResponse,
+    summary="Get comprehensive NCRP Fund Flow Traceability Report data across all worksheets",
+)
+def get_ncrp_fund_flow_traceability_route(
+    file_id: int,
+    case_id: Optional[int] = Query(None, description="Optional case validation"),
+    starting_account: Optional[str] = Query(None, description="Optional starting account filter"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve full fund-flow traceability graph, terminal accounts, investigation gaps, and suggested actions."""
+    return get_ncrp_fund_flow_traceability_service(
+        db=db,
+        file_id=file_id,
+        user=current_user,
+        case_id=case_id,
+        starting_account=starting_account,
+    )
+
