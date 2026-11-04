@@ -2,6 +2,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
     status,
 )
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.authentication.auth_controller import (
     change_first_login_password_controller,
     dismiss_first_login_controller,
+    get_last_login_controller,
     login,
     refresh_access_token,
     signup,
@@ -17,6 +19,7 @@ from app.authentication.auth_service import AuthException
 from app.authentication.auth_schema import (
     FirstLoginPasswordRequest,
     FirstLoginResponse,
+    LastLoginResponse,
     LoginRequest,
     LoginResponse,
     RefreshTokenRequest,
@@ -72,12 +75,18 @@ def signup_route(
 )
 def login_route(
     data: LoginRequest,
+    request: Request = None,
     db: Session = Depends(get_db),
 ):
+    ip_address = None
+    if request and hasattr(request, "client") and request.client:
+        ip_address = request.client.host
+
     try:
         response = login(
             db=db,
             data=data,
+            ip_address=ip_address,
         )
 
         # Notify active Admin dashboards of the successful login via WebSocket
@@ -181,5 +190,30 @@ def dismiss_first_login_route(
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        )
+
+# ============================================================
+# LAST LOGIN
+# ============================================================
+
+@router.get(
+    "/last-login",
+    response_model=LastLoginResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get last successful login timestamp for current authenticated user",
+)
+def get_last_login_route(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return get_last_login_controller(
+            db=db,
+            current_user=current_user,
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
         )

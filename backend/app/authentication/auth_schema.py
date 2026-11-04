@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
 from app.user.user_schema import UserPermissionsSchema
@@ -75,3 +76,11 @@ class FirstLoginPasswordRequest(BaseModel):
 class FirstLoginResponse(BaseModel):
     message: str
     user: UserResponse
+
+class LastLoginResponse(BaseModel):
+    success: bool = True
+    user_id: int
+    username: str
+    last_login: datetime | None = None
+    last_login_at: datetime | None = None
+    formatted_last_login: str | None = None

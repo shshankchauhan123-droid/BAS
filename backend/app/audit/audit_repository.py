@@ -123,3 +123,27 @@ def count_distinct_logins_today_for_client(
         )
     )
     return db.scalar(statement) or 0
+
+
+def get_last_login_for_user(
+    db: Session,
+    user_id: int,
+) -> datetime | None:
+    """
+    Retrieve the most recent successful login timestamp for a specific user from audit logs.
+    Only successful login events (action == 'USER_LOGIN') are considered.
+    Returns None if no login record exists.
+    """
+    record = (
+        db.query(AuditLog.created_at)
+        .filter(
+            AuditLog.user_id == user_id,
+            func.upper(AuditLog.action) == "USER_LOGIN",
+        )
+        .order_by(AuditLog.created_at.desc())
+        .first()
+    )
+    if record and record[0]:
+        return record[0]
+    return None
+

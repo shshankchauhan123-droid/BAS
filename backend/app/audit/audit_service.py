@@ -8,6 +8,7 @@ from app.audit.audit_repository import (
     create_audit_log,
     get_audit_logs,
     get_audit_stats,
+    get_last_login_for_user,
 )
 from app.core.roles import ADMIN_ROLE, CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, USER_ROLE
 from app.user.user_model import User
@@ -200,3 +201,12 @@ def get_audit_stats_for_actor(
 
 def get_today_login_count_for_client(db: Session, client_id: int) -> int:
     return count_distinct_logins_today_for_client(db=db, client_id=client_id)
+
+
+def get_user_last_login(db: Session, user_id: int) -> datetime | None:
+    """
+    Get the timestamp of the last successful login for a given user ID.
+    Derived strictly from the audit log repository.
+    """
+    return get_last_login_for_user(db=db, user_id=user_id)
+

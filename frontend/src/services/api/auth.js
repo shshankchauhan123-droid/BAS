@@ -64,3 +64,12 @@ export function dismissFirstLogin() {
     method: "POST",
   });
 }
+
+/**
+ * Retrieve the last successful login timestamp for the currently authenticated user.
+ */
+export function getLastLogin() {
+  return apiRequest("/api/v1/auth/last-login", {
+    method: "GET",
+  });
+}

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { getUserById } from "../../services/api/user";
+import { getLastLogin } from "../../services/api/auth";
 
 /**
  * ARTHBODH — Banking Analytical System
@@ -27,6 +28,11 @@ function UserNavbar() {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [userDetails, setUserDetails] = useState(user || null);
   const [userLoading, setUserLoading] = useState(false);
+  const [lastLoginData, setLastLoginData] = useState({
+    timestamp: null,
+    formatted: null,
+    loading: true,
+  });
 
   const isUploadRoute =
     location.pathname.startsWith("/dashboard/upload") ||
@@ -114,6 +120,78 @@ function UserNavbar() {
       isMounted = false;
     };
   }, [userId, user]);
+
+  // FETCH LAST LOGIN FOR AUTHENTICATED USER (strictly from backend audit logs)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchLastLoginDetails() {
+      if (!userId) {
+        if (isMounted) {
+          setLastLoginData({ timestamp: null, formatted: null, loading: false });
+        }
+        return;
+      }
+
+      try {
+        setLastLoginData((prev) => ({ ...prev, loading: true }));
+        const response = await getLastLogin();
+        const payload = response?.data ?? response;
+        const rawTime = payload?.last_login_at || payload?.last_login || null;
+        const formattedTime = payload?.formatted_last_login || null;
+
+        if (isMounted) {
+          setLastLoginData({
+            timestamp: rawTime,
+            formatted: formattedTime,
+            loading: false,
+          });
+        }
+      } catch (err) {
+        console.warn("Could not fetch user last login:", err);
+        if (isMounted) {
+          setLastLoginData({ timestamp: null, formatted: null, loading: false });
+        }
+      }
+    }
+
+    fetchLastLoginDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
+
+  // Compute display string for authenticated user's last login
+  const displayLastLogin = (() => {
+    if (lastLoginData.loading) {
+      return "Last login: Loading...";
+    }
+    if (lastLoginData.formatted) {
+      return `Last Login: ${lastLoginData.formatted}`;
+    }
+    if (lastLoginData.timestamp) {
+      try {
+        const d = new Date(lastLoginData.timestamp);
+        if (!isNaN(d.getTime())) {
+          const formatted = d.toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata",
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+          const cleanFormatted = formatted.replace(/\b(am|pm)\b/i, (m) => m.toUpperCase());
+          return `Last Login: ${cleanFormatted}`;
+        }
+      } catch (e) {
+        console.error("Error formatting last login date:", e);
+      }
+    }
+    return "Last login: Not available";
+  })();
 
   // ADJUST MAIN CONTENT WHEN SIDEBAR COLLAPSES (also manages top-header offset)
   useEffect(() => {
@@ -1233,13 +1311,29 @@ function UserNavbar() {
         >
           {/* RIGHT-ALIGNED CONTROLS: Date -> Welcome -> Profile */}
           <div className="relative flex items-center gap-4 sm:gap-5">
-            {/* Date badge */}
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold tracking-wider text-slate-500 shrink-0">
-              <svg className="h-3.5 w-3.5 text-emerald-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            {/* Last login badge (derived from authenticated user audit log) */}
+            <span
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold tracking-wider text-slate-500 shrink-0 select-none"
+              title={
+                lastLoginData.timestamp
+                  ? `Authenticated session timestamp: ${displayLastLogin}`
+                  : "No prior login records found"
+              }
+            >
+              <svg
+                className="h-3.5 w-3.5 text-emerald-600 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
               </svg>
-              {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+              {displayLastLogin}
             </span>
 
             {/* Welcome message */}

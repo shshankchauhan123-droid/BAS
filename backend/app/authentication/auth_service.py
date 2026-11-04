@@ -61,6 +61,7 @@ def login_user(
     username: str,
     password: str,
     company_code: str | None = None,
+    ip_address: str | None = None,
 ) -> User:
 
     cleaned = username.strip()
@@ -181,6 +182,7 @@ def login_user(
             actor=user,
             client_id=user.client_id,
             details={"role": str(user.role).lower(), "email": user.email},
+            ip_address=ip_address,
         )
     except Exception as exc:
         import logging
@@ -193,6 +195,7 @@ def change_first_login_password(
     db: Session,
     user: User,
     new_password: str,
+    ip_address: str | None = None,
 ) -> User:
 
     if not user.first_login:
@@ -223,6 +226,7 @@ def change_first_login_password(
             actor=user,
             client_id=user.client_id,
             details={"role": str(user.role).lower(), "email": user.email},
+            ip_address=ip_address,
         )
     except Exception as exc:
         import logging
@@ -234,6 +238,7 @@ def change_first_login_password(
 def dismiss_first_login(
     db: Session,
     user: User,
+    ip_address: str | None = None,
 ) -> User:
 
     user.first_login = False
@@ -254,6 +259,7 @@ def dismiss_first_login(
             actor=user,
             client_id=user.client_id,
             details={"role": str(user.role).lower(), "email": user.email},
+            ip_address=ip_address,
         )
     except Exception as exc:
         import logging

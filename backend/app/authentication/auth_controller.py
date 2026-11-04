@@ -10,6 +10,7 @@ from app.authentication.auth_schema import (
     SignupRequest,
     SignupResponse,
     UserResponse,
+    LastLoginResponse,
 )
 from app.authentication.auth_service import (
     change_first_login_password,
@@ -91,6 +92,7 @@ def signup(
 def login(
     db: Session,
     data: LoginRequest,
+    ip_address: str | None = None,
 ) -> LoginResponse:
 
     user = login_user(
@@ -98,6 +100,7 @@ def login(
         username=data.username,
         password=data.password,
         company_code=data.company_code,
+        ip_address=ip_address,
     )
 
     access_token = create_access_token(
@@ -202,4 +205,39 @@ def dismiss_first_login_controller(
     return FirstLoginResponse(
         message="First login dismissed",
         user=_format_user_response(updated_user),
+    )
+
+def get_last_login_controller(
+    db: Session,
+    current_user: User,
+) -> LastLoginResponse:
+    from app.audit.audit_service import get_user_last_login
+
+    last_login_dt = get_user_last_login(db=db, user_id=current_user.id)
+    formatted_str = None
+
+    if last_login_dt is not None:
+        try:
+            import zoneinfo
+            ist = zoneinfo.ZoneInfo("Asia/Kolkata")
+        except Exception:
+            from datetime import timedelta, timezone
+            ist = timezone(timedelta(hours=5, minutes=30))
+
+        if last_login_dt.tzinfo is None:
+            from datetime import timezone
+            dt_utc = last_login_dt.replace(tzinfo=timezone.utc)
+        else:
+            dt_utc = last_login_dt
+
+        dt_ist = dt_utc.astimezone(ist)
+        formatted_str = dt_ist.strftime("%d %b %Y, %I:%M %p")
+
+    return LastLoginResponse(
+        success=True,
+        user_id=current_user.id,
+        username=current_user.username,
+        last_login=last_login_dt,
+        last_login_at=last_login_dt,
+        formatted_last_login=formatted_str,
     )

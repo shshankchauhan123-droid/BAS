@@ -12,6 +12,7 @@ from app.user.user_controller import (
     update_user_status_controller,
 )
 from app.user.user_model import User
+from app.authentication.auth_schema import LastLoginResponse
 from app.user.user_schema import (
     UserCreateRequest,
     UserListResponse,
@@ -87,6 +88,30 @@ def create_user_route(
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        )
+
+
+@router.get(
+    "/me/last-login",
+    response_model=LastLoginResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get last successful login timestamp for current authenticated user",
+)
+def get_my_last_login_route(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.authentication.auth_controller import get_last_login_controller
+
+    try:
+        return get_last_login_controller(
+            db=db,
+            current_user=current_user,
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
         )
 
