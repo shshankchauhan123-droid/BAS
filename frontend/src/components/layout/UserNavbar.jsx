@@ -347,7 +347,24 @@ function UserNavbar() {
         currentPath === "/superadmin" ||
         (currentPath.startsWith("/superadmin/") &&
           !currentPath.startsWith("/superadmin/cases") &&
-          !currentPath.startsWith("/superadmin/io-master"))
+          !currentPath.startsWith("/superadmin/io-master") &&
+          !currentPath.startsWith("/superadmin/support"))
+      );
+    }
+
+    if (path === "/superadmin/support") {
+      return (
+        currentPath === "/superadmin/support" ||
+        currentPath.startsWith("/superadmin/support/") ||
+        currentPath === "/superadmin/tickets"
+      );
+    }
+
+    if (path === "/dashboard/support") {
+      return (
+        currentPath === "/dashboard/support" ||
+        currentPath.startsWith("/dashboard/support/") ||
+        currentPath === "/support"
       );
     }
 
@@ -910,6 +927,27 @@ function UserNavbar() {
         },
       ],
     },
+    {
+      label: "Help & Support",
+      path: "/superadmin/support",
+      visible: isSuperAdmin,
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          className="w-5 h-5 shrink-0"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          <line x1="9" y1="10" x2="15" y2="10" />
+          <line x1="12" y1="7" x2="12" y2="13" />
+        </svg>
+      ),
+    },
   ];
 
   // AVATAR COMPONENT
@@ -1423,7 +1461,7 @@ function UserNavbar() {
                     role="menuitem"
                     onClick={() => {
                       setHeaderDropdownOpen(false);
-                      setHelpModalOpen(true);
+                      goTo(isSuperAdmin ? "/superadmin/support" : "/dashboard/support");
                     }}
                     className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-700 transition-all duration-150 hover:bg-emerald-50 hover:text-emerald-900"
                   >

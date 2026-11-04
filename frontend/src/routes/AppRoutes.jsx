@@ -21,6 +21,8 @@ import ChangePassword from "../pages/auth/ChangePassword";
 import SuperAdminDashboard from "../pages/superadmin/SuperAdminDashboard";
 import SuperAdminCaseList from "../pages/superadmin/SuperAdminCaseList";
 import SuperAdminIOMasterList from "../pages/superadmin/SuperAdminIOMasterList";
+import SuperAdminSupportPage from "../pages/superadmin/SuperAdminSupportPage";
+import HelpSupportPage from "../pages/user/support/HelpSupportPage";
 import ClientAdminDashboard from "../pages/clientAdmin/ClientAdminDashboard";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import UserDashboard from "../pages/user/UserDashboard";
@@ -178,6 +180,24 @@ function AppRoutes() {
         />
 
         {/* =====================================================
+            SUPER ADMIN SUPPORT TICKET MANAGEMENT
+        ====================================================== */}
+        <Route
+          path="/superadmin/support"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["superadmin", "admin"]}>
+                <SuperAdminSupportPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/superadmin/tickets"
+          element={<Navigate to="/superadmin/support" replace />}
+        />
+
+        {/* =====================================================
             USER CASE MANAGEMENT
 
             Authentication required
@@ -253,6 +273,24 @@ function AppRoutes() {
               </RoleRoute>
             </ProtectedRoute>
           }
+        />
+
+        {/* =====================================================
+            USER HELP & SUPPORT
+        ====================================================== */}
+        <Route
+          path="/dashboard/support"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "admin", "client_admin", "superadmin"]}>
+                <HelpSupportPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/support"
+          element={<Navigate to="/dashboard/support" replace />}
         />
 
         {/* =====================================================

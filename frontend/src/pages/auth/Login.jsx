@@ -306,7 +306,7 @@ function Login() {
       const fieldErrors = {};
 
       if (code === "USER_NOT_FOUND") {
-        userTitle = "Invalid Username";
+        userTitle = "Invalid Username or Email";
         userMessage = "Invalid username or email. Please check your credentials.";
         fieldErrors.username = userMessage;
       } else if (code === "INVALID_PASSWORD") {

@@ -123,10 +123,12 @@ function SearchableSelect({
       >
         <span className="truncate pr-2">
           {selectedItem ? (
-            <span className="flex items-center gap-2">
-              <span className="font-semibold text-[#172554]">{selectedItem.label}</span>
+            <span className="flex items-center gap-2 min-w-0">
+              <span className="font-semibold text-[#172554] truncate" title={selectedItem.label}>
+                {selectedItem.label}
+              </span>
               {selectedItem.subtitle && (
-                <span className="text-[11px] text-[#64748B] font-normal truncate">
+                <span className="text-[11px] text-[#64748B] font-normal truncate shrink-0">
                   ({selectedItem.subtitle})
                 </span>
               )}
@@ -192,10 +194,12 @@ function SearchableSelect({
                       isSelected ? "bg-emerald-50 font-semibold text-emerald-800" : "text-[#1E293B]"
                     }`}
                   >
-                    <div className="flex flex-col truncate pr-2">
-                      <span className="truncate">{opt.label}</span>
+                    <div className="flex flex-col truncate pr-2 min-w-0">
+                      <span className="truncate font-semibold text-[#172554]" title={opt.label}>
+                        {opt.label}
+                      </span>
                       {opt.subtitle && (
-                        <span className="text-[10px] text-[#64748B]">{opt.subtitle}</span>
+                        <span className="text-[10px] text-[#64748B] truncate">{opt.subtitle}</span>
                       )}
                     </div>
                     {opt.badge && (
@@ -210,6 +214,105 @@ function SearchableSelect({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Reusable Pagination Controls for Report Tables
+ */
+function ReportTablePagination({
+  currentPage = 1,
+  pageSize = 10,
+  totalItems = 0,
+  onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = [10, 25, 50],
+}) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const startItem = totalItems === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1;
+  const endItem = Math.min(safeCurrentPage * pageSize, totalItems);
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 mt-2 border-t border-[#E2E8F0] text-xs text-[#64748B]">
+      {/* Showing indicator and page-size selector */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span>
+          Showing <strong className="text-[#172554]">{startItem}–{endItem}</strong> of{" "}
+          <strong className="text-[#172554]">{totalItems}</strong> records
+        </span>
+
+        <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+          <label className="text-[#64748B] text-[11px] whitespace-nowrap">
+            Rows per page:
+          </label>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              const newSize = Number(e.target.value);
+              if (onPageSizeChange) {
+                onPageSizeChange(newSize);
+              }
+            }}
+            className="rounded-lg border border-[#CBD5E1] bg-white px-2 py-1 text-xs font-semibold text-[#172554] outline-none focus:border-emerald-500"
+          >
+            {pageSizeOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Page navigation buttons */}
+      <div className="flex items-center gap-1.5 self-end sm:self-auto">
+        <button
+          type="button"
+          onClick={() => onPageChange(1)}
+          disabled={safeCurrentPage <= 1 || totalItems === 0}
+          aria-label="First page"
+          title="First page"
+          className="px-2 py-1 rounded-lg border border-[#CBD5E1] bg-white text-[#334155] font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          «
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(safeCurrentPage - 1)}
+          disabled={safeCurrentPage <= 1 || totalItems === 0}
+          aria-label="Previous page"
+          className="px-2.5 py-1 rounded-lg border border-[#CBD5E1] bg-white text-[#334155] font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          ‹ Prev
+        </button>
+
+        <span className="px-2.5 py-1 text-xs font-medium text-[#172554]">
+          Page <b>{totalItems === 0 ? 0 : safeCurrentPage}</b> of <b>{totalPages}</b>
+        </span>
+
+        <button
+          type="button"
+          onClick={() => onPageChange(safeCurrentPage + 1)}
+          disabled={safeCurrentPage >= totalPages || totalItems === 0}
+          aria-label="Next page"
+          className="px-2.5 py-1 rounded-lg border border-[#CBD5E1] bg-white text-[#334155] font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          Next ›
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(totalPages)}
+          disabled={safeCurrentPage >= totalPages || totalItems === 0}
+          aria-label="Last page"
+          title="Last page"
+          className="px-2 py-1 rounded-lg border border-[#CBD5E1] bg-white text-[#334155] font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          »
+        </button>
+      </div>
     </div>
   );
 }
@@ -249,7 +352,19 @@ export default function NcrpInvestigationPriorityReport() {
 
   // Charts references
   const distributionChartRef = useRef(null);
-  const flowGraphRef = useRef(null);
+
+  // Table Pagination States (Default 10 rows per page)
+  const [layerPage, setLayerPage] = useState(1);
+  const [layerPageSize, setLayerPageSize] = useState(10);
+
+  const [triagePage, setTriagePage] = useState(1);
+  const [triagePageSize, setTriagePageSize] = useState(10);
+
+  const [dispersalPage, setDispersalPage] = useState(1);
+  const [dispersalPageSize, setDispersalPageSize] = useState(10);
+
+  const [bankMatrixPage, setBankMatrixPage] = useState(1);
+  const [bankMatrixPageSize, setBankMatrixPageSize] = useState(10);
 
   // 1. Load cases on mount
   useEffect(() => {
@@ -413,82 +528,7 @@ export default function NcrpInvestigationPriorityReport() {
     };
   }, [reportData]);
 
-  // Flow Graph Chart (DAG Visualization)
-  useEffect(() => {
-    if (!reportData || !flowGraphRef.current) return;
-    const flowData = reportData.flow_graph || reportData.graph_data || {};
-    const rawNodes = flowData.nodes || [];
-    const rawLinks = flowData.links || flowData.edges || [];
-    if (!rawNodes || rawNodes.length === 0) return;
 
-    const chartInstance = echarts.init(flowGraphRef.current);
-
-    const nodes = rawNodes.map((n) => {
-      let color = "#3B82F6";
-      if (n.category === "SOURCE") color = "#10B981";
-      else if (n.category === "CASH_OUT") color = "#EF4444";
-      else if (n.category === "HELD") color = "#059669";
-      else if (n.priority_tier === "CRITICAL") color = "#E11D48";
-      else if (n.priority_tier === "HIGH") color = "#D97706";
-
-      return {
-        id: n.id,
-        name: n.name || n.id,
-        symbolSize: n.symbolSize || 30,
-        itemStyle: { color },
-        label: { show: true, fontSize: 10, color: "#1E293B" },
-        tooltip: {
-          formatter: `<div class="p-1">
-            <div class="font-bold text-xs">${n.name || n.id}</div>
-            <div class="text-[11px] text-slate-500">${n.bank || "Unknown Bank"} | ${n.layer || "Layer"}</div>
-            <div class="text-[11px] font-semibold text-emerald-700">Amount: ₹${formatIndianCurrency(n.amount)}</div>
-            ${n.priority_score ? `<div class="text-[11px] text-rose-600">Priority Score: ${n.priority_score}</div>` : ""}
-          </div>`,
-        },
-      };
-    });
-
-    const links = rawLinks.map((l) => ({
-      source: l.source,
-      target: l.target,
-      lineStyle: {
-        width: Math.min(Math.max((l.amount || 1000) / 20000, 1.5), 6),
-        curveness: 0.15,
-        color: l.match_status === "CONFIRMED" ? "#059669" : l.match_status === "PROBABLE" ? "#3B82F6" : "#F59E0B",
-        type: l.match_status === "UNCERTAIN" ? "dashed" : "solid",
-      },
-    }));
-
-    const option = {
-      tooltip: {},
-      animationDurationUpdate: 500,
-      series: [
-        {
-          type: "graph",
-          layout: "force",
-          force: {
-            repulsion: 180,
-            edgeLength: [60, 140],
-            gravity: 0.08,
-          },
-          roam: true,
-          label: { position: "right" },
-          edgeSymbol: ["none", "arrow"],
-          edgeSymbolSize: 6,
-          nodes,
-          links,
-        },
-      ],
-    };
-
-    chartInstance.setOption(option);
-    const handleResize = () => chartInstance.resize();
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      chartInstance.dispose();
-    };
-  }, [reportData]);
 
   // Filtered High Priority Items
   const filteredPriorityItems = useMemo(() => {
@@ -527,6 +567,66 @@ export default function NcrpInvestigationPriorityReport() {
     });
     return Array.from(set).sort();
   }, [reportData]);
+
+  // Reset table pagination pages on case or workbook change
+  useEffect(() => {
+    setLayerPage(1);
+    setTriagePage(1);
+    setDispersalPage(1);
+    setBankMatrixPage(1);
+  }, [selectedCaseId, selectedFileId]);
+
+  // Reset triage page when filters or search change
+  useEffect(() => {
+    setTriagePage(1);
+  }, [tierFilter, bankFilter, layerFilter, accountSearch]);
+
+  // Reset dispersal page when active dispersal tab changes
+  useEffect(() => {
+    setDispersalPage(1);
+  }, [activeDispersalTab]);
+
+  // Section C: Layer Heatmap Data & Slicing
+  const layerHeatmapItems = useMemo(() => {
+    return reportData?.layer_heatmap || reportData?.layer_risk_heatmap || [];
+  }, [reportData]);
+
+  const paginatedLayerHeatmap = useMemo(() => {
+    const start = (layerPage - 1) * layerPageSize;
+    return layerHeatmapItems.slice(start, start + layerPageSize);
+  }, [layerHeatmapItems, layerPage, layerPageSize]);
+
+  // Section D: Triage Table Slicing (operates on filteredPriorityItems)
+  const paginatedPriorityItems = useMemo(() => {
+    const start = (triagePage - 1) * triagePageSize;
+    return filteredPriorityItems.slice(start, start + triagePageSize);
+  }, [filteredPriorityItems, triagePage, triagePageSize]);
+
+  // Section E: Cash Withdrawal & Dispersal Data & Slicing
+  const activeDispersalItems = useMemo(() => {
+    if (!reportData) return [];
+    const cashSrc = reportData.cash_out_analysis || reportData.cash_withdrawals || {};
+    if (activeDispersalTab === "ATM") return cashSrc.atm_withdrawals || [];
+    if (activeDispersalTab === "POS") return cashSrc.pos_transactions || cashSrc.pos_withdrawals || [];
+    if (activeDispersalTab === "CHEQUE") return cashSrc.cheque_withdrawals || [];
+    return cashSrc.downstream_transfers || cashSrc.other_dispersals || [];
+  }, [reportData, activeDispersalTab]);
+
+  const paginatedDispersalItems = useMemo(() => {
+    const start = (dispersalPage - 1) * dispersalPageSize;
+    return activeDispersalItems.slice(start, start + dispersalPageSize);
+  }, [activeDispersalItems, dispersalPage, dispersalPageSize]);
+
+  // Section H: Bank Concentration Matrix Data & Slicing
+  const bankMatrixItems = useMemo(() => {
+    if (!reportData) return [];
+    return reportData.risk_heatmap?.bank_matrix || reportData.investigation_risk_heatmap?.bank_concentration || [];
+  }, [reportData]);
+
+  const paginatedBankMatrix = useMemo(() => {
+    const start = (bankMatrixPage - 1) * bankMatrixPageSize;
+    return bankMatrixItems.slice(start, start + bankMatrixPageSize);
+  }, [bankMatrixItems, bankMatrixPage, bankMatrixPageSize]);
 
   // Excel Export Handler
   const handleExportExcel = () => {
@@ -682,12 +782,56 @@ export default function NcrpInvestigationPriorityReport() {
   }, [cases]);
 
   const fileOptions = useMemo(() => {
-    return ncrpFiles.map((f) => ({
-      id: f.id,
-      label: f.filename,
-      subtitle: f.acknowledgement_no ? `Ack: ${f.acknowledgement_no}` : "NCRP Workbook",
-      badge: f.upload_date ? new Date(f.upload_date).toLocaleDateString() : "",
-    }));
+    return ncrpFiles.map((f) => {
+      // 1. Resolve actual uploaded filename from backend fields with safe fallback
+      const rawName = f?.original_filename || f?.filename || f?.file_name;
+      const displayFilename =
+        typeof rawName === "string" && rawName.trim()
+          ? rawName.trim()
+          : `Unnamed NCRP Workbook (${f?.id ? `#${f.id}` : "Unknown ID"})`;
+
+      // 2. Build subtitle details (Ack number if available, row count, file ID to distinguish duplicates)
+      const subParts = [];
+      if (f?.acknowledgement_no) {
+        subParts.push(`Ack: ${f.acknowledgement_no}`);
+      }
+      if (f?.total_rows !== undefined && f?.total_rows !== null && f.total_rows > 0) {
+        subParts.push(`${f.total_rows} rows`);
+      } else if (f?.imported_rows !== undefined && f?.imported_rows !== null && f.imported_rows > 0) {
+        subParts.push(`${f.imported_rows} rows`);
+      }
+      if (f?.id) {
+        subParts.push(`ID: #${f.id}`);
+      }
+
+      // 3. Format badge (formatted upload date or status)
+      const uploadDateStr = f?.created_at || f?.upload_date;
+      let badge = "";
+      if (uploadDateStr) {
+        try {
+          const d = new Date(uploadDateStr);
+          if (!isNaN(d.getTime())) {
+            badge = d.toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            });
+          }
+        } catch {
+          badge = "";
+        }
+      }
+      if (!badge && f?.status) {
+        badge = String(f.status);
+      }
+
+      return {
+        id: f.id,
+        label: displayFilename,
+        subtitle: subParts.join(" • "),
+        badge,
+      };
+    });
   }, [ncrpFiles]);
 
   const overview = reportData?.overview || {};
@@ -1015,40 +1159,18 @@ export default function NcrpInvestigationPriorityReport() {
               </div>
             )}
 
-            {/* SECTION B & J: Priority Distribution & Hierarchical Flow Graph */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* Distribution Chart (5 cols) */}
-              <div className="lg:col-span-5 rounded-2xl border border-[#DCE5EF] bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-bold text-[#172554] uppercase tracking-wider flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-purple-500" />
-                    Section B: Priority Distribution
-                  </h3>
-                  <span className="text-[11px] text-[#64748B]">
-                    Total Events: <b>{reportData.priority_distribution?.total_items || 0}</b>
-                  </span>
-                </div>
-                <div ref={distributionChartRef} className="h-64 w-full" />
+            {/* SECTION B: Priority Distribution */}
+            <div className="rounded-2xl border border-[#DCE5EF] bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-[#172554] uppercase tracking-wider flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-purple-500" />
+                  Section B: Priority Distribution
+                </h3>
+                <span className="text-[11px] text-[#64748B]">
+                  Total Events: <b>{reportData.priority_distribution?.total_items || 0}</b>
+                </span>
               </div>
-
-              {/* Hierarchical Flow Visualization (7 cols) */}
-              <div className="lg:col-span-7 rounded-2xl border border-[#DCE5EF] bg-white p-4 shadow-sm flex flex-col">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-bold text-[#172554] uppercase tracking-wider flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    Section J: Hierarchical Money Flow DAG
-                  </h3>
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <span className="flex items-center gap-1 text-emerald-700">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" /> Confirmed Link
-                    </span>
-                    <span className="flex items-center gap-1 text-amber-700">
-                      <span className="h-2 w-2 rounded-full bg-amber-500" /> Probable/Uncertain
-                    </span>
-                  </div>
-                </div>
-                <div ref={flowGraphRef} className="h-64 w-full flex-1" />
-              </div>
+              <div ref={distributionChartRef} className="h-64 w-full" />
             </div>
 
             {/* SECTION C: Layer-wise Risk Heatmap */}
@@ -1079,57 +1201,77 @@ export default function NcrpInvestigationPriorityReport() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F1F5F9]">
-                    {(reportData.layer_heatmap || reportData.layer_risk_heatmap || []).map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-2.5 px-3 font-bold text-[#172554]">{row.layer}</td>
-                        <td className="py-2.5 px-3 text-center font-semibold text-[#334155]">
-                          {row.accounts_count}
-                        </td>
-                        <td className="py-2.5 px-3 text-[#475569]">
-                          <div className="flex flex-wrap gap-1 max-w-xs">
-                            {(row.banks || []).slice(0, 3).map((b, bIdx) => (
-                              <span key={bIdx} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-700">
-                                {b}
-                              </span>
-                            ))}
-                            {(row.banks || []).length > 3 && (
-                              <span className="text-[10px] text-slate-400 font-medium">
-                                +{(row.banks || []).length - 3} more
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-bold text-emerald-700">
-                          ₹{formatIndianCurrency(row.unique_traced_amount)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-bold text-rose-600">
-                          ₹{formatIndianCurrency(row.cash_out_amount)}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          {row.has_verified_hold ? (
-                            <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
-                              HELD (₹{formatIndianCurrency(row.verified_held_amount)})
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
-                              UNSECURED
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-bold text-rose-600">
-                          {row.critical_count}
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-bold text-amber-600">
-                          {row.high_count}
-                        </td>
-                        <td className="py-2.5 px-3 text-[#64748B] text-[11px]">
-                          {row.missing_evidence_summary || "Complete"}
+                    {layerHeatmapItems.length === 0 ? (
+                      <tr>
+                        <td colSpan="9" className="py-6 text-center text-xs text-[#94A3B8]">
+                          No layer risk data available for this workbook.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      paginatedLayerHeatmap.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-2.5 px-3 font-bold text-[#172554]">{row.layer}</td>
+                          <td className="py-2.5 px-3 text-center font-semibold text-[#334155]">
+                            {row.accounts_count}
+                          </td>
+                          <td className="py-2.5 px-3 text-[#475569]">
+                            <div className="flex flex-wrap gap-1 max-w-xs">
+                              {(row.banks || []).slice(0, 3).map((b, bIdx) => (
+                                <span key={bIdx} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-700">
+                                  {b}
+                                </span>
+                              ))}
+                              {(row.banks || []).length > 3 && (
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  +{(row.banks || []).length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-bold text-emerald-700">
+                            ₹{formatIndianCurrency(row.unique_traced_amount)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-bold text-rose-600">
+                            ₹{formatIndianCurrency(row.cash_out_amount)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {row.has_verified_hold ? (
+                              <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
+                                HELD (₹{formatIndianCurrency(row.verified_held_amount)})
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                                UNSECURED
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-bold text-rose-600">
+                            {row.critical_count}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-bold text-amber-600">
+                            {row.high_count}
+                          </td>
+                          <td className="py-2.5 px-3 text-[#64748B] text-[11px]">
+                            {row.missing_evidence_summary || "Complete"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
+
+              {/* Section C Pagination */}
+              <ReportTablePagination
+                currentPage={layerPage}
+                pageSize={layerPageSize}
+                totalItems={layerHeatmapItems.length}
+                onPageChange={setLayerPage}
+                onPageSizeChange={(newSize) => {
+                  setLayerPageSize(newSize);
+                  setLayerPage(1);
+                }}
+              />
             </div>
 
             {/* SECTION D: High-Priority Transactions & Accounts (Triage Table) */}
@@ -1227,7 +1369,7 @@ export default function NcrpInvestigationPriorityReport() {
                         </td>
                       </tr>
                     ) : (
-                      filteredPriorityItems.map((item, idx) => {
+                      paginatedPriorityItems.map((item, idx) => {
                         const isCritical = item.tier === "CRITICAL";
                         const isHigh = item.tier === "HIGH";
                         const isMedium = item.tier === "MEDIUM";
@@ -1329,6 +1471,18 @@ export default function NcrpInvestigationPriorityReport() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Section D Pagination */}
+              <ReportTablePagination
+                currentPage={triagePage}
+                pageSize={triagePageSize}
+                totalItems={filteredPriorityItems.length}
+                onPageChange={setTriagePage}
+                onPageSizeChange={(newSize) => {
+                  setTriagePageSize(newSize);
+                  setTriagePage(1);
+                }}
+              />
             </div>
 
             {/* SECTION E: Cash Withdrawal & Dispersal Analysis */}
@@ -1380,25 +1534,14 @@ export default function NcrpInvestigationPriorityReport() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F1F5F9]">
-                    {(() => {
-                      const cashSrc = reportData.cash_out_analysis || reportData.cash_withdrawals || {};
-                      let items = [];
-                      if (activeDispersalTab === "ATM") items = cashSrc.atm_withdrawals || [];
-                      else if (activeDispersalTab === "POS") items = cashSrc.pos_transactions || cashSrc.pos_withdrawals || [];
-                      else if (activeDispersalTab === "CHEQUE") items = cashSrc.cheque_withdrawals || [];
-                      else items = cashSrc.downstream_transfers || cashSrc.other_dispersals || [];
-
-                      if (items.length === 0) {
-                        return (
-                          <tr>
-                            <td colSpan="6" className="py-6 text-center text-xs text-[#94A3B8]">
-                              No {activeDispersalTab} dispersal transactions reported in this NCRP workbook.
-                            </td>
-                          </tr>
-                        );
-                      }
-
-                      return items.map((w, wIdx) => (
+                    {activeDispersalItems.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="py-6 text-center text-xs text-[#94A3B8]">
+                          No {activeDispersalTab} dispersal transactions reported in this NCRP workbook.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedDispersalItems.map((w, wIdx) => (
                         <tr key={wIdx} className="hover:bg-slate-50 transition-colors">
                           <td className="py-2 px-3 font-mono text-[11px] text-[#334155]">{w.date || "-"}</td>
                           <td className="py-2 px-3">
@@ -1427,11 +1570,23 @@ export default function NcrpInvestigationPriorityReport() {
                             {w.recommended_lead || "Subpoena CCTV / Terminal Logs"}
                           </td>
                         </tr>
-                      ));
-                    })()}
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
+
+              {/* Section E Pagination */}
+              <ReportTablePagination
+                currentPage={dispersalPage}
+                pageSize={dispersalPageSize}
+                totalItems={activeDispersalItems.length}
+                onPageChange={setDispersalPage}
+                onPageSizeChange={(newSize) => {
+                  setDispersalPageSize(newSize);
+                  setDispersalPage(1);
+                }}
+              />
             </div>
 
             {/* SECTION F & G: Bank Gaps & Actionable Next Steps */}
@@ -1462,38 +1617,58 @@ export default function NcrpInvestigationPriorityReport() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F1F5F9]">
-                      {(reportData.risk_heatmap?.bank_matrix || reportData.investigation_risk_heatmap?.bank_concentration || []).map((bm, bIdx) => (
-                        <tr key={bIdx} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-2.5 px-3 font-bold text-[#172554]">{bm.bank_name}</td>
-                          <td className="py-2.5 px-3 text-center font-semibold text-[#475569]">{bm.accounts_count}</td>
-                          <td className="py-2.5 px-3 text-right font-bold text-[#172554]">
-                            ₹{formatIndianCurrency(bm.total_traced_amount)}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-bold text-rose-600">
-                            ₹{formatIndianCurrency(bm.cash_out_amount)}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-bold text-teal-700">
-                            ₹{formatIndianCurrency(bm.verified_held_amount)}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-bold text-amber-700">
-                            ₹{formatIndianCurrency(bm.unsecured_amount)}
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            {bm.unsecured_amount > 0 ? (
-                              <span className="rounded bg-rose-100 text-rose-800 px-2 py-0.5 text-[9px] font-bold">
-                                UNSECURED
-                              </span>
-                            ) : (
-                              <span className="rounded bg-teal-100 text-teal-800 px-2 py-0.5 text-[9px] font-bold">
-                                FULLY HELD
-                              </span>
-                            )}
+                      {bankMatrixItems.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="py-6 text-center text-xs text-[#94A3B8]">
+                            No bank exposure matrix data available.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        paginatedBankMatrix.map((bm, bIdx) => (
+                          <tr key={bIdx} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-2.5 px-3 font-bold text-[#172554]">{bm.bank_name}</td>
+                            <td className="py-2.5 px-3 text-center font-semibold text-[#475569]">{bm.accounts_count}</td>
+                            <td className="py-2.5 px-3 text-right font-bold text-[#172554]">
+                              ₹{formatIndianCurrency(bm.total_traced_amount)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold text-rose-600">
+                              ₹{formatIndianCurrency(bm.cash_out_amount)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold text-teal-700">
+                              ₹{formatIndianCurrency(bm.verified_held_amount)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold text-amber-700">
+                              ₹{formatIndianCurrency(bm.unsecured_amount)}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {bm.unsecured_amount > 0 ? (
+                                <span className="rounded bg-rose-100 text-rose-800 px-2 py-0.5 text-[9px] font-bold">
+                                  UNSECURED
+                                </span>
+                              ) : (
+                                <span className="rounded bg-teal-100 text-teal-800 px-2 py-0.5 text-[9px] font-bold">
+                                  FULLY HELD
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
+
+                {/* Section H Pagination */}
+                <ReportTablePagination
+                  currentPage={bankMatrixPage}
+                  pageSize={bankMatrixPageSize}
+                  totalItems={bankMatrixItems.length}
+                  onPageChange={setBankMatrixPage}
+                  onPageSizeChange={(newSize) => {
+                    setBankMatrixPageSize(newSize);
+                    setBankMatrixPage(1);
+                  }}
+                />
               </div>
             )}
           </div>

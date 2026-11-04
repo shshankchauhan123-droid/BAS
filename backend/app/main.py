@@ -16,6 +16,10 @@ from app.dashboard.dashboard_route import router as dashboard_router
 from app.ncrp.ncrp_routes import router as ncrp_router
 from app.gst.gst_router import router as gst_router
 from app.cin.cin_router import router as cin_router
+from app.support.support_route import (
+    user_support_router,
+    admin_support_router,
+)
 
 
 app = FastAPI(
@@ -55,6 +59,8 @@ app.include_router(dashboard_router)
 app.include_router(ncrp_router)
 app.include_router(gst_router)
 app.include_router(cin_router)
+app.include_router(user_support_router)
+app.include_router(admin_support_router)
 
 
 import re

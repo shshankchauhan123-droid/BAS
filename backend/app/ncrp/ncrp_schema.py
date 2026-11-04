@@ -33,6 +33,16 @@ class NcrpFileResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @computed_field
+    @property
+    def filename(self) -> str:
+        return self.original_filename
+
+    @computed_field
+    @property
+    def file_name(self) -> str:
+        return self.original_filename
+
 
 class NcrpUploadResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -51,6 +61,16 @@ class NcrpUploadResponse(BaseModel):
     created_at: datetime
     sheets_summary: List[SheetSummaryResponse] = []
     message: str = "NCRP Statement uploaded and imported successfully."
+
+    @computed_field
+    @property
+    def filename(self) -> str:
+        return self.original_filename
+
+    @computed_field
+    @property
+    def file_name(self) -> str:
+        return self.original_filename
 
 
 class NcrpTransactionResponse(BaseModel):

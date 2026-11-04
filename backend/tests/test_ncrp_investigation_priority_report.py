@@ -624,5 +624,20 @@ class TestNcrpInvestigationPriorityReport(unittest.TestCase):
         self.assertEqual(len(res["cash_out_analysis"]["downstream_transfers"]), 1)
         self.assertEqual(res["cash_out_analysis"]["downstream_transfers"][0]["amount"], 120000.00)
 
+    def test_25_ncrp_file_response_schema_returns_actual_filenames(self):
+        """Scenario 25: NcrpFileResponse schema exposes original_filename, filename, and file_name."""
+        from app.ncrp.ncrp_schema import NcrpFileResponse
+
+        f = self._create_file("NCRP_Complaint_12345.xlsx")
+        response_model = NcrpFileResponse.model_validate(f)
+        dumped = response_model.model_dump()
+
+        self.assertEqual(response_model.original_filename, "NCRP_Complaint_12345.xlsx")
+        self.assertEqual(response_model.filename, "NCRP_Complaint_12345.xlsx")
+        self.assertEqual(response_model.file_name, "NCRP_Complaint_12345.xlsx")
+        self.assertEqual(dumped["original_filename"], "NCRP_Complaint_12345.xlsx")
+        self.assertEqual(dumped["filename"], "NCRP_Complaint_12345.xlsx")
+        self.assertEqual(dumped["file_name"], "NCRP_Complaint_12345.xlsx")
+
 if __name__ == "__main__":
     unittest.main()
