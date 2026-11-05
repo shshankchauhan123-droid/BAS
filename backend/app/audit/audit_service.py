@@ -9,6 +9,8 @@ from app.audit.audit_repository import (
     get_audit_logs,
     get_audit_stats,
     get_last_login_for_user,
+    get_user_activity_logs,
+    get_user_activity_summary,
 )
 from app.core.roles import ADMIN_ROLE, CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, USER_ROLE
 from app.user.user_model import User
@@ -46,6 +48,26 @@ def sanitize_details(data: dict | None) -> dict:
     return sanitized
 
 
+def deduce_module(action: str, entity_type: str) -> str:
+    act = (action or "").upper()
+    ent = (entity_type or "").upper()
+    if "LOGIN" in act or "LOGOUT" in act or "AUTH" in ent or "PASSWORD" in act:
+        return "AUTH"
+    if "CASE" in act or "CASE" in ent:
+        return "CASE"
+    if "FILE" in act or "UPLOAD" in act or "FILE" in ent or "WORKBOOK" in ent:
+        return "UPLOAD"
+    if "REPORT" in act or "REPORT" in ent or "ANALYSIS" in act:
+        return "REPORT"
+    if "USER" in act or "CLIENT" in act or "IO" in act or "MASTER" in act or ent in {"USER", "CLIENT", "IO_MASTER"}:
+        return "ADMIN"
+    if "TICKET" in act or "SUPPORT" in act or "SUPPORT" in ent:
+        return "SUPPORT"
+    if "PAGE" in act or "DASHBOARD" in act:
+        return "DASHBOARD"
+    return "GENERAL"
+
+
 def record_audit_log(
     db: Session,
     action: str,
@@ -57,6 +79,9 @@ def record_audit_log(
     details: dict | None = None,
     client_id: int | None = None,
     ip_address: str | None = None,
+    module: str | None = None,
+    status: str | None = "SUCCESS",
+    user_agent: str | None = None,
 ) -> AuditLog:
     """
     Backend-controlled helper to record an append-only audit log entry.
@@ -77,6 +102,13 @@ def record_audit_log(
         user_role = "system"
         effective_client_id = client_id
 
+    effective_module = module if module else deduce_module(action, entity_type)
+    effective_status = (
+        status
+        if status
+        else ("FAILED" if "FAIL" in action.upper() or "ERROR" in action.upper() else "SUCCESS")
+    )
+
     log_entry = AuditLog(
         client_id=effective_client_id,
         user_id=user_id,
@@ -84,12 +116,15 @@ def record_audit_log(
         user_name=user_name,
         user_role=user_role,
         action=action.strip(),
+        module=effective_module.strip().upper(),
+        status=effective_status.strip().upper(),
         entity_type=entity_type.strip().lower(),
         entity_id=str(entity_id).strip(),
         entity_name=entity_name.strip() if entity_name else None,
         description=description.strip(),
         details=safe_details,
         ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return create_audit_log(db=db, audit_log=log_entry)
@@ -209,4 +244,95 @@ def get_user_last_login(db: Session, user_id: int) -> datetime | None:
     Derived strictly from the audit log repository.
     """
     return get_last_login_for_user(db=db, user_id=user_id)
+
+
+def list_my_activity_logs(
+    db: Session,
+    user: User,
+    page: int = 1,
+    page_size: int = 20,
+    module: str | None = None,
+    action: str | None = None,
+    status: str | None = None,
+    start_date: datetime | str | None = None,
+    end_date: datetime | str | None = None,
+    search: str | None = None,
+) -> tuple[list[AuditLog], int, int]:
+    """
+    List the authenticated user's own activity logs.
+    Strictly scoped to user.id - role-independent ownership.
+    """
+    parsed_start = None
+    parsed_end = None
+    if isinstance(start_date, str) and start_date.strip():
+        try:
+            parsed_start = datetime.fromisoformat(start_date.strip())
+        except ValueError:
+            pass
+    elif isinstance(start_date, datetime):
+        parsed_start = start_date
+
+    if isinstance(end_date, str) and end_date.strip():
+        try:
+            parsed_end = datetime.fromisoformat(end_date.strip())
+        except ValueError:
+            pass
+    elif isinstance(end_date, datetime):
+        parsed_end = end_date
+
+    return get_user_activity_logs(
+        db=db,
+        user_id=user.id,
+        page=page,
+        page_size=page_size,
+        module=module,
+        action=action,
+        status=status,
+        start_date=parsed_start,
+        end_date=parsed_end,
+        search=search,
+    )
+
+
+def get_my_activity_summary(
+    db: Session,
+    user: User,
+    module: str | None = None,
+    action: str | None = None,
+    status: str | None = None,
+    start_date: datetime | str | None = None,
+    end_date: datetime | str | None = None,
+    search: str | None = None,
+) -> dict:
+    """
+    Retrieve statistics and chart aggregations for the authenticated user's activity.
+    """
+    parsed_start = None
+    parsed_end = None
+    if isinstance(start_date, str) and start_date.strip():
+        try:
+            parsed_start = datetime.fromisoformat(start_date.strip())
+        except ValueError:
+            pass
+    elif isinstance(start_date, datetime):
+        parsed_start = start_date
+
+    if isinstance(end_date, str) and end_date.strip():
+        try:
+            parsed_end = datetime.fromisoformat(end_date.strip())
+        except ValueError:
+            pass
+    elif isinstance(end_date, datetime):
+        parsed_end = end_date
+
+    return get_user_activity_summary(
+        db=db,
+        user_id=user.id,
+        module=module,
+        action=action,
+        status=status,
+        start_date=parsed_start,
+        end_date=parsed_end,
+        search=search,
+    )
 

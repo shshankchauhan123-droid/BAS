@@ -61,6 +61,20 @@ class AuditLog(Base):
         index=True,
     )
 
+    module: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        index=True,
+    )
+
+    status: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        default="SUCCESS",
+        server_default="SUCCESS",
+        index=True,
+    )
+
     entity_type: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -94,6 +108,11 @@ class AuditLog(Base):
         nullable=True,
     )
 
+    user_agent: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -108,5 +127,6 @@ class AuditLog(Base):
 
     __table_args__ = (
         Index("ix_audit_logs_client_created", "client_id", "created_at"),
+        Index("ix_audit_logs_user_created", "user_id", "created_at"),
         Index("ix_audit_logs_entity", "entity_type", "entity_id"),
     )

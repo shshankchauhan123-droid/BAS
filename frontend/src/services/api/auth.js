@@ -73,3 +73,13 @@ export function getLastLogin() {
     method: "GET",
   });
 }
+
+/**
+ * Logout the currently authenticated user and record audit log.
+ */
+export function logoutUser() {
+  return apiRequest("/api/v1/auth/logout", {
+    method: "POST",
+  }).catch(() => {});
+}
+

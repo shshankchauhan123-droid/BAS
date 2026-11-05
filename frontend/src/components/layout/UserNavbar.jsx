@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { getUserById } from "../../services/api/user";
-import { getLastLogin } from "../../services/api/auth";
+import { getLastLogin, logoutUser } from "../../services/api/auth";
 
 /**
  * ARTHBODH — Banking Analytical System
@@ -535,6 +535,11 @@ function UserNavbar() {
   };
 
   const handleLogout = () => {
+    try {
+      logoutUser();
+    } catch (e) {
+      // Ignore network errors on logout
+    }
     try {
       logout();
     } catch (error) {
@@ -1480,6 +1485,34 @@ function UserNavbar() {
                     </button>
                   )}
 
+                  {/* Activity Logs for all roles */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setHeaderDropdownOpen(false);
+                      goTo("/activity-logs");
+                    }}
+                    className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-700 transition-all duration-150 hover:bg-emerald-50 hover:text-emerald-900"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition group-hover:border-emerald-200 group-hover:bg-emerald-100 group-hover:text-emerald-700">
+                      <svg
+                        className="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="9" />
+                        <polyline points="12 7 12 12 15 15" />
+                      </svg>
+                    </span>
+                    <span className="font-semibold">Logs</span>
+                  </button>
+
                   {/* Divider */}
                   <div className="mx-3 my-1 h-px bg-slate-100" />
 
@@ -2159,6 +2192,29 @@ function UserNavbar() {
               SYSTEM ONLINE
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              goTo("/activity-logs");
+            }}
+            className="mb-1 flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-900"
+          >
+            <svg
+              className="h-4 w-4 text-slate-500"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <polyline points="12 7 12 12 15 15" />
+            </svg>
+            <span>Activity Logs</span>
+          </button>
 
           <button
             type="button"

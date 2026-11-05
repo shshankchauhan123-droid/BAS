@@ -144,6 +144,25 @@ def login_user(
         password,
         user.password_hash,
     ):
+        try:
+            from app.audit.audit_service import record_audit_log
+            record_audit_log(
+                db=db,
+                action="USER_LOGIN_FAILED",
+                entity_type="user",
+                entity_id=str(user.id),
+                entity_name=user.username,
+                description=f"Failed login attempt for '{user.username}': incorrect password",
+                actor=user,
+                client_id=user.client_id,
+                details={"role": str(user.role).lower(), "email": user.email, "reason": "INVALID_PASSWORD"},
+                ip_address=ip_address,
+                module="AUTH",
+                status="FAILED",
+            )
+        except Exception:
+            pass
+
         raise AuthException(
             code="INVALID_PASSWORD",
             message="Incorrect password. Please try again.",
@@ -151,6 +170,25 @@ def login_user(
         )
 
     if not user.is_active:
+        try:
+            from app.audit.audit_service import record_audit_log
+            record_audit_log(
+                db=db,
+                action="USER_LOGIN_FAILED",
+                entity_type="user",
+                entity_id=str(user.id),
+                entity_name=user.username,
+                description=f"Failed login attempt for '{user.username}': account inactive",
+                actor=user,
+                client_id=user.client_id,
+                details={"role": str(user.role).lower(), "email": user.email, "reason": "ACCOUNT_INACTIVE"},
+                ip_address=ip_address,
+                module="AUTH",
+                status="FAILED",
+            )
+        except Exception:
+            pass
+
         raise AuthException(
             code="ACCOUNT_INACTIVE",
             message="User account is inactive. Please contact your administrator.",

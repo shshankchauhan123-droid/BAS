@@ -217,3 +217,43 @@ def get_last_login_route(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
         )
+
+# ============================================================
+# LOGOUT
+# ============================================================
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK,
+    summary="Logout user and record audit log",
+)
+def logout_route(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        from app.audit.audit_service import record_audit_log
+        ip_address = request.client.host if request and request.client else None
+        user_agent = request.headers.get("user-agent") if request else None
+
+        record_audit_log(
+            db=db,
+            action="USER_LOGOUT",
+            entity_type="user",
+            entity_id=str(current_user.id),
+            entity_name=current_user.username,
+            description=f"User '{current_user.username}' logged out",
+            actor=current_user,
+            client_id=current_user.client_id,
+            details={"role": str(current_user.role).lower(), "email": current_user.email},
+            ip_address=ip_address,
+            user_agent=user_agent,
+            module="AUTH",
+            status="SUCCESS",
+        )
+    except Exception:
+        pass
+
+    return {"success": True, "message": "Logged out successfully"}
+

@@ -9,7 +9,7 @@ from app.bank_transactions.bank_transaction_routes import (
     router as bank_transaction_router,
 )
 from app.client.client_route import router as client_router
-from app.audit.audit_route import router as audit_router
+from app.audit.audit_route import router as audit_router, activity_router
 from app.io_master.io_master_route import router as io_master_router
 from app.websocket.websocket_route import router as websocket_router
 from app.dashboard.dashboard_route import router as dashboard_router
@@ -54,6 +54,7 @@ app.include_router(user_router)
 app.include_router(file_router)
 app.include_router(bank_transaction_router)
 app.include_router(audit_router)
+app.include_router(activity_router)
 app.include_router(websocket_router)
 app.include_router(dashboard_router)
 app.include_router(ncrp_router)
