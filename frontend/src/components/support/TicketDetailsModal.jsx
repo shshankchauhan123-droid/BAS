@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
+import { useAuth } from "../../context/AuthContext";
 import {
   addAdminTicketReply,
   addMyTicketReply,
@@ -48,8 +49,14 @@ export default function TicketDetailsModal({
   onClose,
   ticketId,
   isAdmin = false,
+  isReadOnly = false,
   onUpdated,
 }) {
+  const { user } = useAuth();
+  const userRole = String(user?.role || "").toLowerCase();
+  const isClient = userRole === "client_admin";
+  const effectiveReadOnly = isReadOnly || (!isAdmin && isClient);
+
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -107,7 +114,7 @@ export default function TicketDetailsModal({
 
   const handlePostReply = async (e) => {
     e.preventDefault();
-    if (!replyText.trim()) return;
+    if (effectiveReadOnly || !replyText.trim()) return;
 
     try {
       setSubmittingReply(true);
@@ -282,7 +289,7 @@ export default function TicketDetailsModal({
                 )}
               </div>
               <h2 className="text-base font-extrabold text-blue-950 line-clamp-1 mt-0.5">
-                {ticket?.subject || "Loading..."}
+                {ticket?.subject || (error ? "Error Loading Ticket" : "Loading...")}
               </h2>
             </div>
           </div>
@@ -308,8 +315,29 @@ export default function TicketDetailsModal({
               <p className="text-sm font-semibold">Loading ticket data...</p>
             </div>
           ) : error ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-              {error}
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 mb-3 ring-1 ring-rose-200">
+                <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <h3 className="text-base font-bold text-slate-800 mb-1">
+                {String(error).toLowerCase().includes("permission") ||
+                String(error).toLowerCase().includes("access") ||
+                String(error).toLowerCase().includes("unauthorized")
+                  ? "Access Denied"
+                  : "Unable to Load Ticket"}
+              </h3>
+              <p className="text-xs text-slate-600 max-w-md mb-5">{error}</p>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl bg-slate-100 border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
+              >
+                Close
+              </button>
             </div>
           ) : ticket ? (
             <>
@@ -332,25 +360,35 @@ export default function TicketDetailsModal({
                   <p className="font-bold text-slate-800 mt-0.5">{formatIST(ticket.updated_at)}</p>
                 </div>
 
+                {/* Creator info for Client Admin or Admin */}
+                {(isAdmin || effectiveReadOnly || Boolean(ticket.user_name)) && (
+                  <div>
+                    <span className="text-slate-400 font-medium">Submitted By</span>
+                    <p className="font-bold text-slate-800 mt-0.5 truncate" title={ticket.user_name}>
+                      {ticket.user_name || "User"} {ticket.user_email ? `(${ticket.user_email})` : ""}
+                    </p>
+                  </div>
+                )}
+
                 {isAdmin && (
-                  <>
-                    <div>
-                      <span className="text-slate-400 font-medium">Client / Tenant</span>
-                      <p className="font-bold text-blue-950 mt-0.5">{ticket.client_name || "Direct Tenant"}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 font-medium">User</span>
-                      <p className="font-bold text-slate-800 mt-0.5">{ticket.user_name} ({ticket.user_email})</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 font-medium">Resolved At</span>
-                      <p className="font-bold text-slate-800 mt-0.5">{formatIST(ticket.resolved_at)}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 font-medium">Closed At</span>
-                      <p className="font-bold text-slate-800 mt-0.5">{formatIST(ticket.closed_at)}</p>
-                    </div>
-                  </>
+                  <div>
+                    <span className="text-slate-400 font-medium">Client / Tenant</span>
+                    <p className="font-bold text-blue-950 mt-0.5">{ticket.client_name || "Direct Tenant"}</p>
+                  </div>
+                )}
+
+                {(isAdmin || ticket.resolved_at) && (
+                  <div>
+                    <span className="text-slate-400 font-medium">Resolved At</span>
+                    <p className="font-bold text-slate-800 mt-0.5">{formatIST(ticket.resolved_at)}</p>
+                  </div>
+                )}
+
+                {(isAdmin || ticket.closed_at) && (
+                  <div>
+                    <span className="text-slate-400 font-medium">Closed At</span>
+                    <p className="font-bold text-slate-800 mt-0.5">{formatIST(ticket.closed_at)}</p>
+                  </div>
                 )}
               </div>
 
@@ -571,9 +609,23 @@ export default function TicketDetailsModal({
                 </div>
               </div>
 
-              {/* Reply Form / Disabled State */}
+              {/* Reply Form / Disabled State / Read-Only Client State */}
               <div className="border-t border-slate-200 pt-4">
-                {isReplyDisabled ? (
+                {effectiveReadOnly ? (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-xs text-blue-900">
+                    <div className="flex items-center gap-2 font-bold mb-1">
+                      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-blue-700 shrink-0" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                      <span>Client Read-Only Access</span>
+                    </div>
+                    <p className="text-blue-800/90 leading-relaxed">
+                      You are viewing this support ticket in read-only mode. Ticket creation, replies, and status updates are managed by the submitting user and Super Admins.
+                    </p>
+                  </div>
+                ) : isReplyDisabled ? (
                   <div className="space-y-3">
                     <div className="rounded-xl border border-slate-200 bg-slate-100 p-3.5 text-xs text-slate-700 flex items-center gap-2.5">
                       <svg

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "../../../context/AuthContext";
 import UserNavbar from "../../../components/layout/UserNavbar";
 import UserFooter from "../../../components/layout/UserFooter";
 import CreateTicketModal from "../../../components/support/CreateTicketModal";
@@ -38,6 +39,10 @@ const PRIORITY_BADGES = {
 };
 
 export default function HelpSupportPage() {
+  const { user } = useAuth();
+  const userRole = String(user?.role || "").toLowerCase();
+  const isClient = userRole === "client_admin";
+
   const [summary, setSummary] = useState({
     total: 0,
     open: 0,
@@ -142,21 +147,34 @@ export default function HelpSupportPage() {
                 </h1>
               </div>
               <p className="mt-1 text-xs sm:text-sm text-slate-500">
-                Create support tickets and track the resolution of your issues.
+                {isClient
+                  ? "View and track support tickets submitted by users across your organization (read-only)."
+                  : "Create support tickets and track the resolution of your issues."}
               </p>
             </div>
 
             <div className="flex shrink-0 sm:self-center">
-              <button
-                type="button"
-                onClick={() => setCreateModalOpen(true)}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition whitespace-nowrap min-w-[140px] w-full sm:w-auto"
-              >
-                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>Create Ticket</span>
-              </button>
+              {isClient ? (
+                <div className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/90 px-4 py-2 text-xs font-bold text-blue-800 shadow-xs">
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-blue-600 shrink-0" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                  <span>Client Read-Only Access</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCreateModalOpen(true)}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition whitespace-nowrap min-w-[140px] w-full sm:w-auto"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Create Ticket</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -308,19 +326,20 @@ export default function HelpSupportPage() {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <th className="py-3 px-4">Ticket ID</th>
+                    <th className="py-3 px-4">User / Creator</th>
                     <th className="py-3 px-4">Subject</th>
                     <th className="py-3 px-4">Category</th>
                     <th className="py-3 px-4">Priority</th>
+                    <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Created Date</th>
                     <th className="py-3 px-4">Last Updated</th>
-                    <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
                         <svg className="inline h-6 w-6 animate-spin text-emerald-600 mb-2" viewBox="0 0 24 24" fill="none">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -330,7 +349,7 @@ export default function HelpSupportPage() {
                     </tr>
                   ) : tickets.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-16 text-center">
+                      <td colSpan={9} className="py-16 text-center">
                         <div className="flex flex-col items-center justify-center">
                           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mb-3">
                             <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7" stroke="currentColor" strokeWidth="1.5">
@@ -342,9 +361,11 @@ export default function HelpSupportPage() {
                           <p className="text-xs text-slate-400 mt-1 max-w-sm">
                             {search || statusFilter || priorityFilter
                               ? "Try adjusting your search criteria or clear active filters."
+                              : isClient
+                              ? "No support requests have been submitted by users in your organization yet."
                               : "You haven't submitted any support requests yet. Click 'Create Ticket' above to get started."}
                           </p>
-                          {!search && !statusFilter && !priorityFilter && (
+                          {!isClient && !search && !statusFilter && !priorityFilter && (
                             <button
                               type="button"
                               onClick={() => setCreateModalOpen(true)}
@@ -370,6 +391,18 @@ export default function HelpSupportPage() {
                           <td className="py-3 px-4 font-mono font-bold text-blue-950">
                             {t.ticket_number}
                           </td>
+                          <td className="py-3 px-4">
+                            <div className="flex flex-col min-w-0 max-w-[150px]">
+                              <span className="font-bold text-slate-800 text-xs truncate" title={t.user_name || "User"}>
+                                {t.user_name || "Unknown"}
+                              </span>
+                              {t.user_email && (
+                                <span className="text-[11px] text-slate-400 truncate" title={t.user_email}>
+                                  {t.user_email}
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-3 px-4 font-semibold text-slate-800 max-w-xs truncate">
                             <div className="flex items-center gap-1.5 truncate">
                               <span className="truncate">{t.subject}</span>
@@ -388,12 +421,17 @@ export default function HelpSupportPage() {
                               )}
                             </div>
                           </td>
-                          <td className="py-3 px-4 text-slate-600">
+                          <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
                             {t.category}
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3 px-4 whitespace-nowrap">
                             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${prBadge}`}>
                               {t.priority.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${stBadge}`}>
+                              {t.status.replaceAll("_", " ").toUpperCase()}
                             </span>
                           </td>
                           <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
@@ -401,11 +439,6 @@ export default function HelpSupportPage() {
                           </td>
                           <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
                             {formatIST(t.updated_at)}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${stBadge}`}>
-                              {t.status.replaceAll("_", " ").toUpperCase()}
-                            </span>
                           </td>
                           <td className="py-3 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <button
@@ -456,18 +489,21 @@ export default function HelpSupportPage() {
 
       <UserFooter />
 
-      {/* Create Ticket Modal */}
-      <CreateTicketModal
-        isOpen={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        onSuccess={() => loadData()}
-      />
+      {/* Create Ticket Modal - Available only to regular users */}
+      {!isClient && (
+        <CreateTicketModal
+          isOpen={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onSuccess={() => loadData()}
+        />
+      )}
 
       {/* Ticket Details Drawer / Modal */}
       <TicketDetailsModal
         isOpen={detailsModalOpen}
         ticketId={selectedTicketId}
         isAdmin={false}
+        isReadOnly={isClient}
         onClose={() => setDetailsModalOpen(false)}
         onUpdated={() => loadData()}
       />

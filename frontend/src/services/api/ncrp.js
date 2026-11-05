@@ -311,3 +311,36 @@ export function getNcrpFundFlowTraceabilityReport(fileId, options = {}) {
   });
 }
 
+/**
+ * Get distinct accounts present across worksheets in an NCRP workbook
+ */
+export function getNcrpWorkbookAccounts(fileId, options = {}) {
+  const params = new URLSearchParams();
+  if (options.caseId) params.append("case_id", options.caseId);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/v1/ncrp/file/${fileId}/accounts${queryString}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Get comprehensive NCRP Account Activity & Exit Report (Report 07) data
+ */
+export function getNcrpAccountActivityReport(fileId, options = {}) {
+  const params = new URLSearchParams();
+  if (options.caseId) params.append("case_id", options.caseId);
+  if (options.account) params.append("account", options.account);
+  if (options.layer && options.layer !== "ALL") params.append("layer", options.layer);
+  if (options.txType && options.txType !== "ALL") params.append("tx_type", options.txType);
+  if (options.dateFrom) params.append("date_from", options.dateFrom);
+  if (options.dateTo) params.append("date_to", options.dateTo);
+  if (options.rapidThresholdMins) params.append("rapid_threshold_mins", options.rapidThresholdMins);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest(`/api/v1/ncrp/file/${fileId}/account-activity${queryString}`, {
+    method: "GET",
+  });
+}
+
+

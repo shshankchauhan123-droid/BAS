@@ -707,3 +707,54 @@ class NcrpFundFlowTraceabilityReportResponse(BaseModel):
     broken_links_and_gaps: List[Dict[str, Any]] = []
     suggested_actions: List[Dict[str, Any]] = []
 
+
+
+class NcrpWorkbookAccountItem(BaseModel):
+    """Single account item present in NCRP workbook."""
+    model_config = ConfigDict(from_attributes=True, extra="allow")
+
+    account: str
+    masked_account: str
+    bank: str
+    holder_name: Optional[str] = "Not provided"
+    layers: List[int] = []
+    total_transactions: int = 0
+    is_starting_account: bool = False
+
+
+class NcrpWorkbookAccountsResponse(BaseModel):
+    """List of all distinct accounts present in an NCRP workbook."""
+    model_config = ConfigDict(from_attributes=True, extra="allow")
+
+    file_id: int
+    case_id: int
+    filename: str
+    total_accounts: int
+    accounts: List[NcrpWorkbookAccountItem] = []
+
+
+class NcrpAccountActivityReportResponse(BaseModel):
+    """Schema for Report 07: NCRP Account Activity and Exit Report."""
+    model_config = ConfigDict(from_attributes=True, extra="allow")
+
+    file_id: int
+    case_id: int
+    filename: str
+    acknowledgement_no: Optional[str] = None
+    generated_at: str
+    report_title: Optional[str] = "NCRP Account Activity and Exit Report"
+    selected_account: str
+    selected_account_masked: str
+    available_accounts: List[Dict[str, Any]] = []
+    filters_applied: Dict[str, Any] = {}
+    kpi_cards: Dict[str, Any] = {}
+    account_profile: Dict[str, Any] = {}
+    timeline_transactions: List[Dict[str, Any]] = []
+    incoming_vs_outgoing: Dict[str, Any] = {}
+    rapid_fund_movement: Dict[str, Any] = {}
+    exit_activity: Dict[str, Any] = {}
+    last_traceable_activity: Dict[str, Any] = {}
+    amount_reconciliation: Dict[str, Any] = {}
+    suspicious_indicators: List[Dict[str, Any]] = []
+    data_quality_gaps: List[Dict[str, Any]] = []
+    suggested_actions: List[Dict[str, Any]] = []

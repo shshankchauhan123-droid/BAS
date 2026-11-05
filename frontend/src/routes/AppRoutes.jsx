@@ -48,6 +48,7 @@ import NcrpHierarchicalFlowReport from "../pages/user/reports/NcrpHierarchicalFl
 import NcrpHoldRecoveryReport from "../pages/user/reports/NcrpHoldRecoveryReport";
 import NcrpInvestigationPriorityReport from "../pages/user/reports/NcrpInvestigationPriorityReport";
 import NcrpFundFlowTraceabilityReport from "../pages/user/reports/NcrpFundFlowTraceabilityReport";
+import NcrpAccountActivityReport from "../pages/user/reports/NcrpAccountActivityReport";
 import GstAdvanceSearch from "../pages/user/reports/GstAdvanceSearch";
 import CinAdvanceSearch from "../pages/user/reports/CinAdvanceSearch";
 
@@ -59,6 +60,16 @@ import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 import PublicRoute from "./PublicRoute";
 import FirstLoginModal from "../components/auth/FirstLoginModal";
+import { useAuth } from "../context/AuthContext";
+
+function UniversalSupportRedirect() {
+  const { user } = useAuth();
+  const userRole = String(user?.role || "").toLowerCase();
+  if (userRole === "superadmin" || userRole === "admin") {
+    return <Navigate to="/superadmin/support" replace />;
+  }
+  return <Navigate to="/dashboard/support" replace />;
+}
 
 /* ============================================================
    404 PAGE
@@ -194,7 +205,13 @@ function AppRoutes() {
         />
         <Route
           path="/superadmin/tickets"
-          element={<Navigate to="/superadmin/support" replace />}
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["superadmin", "admin"]}>
+                <Navigate to="/superadmin/support" replace />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
         />
 
         {/* =====================================================
@@ -276,23 +293,36 @@ function AppRoutes() {
         />
 
         {/* =====================================================
-            USER HELP & SUPPORT
+            USER & CLIENT HELP & SUPPORT
         ====================================================== */}
         <Route
           path="/dashboard/support"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={["user", "admin", "client_admin", "superadmin"]}>
+              <RoleRoute allowedRoles={["user", "client_admin", "superadmin", "admin"]}>
                 <HelpSupportPage />
               </RoleRoute>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/support"
-          element={<Navigate to="/dashboard/support" replace />}
+          path="/client-admin/support"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["user", "client_admin", "superadmin", "admin"]}>
+                <Navigate to="/dashboard/support" replace />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
         />
-
+        <Route
+          path="/support"
+          element={
+            <ProtectedRoute>
+              <UniversalSupportRedirect />
+            </ProtectedRoute>
+          }
+        />
         {/* =====================================================
             CASE MANAGEMENT
             Accessible to User and SuperAdmin
@@ -900,6 +930,51 @@ function AppRoutes() {
                 requiredPermission="can_ncrp_statement_analysis"
               >
                 <NcrpFundFlowTraceabilityReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            REPORT 07 - NCRP ACCOUNT ACTIVITY & EXIT REPORT
+        ====================================================== */}
+        <Route
+          path="/dashboard/cases/:caseId/reports/ncrp-account-activity"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpAccountActivityReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/reports/ncrp-account-activity"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpAccountActivityReport />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ncrp-account-activity"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={["user", "admin", "superadmin", "client_admin"]}
+                requiredPermission="can_ncrp_statement_analysis"
+              >
+                <NcrpAccountActivityReport />
               </RoleRoute>
             </ProtectedRoute>
           }

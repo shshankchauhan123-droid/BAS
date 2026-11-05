@@ -306,6 +306,7 @@ function UserNavbar() {
 
   const casesPath = isSuperAdmin ? "/superadmin/cases" : "/dashboard/cases";
   const ioMasterPath = isSuperAdmin ? "/superadmin/io-master" : "/dashboard/io-master";
+  const supportPath = "/superadmin/support";
 
   const userPerms =
     userDetails?.permissions || user?.permissions || {};
@@ -356,14 +357,7 @@ function UserNavbar() {
       return (
         currentPath === "/superadmin/support" ||
         currentPath.startsWith("/superadmin/support/") ||
-        currentPath === "/superadmin/tickets"
-      );
-    }
-
-    if (path === "/dashboard/support") {
-      return (
-        currentPath === "/dashboard/support" ||
-        currentPath.startsWith("/dashboard/support/") ||
+        currentPath === "/superadmin/tickets" ||
         currentPath === "/support"
       );
     }
@@ -1455,25 +1449,36 @@ function UserNavbar() {
                     <span className="font-semibold">Profile</span>
                   </button>
 
-                  {/* Help */}
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setHeaderDropdownOpen(false);
-                      goTo(isSuperAdmin ? "/superadmin/support" : "/dashboard/support");
-                    }}
-                    className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-700 transition-all duration-150 hover:bg-emerald-50 hover:text-emerald-900"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition group-hover:border-emerald-200 group-hover:bg-emerald-100 group-hover:text-emerald-700">
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-                        <path d="M12 17v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        <circle cx="12" cy="8" r="0.75" fill="currentColor" stroke="currentColor" strokeWidth="0.5" />
-                      </svg>
-                    </span>
-                    <span className="font-semibold">Help</span>
-                  </button>
+                  {/* Help & Support for Client Admin and User / Investigator */}
+                  {!isSuperAdmin && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setHeaderDropdownOpen(false);
+                        goTo("/dashboard/support");
+                      }}
+                      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-700 transition-all duration-150 hover:bg-emerald-50 hover:text-emerald-900"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition group-hover:border-emerald-200 group-hover:bg-emerald-100 group-hover:text-emerald-700">
+                        <svg
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          <line x1="9" y1="10" x2="15" y2="10" />
+                          <line x1="12" y1="7" x2="12" y2="13" />
+                        </svg>
+                      </span>
+                      <span className="font-semibold">Help &amp; Support</span>
+                    </button>
+                  )}
 
                   {/* Divider */}
                   <div className="mx-3 my-1 h-px bg-slate-100" />

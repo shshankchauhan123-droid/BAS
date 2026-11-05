@@ -119,6 +119,10 @@ def create_user_ticket(
     data: TicketCreateRequest,
     attachment_file=None,
 ) -> SupportTicket:
+    is_client = str(user.role or "").lower() == "client_admin"
+    if is_client:
+        raise PermissionError("Client accounts have read-only access and cannot create support tickets.")
+
     ticket_number = get_next_ticket_number(db)
 
     orig_name = None
@@ -194,6 +198,19 @@ def list_my_tickets(
     page: int = 1,
     page_size: int = 10,
 ) -> tuple[list[SupportTicket], int, int]:
+    is_client = str(user.role or "").lower() == "client_admin"
+    if is_client:
+        return list_user_tickets(
+            db=db,
+            user_id=user.id,
+            search=search,
+            status=status,
+            priority=priority,
+            page=page,
+            page_size=page_size,
+            client_id=user.client_id if user.client_id is not None else -1,
+        )
+
     return list_user_tickets(
         db=db,
         user_id=user.id,
@@ -206,6 +223,14 @@ def list_my_tickets(
 
 
 def get_my_tickets_summary(db: Session, user: User) -> dict:
+    is_client = str(user.role or "").lower() == "client_admin"
+    if is_client:
+        return get_user_tickets_summary(
+            db=db,
+            user_id=user.id,
+            client_id=user.client_id if user.client_id is not None else -1,
+        )
+
     return get_user_tickets_summary(db=db, user_id=user.id)
 
 
@@ -218,11 +243,17 @@ def get_my_ticket_details(
     if not ticket:
         raise ValueError(f"Ticket with ID {ticket_id} not found.")
 
-    # Strict IDOR protection
-    if ticket.user_id != user.id:
-        raise PermissionError("Access denied. You cannot view tickets belonging to another user.")
+    is_client = str(user.role or "").lower() == "client_admin"
+    if is_client:
+        ticket_client_id = ticket.client_id or (ticket.user.client_id if ticket.user else None)
+        if user.client_id is None or ticket_client_id != user.client_id:
+            raise PermissionError("Access denied. You cannot view tickets belonging to another client organization.")
+    else:
+        # Strict IDOR protection for regular users
+        if ticket.user_id != user.id:
+            raise PermissionError("Access denied. You cannot view tickets belonging to another user.")
 
-    # Exclude internal admin notes for users
+    # Exclude internal admin notes for client_admin and users
     activities = get_ticket_activities(db, ticket_id, include_internal=False)
     return ticket, activities
 
@@ -233,6 +264,10 @@ def add_user_ticket_reply(
     ticket_id: int,
     message: str,
 ) -> TicketActivity:
+    is_client = str(user.role or "").lower() == "client_admin"
+    if is_client:
+        raise PermissionError("Client accounts have read-only access and cannot reply to tickets.")
+
     ticket = get_ticket_by_id(db, ticket_id)
     if not ticket:
         raise ValueError(f"Ticket with ID {ticket_id} not found.")
@@ -324,6 +359,9 @@ def update_ticket_admin(
     ticket_id: int,
     data: AdminTicketUpdateRequest,
 ) -> SupportTicket:
+    if str(admin.role).lower() not in {"superadmin", "admin"}:
+        raise PermissionError("Only Super Admins can update ticket status or assignment.")
+
     ticket = get_ticket_by_id(db, ticket_id)
     if not ticket:
         raise ValueError(f"Ticket with ID {ticket_id} not found.")
@@ -427,6 +465,9 @@ def add_admin_ticket_reply(
     message: str,
     is_internal: bool = False,
 ) -> TicketActivity:
+    if str(admin.role).lower() not in {"superadmin", "admin"}:
+        raise PermissionError("Only Super Admins can add admin replies or notes.")
+
     ticket = get_ticket_by_id(db, ticket_id)
     if not ticket:
         raise ValueError(f"Ticket with ID {ticket_id} not found.")
@@ -474,8 +515,14 @@ def get_user_ticket_attachment(
     if not ticket:
         raise ValueError(f"Ticket with ID {ticket_id} not found.")
 
-    if ticket.user_id != user.id:
-        raise PermissionError("Access denied. You cannot access attachments for tickets belonging to another user.")
+    is_client = str(user.role or "").lower() == "client_admin"
+    if is_client:
+        ticket_client_id = ticket.client_id or (ticket.user.client_id if ticket.user else None)
+        if user.client_id is None or ticket_client_id != user.client_id:
+            raise PermissionError("Access denied. You cannot access attachments for tickets belonging to another client organization.")
+    else:
+        if ticket.user_id != user.id:
+            raise PermissionError("Access denied. You cannot access attachments for tickets belonging to another user.")
 
     if not ticket.attachment_path or not ticket.attachment_filename:
         raise ValueError("This ticket does not have an attachment.")

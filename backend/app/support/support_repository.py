@@ -70,6 +70,7 @@ def list_user_tickets(
     priority: str | None = None,
     page: int = 1,
     page_size: int = 10,
+    client_id: int | None = None,
 ) -> tuple[list[SupportTicket], int, int]:
     query = (
         db.query(SupportTicket)
@@ -78,8 +79,18 @@ def list_user_tickets(
             joinedload(SupportTicket.user),
             joinedload(SupportTicket.assigned_admin),
         )
-        .filter(SupportTicket.user_id == user_id)
+        .outerjoin(User, SupportTicket.user_id == User.id)
     )
+
+    if client_id is not None:
+        query = query.filter(
+            or_(
+                SupportTicket.client_id == client_id,
+                User.client_id == client_id,
+            )
+        )
+    else:
+        query = query.filter(SupportTicket.user_id == user_id)
 
     if search and search.strip():
         term = f"%{search.strip().lower()}%"
@@ -88,6 +99,8 @@ def list_user_tickets(
                 func.lower(SupportTicket.ticket_number).like(term),
                 func.lower(SupportTicket.subject).like(term),
                 func.lower(SupportTicket.description).like(term),
+                func.lower(User.username).like(term),
+                func.lower(User.email).like(term),
             )
         )
 
@@ -114,8 +127,24 @@ def list_user_tickets(
     return items, total_count, total_pages
 
 
-def get_user_tickets_summary(db: Session, user_id: int) -> dict:
-    base_query = db.query(SupportTicket).filter(SupportTicket.user_id == user_id)
+def get_user_tickets_summary(
+    db: Session,
+    user_id: int,
+    client_id: int | None = None,
+) -> dict:
+    if client_id is not None:
+        base_query = (
+            db.query(SupportTicket)
+            .outerjoin(User, SupportTicket.user_id == User.id)
+            .filter(
+                or_(
+                    SupportTicket.client_id == client_id,
+                    User.client_id == client_id,
+                )
+            )
+        )
+    else:
+        base_query = db.query(SupportTicket).filter(SupportTicket.user_id == user_id)
     total = base_query.count()
     open_count = base_query.filter(func.lower(SupportTicket.status) == "open").count()
     in_progress = base_query.filter(func.lower(SupportTicket.status).in_(["in_progress", "waiting_user"])).count()

@@ -585,3 +585,65 @@ def get_ncrp_fund_flow_traceability_route(
         starting_account=starting_account,
     )
 
+
+
+from app.ncrp.ncrp_schema import (
+    NcrpWorkbookAccountsResponse,
+    NcrpAccountActivityReportResponse,
+)
+from app.ncrp.ncrp_service import (
+    get_ncrp_workbook_accounts_service,
+    get_ncrp_account_activity_report_service,
+)
+
+
+@router.get(
+    "/file/{file_id}/accounts",
+    response_model=NcrpWorkbookAccountsResponse,
+    summary="Get all distinct accounts present across worksheets in an NCRP workbook",
+)
+def get_ncrp_workbook_accounts_route(
+    file_id: int,
+    case_id: Optional[int] = Query(None, description="Optional case validation"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve all distinct accounts with transaction counts, banks, and layer indicators."""
+    return get_ncrp_workbook_accounts_service(
+        db=db,
+        file_id=file_id,
+        user=current_user,
+        case_id=case_id,
+    )
+
+
+@router.get(
+    "/file/{file_id}/account-activity",
+    response_model=NcrpAccountActivityReportResponse,
+    summary="Get comprehensive NCRP Account Activity & Exit Report (Report 07)",
+)
+def get_ncrp_account_activity_route(
+    file_id: int,
+    account: Optional[str] = Query(None, description="Selected suspicious account number"),
+    case_id: Optional[int] = Query(None, description="Optional case validation"),
+    layer: Optional[str] = Query(None, description="Optional filter by layer"),
+    tx_type: Optional[str] = Query(None, description="Optional filter by transaction direction/type"),
+    date_from: Optional[str] = Query(None, description="Optional start date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Optional end date (YYYY-MM-DD)"),
+    rapid_threshold_mins: int = Query(60, description="Rapid fund movement threshold in minutes"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve forensic account-level fund movement, rapid exit velocity, timeline, and destinations."""
+    return get_ncrp_account_activity_report_service(
+        db=db,
+        file_id=file_id,
+        user=current_user,
+        account=account,
+        case_id=case_id,
+        layer_filter=layer,
+        tx_type_filter=tx_type,
+        date_from=date_from,
+        date_to=date_to,
+        rapid_threshold_mins=rapid_threshold_mins,
+    )

@@ -86,6 +86,11 @@ async def create_ticket_route(
             data=data,
             attachment_file=attachment_file,
         )
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        )
     except (ValueError, ValidationError) as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -210,6 +215,11 @@ def add_my_ticket_reply_route(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(err),
         )
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        )
     except ValueError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -257,6 +267,46 @@ def download_my_ticket_attachment_route(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(err),
         )
+
+
+@user_support_router.delete(
+    "/tickets/{ticket_id}",
+    summary="Delete ticket (Forbidden for clients and regular users)",
+)
+def delete_ticket_route(
+    ticket_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Clients and regular users cannot delete support tickets.",
+    )
+
+
+@user_support_router.patch(
+    "/tickets/{ticket_id}",
+    summary="Update ticket (Forbidden for clients and regular users)",
+)
+@user_support_router.patch(
+    "/tickets/{ticket_id}/status",
+    summary="Change ticket status (Forbidden for clients and regular users)",
+)
+@user_support_router.patch(
+    "/tickets/{ticket_id}/priority",
+    summary="Change ticket priority (Forbidden for clients and regular users)",
+)
+@user_support_router.post(
+    "/tickets/{ticket_id}/assign",
+    summary="Assign ticket (Forbidden for clients and regular users)",
+)
+def forbidden_ticket_management_route(
+    ticket_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Clients and regular users have read-only access and cannot update, assign, or change ticket status.",
+    )
 
 
 # ============================================================
@@ -378,6 +428,11 @@ def update_ticket_admin_route(
             ticket_id=ticket_id,
             data=data,
         )
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        )
     except ValueError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -408,6 +463,11 @@ def add_admin_ticket_reply_route(
             admin=current_user,
             ticket_id=ticket_id,
             data=data,
+        )
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(err),
         )
     except ValueError as err:
         raise HTTPException(

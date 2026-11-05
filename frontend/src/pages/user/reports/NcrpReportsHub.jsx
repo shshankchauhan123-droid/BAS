@@ -352,6 +352,10 @@ export default function NcrpReportsHub() {
       ? `/reports/ncrp-fund-flow-traceability?caseId=${encodeURIComponent(activeCaseId)}`
       : "/reports/ncrp-fund-flow-traceability";
 
+    const accountActivityRoute = activeCaseId
+      ? `/reports/ncrp-account-activity?caseId=${encodeURIComponent(activeCaseId)}`
+      : "/reports/ncrp-account-activity";
+
     return [
       {
         id: "ncrp-transaction-grid",
@@ -567,6 +571,34 @@ export default function NcrpReportsHub() {
               strokeWidth="1.8"
               d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
             />
+          </svg>
+        ),
+      },
+      {
+        id: "ncrp-account-activity",
+        reportNumber: "07",
+        title: "NCRP Account Activity & Exit Report",
+        category: "ncrp-analysis",
+        categoryLabel: "NCRP ANALYSIS",
+        status: "available",
+        isReady: true,
+        route: accountActivityRoute,
+        description:
+          "Analyze account-level fund movement, transaction timing and last traceable activity.",
+        features: [
+          "Dynamic KPI cards with unresolved fund estimates",
+          "Account profile summary with full account masking & reveal control",
+          "Incoming vs. Outgoing chronological timeline & comparison chart",
+          "Rapid fund movement analysis (< 15m, < 1h, < 24h thresholds)",
+          "Exit activity & destination account mapping with onward transfer audit",
+          "Forensic reason why the available money trail ends",
+          "Rule-based suspicious activity indicators (pass-through & fan-out)",
+          "Data quality gaps and statutory Section 91/102 CrPC actions",
+          "Multi-sheet Excel (.xlsx) export utility",
+        ],
+        icon: (
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
         ),
       },

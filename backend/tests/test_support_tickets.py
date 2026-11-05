@@ -98,6 +98,17 @@ class TestSupportTickets(unittest.TestCase):
             is_active=True,
             first_login=False,
         )
+        # Seed User A2 (Client 1)
+        self.user_a2 = User(
+            id=11,
+            client_id=self.client_1.id,
+            username="investigator_alice2",
+            email="alice2@bcorpa.com",
+            password_hash=hash_password("Pass123!"),
+            role="user",
+            is_active=True,
+            first_login=False,
+        )
         # Seed User B (Client 2)
         self.user_b = User(
             id=20,
@@ -106,6 +117,28 @@ class TestSupportTickets(unittest.TestCase):
             email="bob@bcorpb.com",
             password_hash=hash_password("Pass123!"),
             role="user",
+            is_active=True,
+            first_login=False,
+        )
+        # Seed Client Admin 1 (Client 1)
+        self.client_admin_1 = User(
+            id=30,
+            client_id=self.client_1.id,
+            username="client_admin_corp_a",
+            email="admin@bcorpa.com",
+            password_hash=hash_password("Pass123!"),
+            role="client_admin",
+            is_active=True,
+            first_login=False,
+        )
+        # Seed Client Admin 2 (Client 2)
+        self.client_admin_2 = User(
+            id=31,
+            client_id=self.client_2.id,
+            username="client_admin_corp_b",
+            email="admin@bcorpb.com",
+            password_hash=hash_password("Pass123!"),
+            role="client_admin",
             is_active=True,
             first_login=False,
         )
@@ -120,11 +153,14 @@ class TestSupportTickets(unittest.TestCase):
             is_active=True,
             first_login=False,
         )
-        self.db.add_all([self.user_a, self.user_b, self.super_admin])
+        self.db.add_all([self.user_a, self.user_a2, self.user_b, self.client_admin_1, self.client_admin_2, self.super_admin])
         self.db.commit()
 
         self.token_a = create_access_token(user_id=self.user_a.id, role=self.user_a.role)
+        self.token_a2 = create_access_token(user_id=self.user_a2.id, role=self.user_a2.role)
         self.token_b = create_access_token(user_id=self.user_b.id, role=self.user_b.role)
+        self.token_client_1 = create_access_token(user_id=self.client_admin_1.id, role=self.client_admin_1.role)
+        self.token_client_2 = create_access_token(user_id=self.client_admin_2.id, role=self.client_admin_2.role)
         self.token_super = create_access_token(user_id=self.super_admin.id, role=self.super_admin.role)
 
     def tearDown(self):
@@ -701,6 +737,255 @@ class TestSupportTickets(unittest.TestCase):
         )
         self.assertEqual(dl_res.status_code, 404)
         self.assertIn("This ticket does not have an attachment", dl_res.json()["detail"])
+
+    def test_15_client_admin_visibility_of_all_users_under_client(self):
+        """Client Admin sees all tickets created by users belonging to that client."""
+        # Alice (User A, Client 1) creates Ticket 1
+        t1_res = self.client.post(
+            "/api/v1/support/tickets",
+            json={
+                "subject": "Alice's Issue with Statement",
+                "category": "Technical Issue",
+                "description": "Alice cannot parse ICICI statement.",
+                "priority": "high",
+            },
+            headers={"Authorization": f"Bearer {self.token_a}"},
+        )
+        self.assertEqual(t1_res.status_code, 201)
+        t1_id = t1_res.json()["id"]
+
+        # Alice 2 (User A2, Client 1) creates Ticket 2
+        t2_res = self.client.post(
+            "/api/v1/support/tickets",
+            json={
+                "subject": "Alice 2's Question on NCRP",
+                "category": "Data/Report Issue",
+                "description": "Alice 2 has questions on report 07.",
+                "priority": "medium",
+            },
+            headers={"Authorization": f"Bearer {self.token_a2}"},
+        )
+        self.assertEqual(t2_res.status_code, 201)
+        t2_id = t2_res.json()["id"]
+
+        # Bob (User B, Client 2) creates Ticket 3
+        t3_res = self.client.post(
+            "/api/v1/support/tickets",
+            json={
+                "subject": "Bob's Client 2 Ticket",
+                "category": "Feature Request",
+                "description": "Bob belongs to Client 2.",
+                "priority": "low",
+            },
+            headers={"Authorization": f"Bearer {self.token_b}"},
+        )
+        self.assertEqual(t3_res.status_code, 201)
+        t3_id = t3_res.json()["id"]
+
+        # 1. User A only sees their own ticket (Ticket 1)
+        res_a = self.client.get(
+            "/api/v1/support/tickets/my",
+            headers={"Authorization": f"Bearer {self.token_a}"},
+        )
+        self.assertEqual(res_a.status_code, 200)
+        user_a_ids = [t["id"] for t in res_a.json()["data"]]
+        self.assertEqual(user_a_ids, [t1_id])
+
+        # 2. Client Admin 1 sees BOTH Ticket 1 and Ticket 2 (all users under Client 1), but NOT Ticket 3
+        res_client_1 = self.client.get(
+            "/api/v1/support/tickets/my",
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(res_client_1.status_code, 200)
+        client_1_ids = [t["id"] for t in res_client_1.json()["data"]]
+        self.assertIn(t1_id, client_1_ids)
+        self.assertIn(t2_id, client_1_ids)
+        self.assertNotIn(t3_id, client_1_ids)
+        self.assertEqual(len(client_1_ids), 2)
+
+        # Creator info is populated
+        items = res_client_1.json()["data"]
+        usernames = {i["user_name"] for i in items}
+        self.assertIn("investigator_alice", usernames)
+        self.assertIn("investigator_alice2", usernames)
+
+        # 3. Client Admin 2 sees ONLY Ticket 3 (Client 2 user)
+        res_client_2 = self.client.get(
+            "/api/v1/support/tickets/my",
+            headers={"Authorization": f"Bearer {self.token_client_2}"},
+        )
+        self.assertEqual(res_client_2.status_code, 200)
+        client_2_ids = [t["id"] for t in res_client_2.json()["data"]]
+        self.assertEqual(client_2_ids, [t3_id])
+
+    def test_16_client_admin_summary_counts(self):
+        """Client Admin summary reflects total tickets of all users under that client."""
+        # Create 2 tickets under Client 1 and 1 ticket under Client 2
+        p1 = self.client.post(
+            "/api/v1/support/tickets",
+            json={"subject": "Subject 1", "category": "Tech", "description": "Description 1", "priority": "low"},
+            headers={"Authorization": f"Bearer {self.token_a}"},
+        )
+        self.assertEqual(p1.status_code, 201)
+
+        p2 = self.client.post(
+            "/api/v1/support/tickets",
+            json={"subject": "Subject 2", "category": "Tech", "description": "Description 2", "priority": "high"},
+            headers={"Authorization": f"Bearer {self.token_a2}"},
+        )
+        self.assertEqual(p2.status_code, 201)
+
+        p3 = self.client.post(
+            "/api/v1/support/tickets",
+            json={"subject": "Subject 3", "category": "Tech", "description": "Description 3", "priority": "medium"},
+            headers={"Authorization": f"Bearer {self.token_b}"},
+        )
+        self.assertEqual(p3.status_code, 201)
+
+        # Client Admin 1 summary
+        sum_1 = self.client.get(
+            "/api/v1/support/tickets/my/summary",
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(sum_1.status_code, 200)
+        self.assertEqual(sum_1.json()["total"], 2)
+        self.assertEqual(sum_1.json()["open"], 2)
+
+        # Client Admin 2 summary
+        sum_2 = self.client.get(
+            "/api/v1/support/tickets/my/summary",
+            headers={"Authorization": f"Bearer {self.token_client_2}"},
+        )
+        self.assertEqual(sum_2.status_code, 200)
+        self.assertEqual(sum_2.json()["total"], 1)
+
+    def test_17_client_admin_cannot_view_other_client_ticket_details(self):
+        """Client Admin is forbidden from viewing ticket details belonging to another client."""
+        # Bob (Client 2) creates a ticket
+        bob_ticket = self.client.post(
+            "/api/v1/support/tickets",
+            json={"subject": "Bob Secret", "category": "Audit", "description": "Client 2 internal", "priority": "medium"},
+            headers={"Authorization": f"Bearer {self.token_b}"},
+        ).json()
+
+        # Client Admin 1 attempts to view Bob's ticket
+        res = self.client.get(
+            f"/api/v1/support/tickets/my/{bob_ticket['id']}",
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(res.status_code, 403)
+        self.assertIn("belonging to another client", res.json()["detail"])
+
+    def test_18_client_admin_read_only_rejection_for_creation_and_replies(self):
+        """Client Admin cannot create tickets or post replies (read-only enforcement)."""
+        # 1. Attempt to create ticket as Client Admin
+        create_res = self.client.post(
+            "/api/v1/support/tickets",
+            json={"subject": "Client Admin Ticket", "category": "General", "description": "Testing creation", "priority": "low"},
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(create_res.status_code, 403)
+        self.assertIn("Client accounts have read-only access", create_res.json()["detail"])
+
+        # 2. User A creates a ticket
+        user_ticket = self.client.post(
+            "/api/v1/support/tickets",
+            json={"subject": "User A Ticket", "category": "General", "description": "Testing", "priority": "low"},
+            headers={"Authorization": f"Bearer {self.token_a}"},
+        ).json()
+
+        # 3. Client Admin attempts to reply
+        reply_res = self.client.post(
+            f"/api/v1/support/tickets/my/{user_ticket['id']}/replies",
+            json={"message": "Client admin reply attempt"},
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(reply_res.status_code, 403)
+        self.assertIn("Client accounts have read-only access", reply_res.json()["detail"])
+
+    def test_19_client_admin_rejection_for_status_update_assign_and_delete(self):
+        """Client Admin cannot update status, assign, or delete tickets."""
+        user_ticket = self.client.post(
+            "/api/v1/support/tickets",
+            json={"subject": "User Ticket", "category": "General", "description": "Testing", "priority": "low"},
+            headers={"Authorization": f"Bearer {self.token_a}"},
+        ).json()
+        tid = user_ticket["id"]
+
+        # Attempt DELETE
+        del_res = self.client.delete(
+            f"/api/v1/support/tickets/{tid}",
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(del_res.status_code, 403)
+
+        # Attempt PATCH status
+        patch_status_res = self.client.patch(
+            f"/api/v1/support/tickets/{tid}/status",
+            json={"status": "resolved"},
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(patch_status_res.status_code, 403)
+
+        # Attempt POST assign
+        assign_res = self.client.post(
+            f"/api/v1/support/tickets/{tid}/assign",
+            json={"assigned_to": 1},
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(assign_res.status_code, 403)
+
+        # Attempt SuperAdmin update endpoint with client admin token
+        admin_patch_res = self.client.patch(
+            f"/api/v1/admin/support/tickets/{tid}",
+            json={"status": "resolved"},
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(admin_patch_res.status_code, 403)
+
+    def test_20_client_admin_can_view_details_and_download_attachment_for_client_users(self):
+        """Client Admin can view ticket details and download attachment of user tickets under their client."""
+        import io
+        files = {
+            "attachment": ("sample_report.pdf", io.BytesIO(b"%PDF-1.4 sample content"), "application/pdf"),
+        }
+        create_res = self.client.post(
+            "/api/v1/support/tickets",
+            data={
+                "subject": "Statement with attachment",
+                "category": "Technical Issue",
+                "description": "Please review attached document",
+                "priority": "medium",
+            },
+            files=files,
+            headers={"Authorization": f"Bearer {self.token_a}"},
+        )
+        self.assertEqual(create_res.status_code, 201)
+        tid = create_res.json()["id"]
+
+        # Client Admin 1 can view details
+        detail_res = self.client.get(
+            f"/api/v1/support/tickets/my/{tid}",
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(detail_res.status_code, 200)
+        self.assertEqual(detail_res.json()["id"], tid)
+        self.assertEqual(detail_res.json()["user_name"], "investigator_alice")
+
+        # Client Admin 1 can download attachment
+        dl_res = self.client.get(
+            f"/api/v1/support/tickets/my/{tid}/attachment",
+            headers={"Authorization": f"Bearer {self.token_client_1}"},
+        )
+        self.assertEqual(dl_res.status_code, 200)
+        self.assertEqual(dl_res.content, b"%PDF-1.4 sample content")
+
+        # Client Admin 2 CANNOT download attachment of Client 1's ticket
+        dl_res_2 = self.client.get(
+            f"/api/v1/support/tickets/my/{tid}/attachment",
+            headers={"Authorization": f"Bearer {self.token_client_2}"},
+        )
+        self.assertEqual(dl_res_2.status_code, 403)
 
 
 
