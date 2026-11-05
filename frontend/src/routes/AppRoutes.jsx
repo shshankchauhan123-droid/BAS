@@ -24,6 +24,7 @@ import SuperAdminIOMasterList from "../pages/superadmin/SuperAdminIOMasterList";
 import SuperAdminSupportPage from "../pages/superadmin/SuperAdminSupportPage";
 import HelpSupportPage from "../pages/user/support/HelpSupportPage";
 import ActivityLogsPage from "../pages/user/activityLogs/ActivityLogsPage";
+import AuditActivityLogsPage from "../pages/audit/AuditActivityLogsPage";
 import ClientAdminDashboard from "../pages/clientAdmin/ClientAdminDashboard";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import UserDashboard from "../pages/user/UserDashboard";
@@ -354,6 +355,40 @@ function AppRoutes() {
             <ProtectedRoute>
               <RoleRoute allowedRoles={["user", "client_admin", "admin", "superadmin"]}>
                 <Navigate to="/activity-logs" replace />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =====================================================
+            ROLE-BASED AUDIT & ACTIVITY LOGS (Client & Super Admin)
+        ====================================================== */}
+        <Route
+          path="/audit-logs"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["client_admin", "superadmin"]}>
+                <AuditActivityLogsPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/superadmin/audit-logs"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["superadmin"]}>
+                <Navigate to="/audit-logs" replace />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/client-admin/audit-logs"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["client_admin"]}>
+                <Navigate to="/audit-logs" replace />
               </RoleRoute>
             </ProtectedRoute>
           }

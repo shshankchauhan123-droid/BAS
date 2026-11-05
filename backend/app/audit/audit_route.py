@@ -4,11 +4,17 @@ from sqlalchemy.orm import Session
 from app.audit.audit_controller import (
     get_audit_stats_controller,
     get_my_activity_summary_controller,
+    get_target_user_activity_summary_controller,
+    list_audit_companies_controller,
     list_audit_logs_controller,
+    list_company_users_controller,
     list_my_activity_logs_controller,
+    list_target_user_activity_logs_controller,
     record_user_activity_controller,
 )
 from app.audit.audit_schema import (
+    AuditCompanyListResponse,
+    AuditCompanyUserListResponse,
     AuditLogListResponse,
     AuditLogResponse,
     AuditStatsResponse,
@@ -230,7 +236,203 @@ def get_audit_stats_route(
         )
 
 
+# ============================================================
+# ROLE-BASED AUDIT & ACTIVITY LOGS (CLIENT ADMIN & SUPERADMIN)
+# ============================================================
+
+
+@router.get(
+    "/companies",
+    response_model=AuditCompanyListResponse,
+    status_code=http_status.HTTP_200_OK,
+    summary="List active companies for audit selection (Super Admin only)",
+)
+def get_audit_companies_route(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return list_audit_companies_controller(db=db, actor=current_user)
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        )
+    except Exception as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        )
+
+
+@router.get(
+    "/company-users",
+    response_model=AuditCompanyUserListResponse,
+    status_code=http_status.HTTP_200_OK,
+    summary="List users belonging to a company for audit selection (Client Admin sees own; Super Admin passes company_id)",
+)
+def get_company_users_route(
+    company_id: int | None = Query(default=None, description="Company/Client ID (Required for Super Admin)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return list_company_users_controller(
+            db=db,
+            actor=current_user,
+            company_id=company_id,
+        )
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        )
+    except ValueError as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        )
+    except Exception as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        )
+
+
+@router.get(
+    "/me/company-users",
+    response_model=AuditCompanyUserListResponse,
+    status_code=http_status.HTTP_200_OK,
+    summary="List users belonging to the authenticated Client's company",
+)
+def get_my_company_users_route(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return list_company_users_controller(
+            db=db,
+            actor=current_user,
+            company_id=None,
+        )
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        )
+    except Exception as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        )
+
+
+@router.get(
+    "/user/{user_id}",
+    response_model=AuditLogListResponse,
+    status_code=http_status.HTTP_200_OK,
+    summary="Get paginated activity logs for a selected user with company authorization",
+)
+def get_user_activity_logs_route(
+    user_id: int,
+    company_id: int | None = Query(default=None, description="Company ID for verification"),
+    page: int = Query(default=1, ge=1, description="Page number"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    module: str | None = Query(default=None, description="Filter by module"),
+    action: str | None = Query(default=None, description="Filter by action name"),
+    status: str | None = Query(default=None, description="Filter by status (SUCCESS, FAILED)"),
+    start_date: str | None = Query(default=None, description="Start date filter (ISO format)"),
+    end_date: str | None = Query(default=None, description="End date filter (ISO format)"),
+    search: str | None = Query(default=None, description="Search term across description, action, entity"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return list_target_user_activity_logs_controller(
+            db=db,
+            actor=current_user,
+            target_user_id=user_id,
+            company_id=company_id,
+            page=page,
+            page_size=page_size,
+            module=module,
+            action=action,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            search=search,
+        )
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        )
+    except ValueError as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        )
+    except Exception as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        )
+
+
+@router.get(
+    "/user/{user_id}/summary",
+    response_model=UserActivitySummaryResponse,
+    status_code=http_status.HTTP_200_OK,
+    summary="Get activity statistics and charts for a selected user with company authorization",
+)
+def get_user_activity_summary_route(
+    user_id: int,
+    company_id: int | None = Query(default=None, description="Company ID for verification"),
+    module: str | None = Query(default=None, description="Filter by module"),
+    action: str | None = Query(default=None, description="Filter by action"),
+    status: str | None = Query(default=None, description="Filter by status"),
+    start_date: str | None = Query(default=None, description="Start date filter (ISO format)"),
+    end_date: str | None = Query(default=None, description="End date filter (ISO format)"),
+    search: str | None = Query(default=None, description="Search term"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return get_target_user_activity_summary_controller(
+            db=db,
+            actor=current_user,
+            target_user_id=user_id,
+            company_id=company_id,
+            module=module,
+            action=action,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            search=search,
+        )
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        )
+    except ValueError as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        )
+    except Exception as err:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        )
+
+
 # Bind user activity endpoints to activity_router alias
 activity_router.add_api_route("/me", get_my_activity_logs_route, methods=["GET"], response_model=AuditLogListResponse)
 activity_router.add_api_route("/me/summary", get_my_activity_summary_route, methods=["GET"], response_model=UserActivitySummaryResponse)
 activity_router.add_api_route("/activity", record_activity_route, methods=["POST"], response_model=AuditLogResponse, status_code=http_status.HTTP_201_CREATED)
+activity_router.add_api_route("/companies", get_audit_companies_route, methods=["GET"], response_model=AuditCompanyListResponse)
+activity_router.add_api_route("/company-users", get_company_users_route, methods=["GET"], response_model=AuditCompanyUserListResponse)
+activity_router.add_api_route("/me/company-users", get_my_company_users_route, methods=["GET"], response_model=AuditCompanyUserListResponse)
+activity_router.add_api_route("/user/{user_id}", get_user_activity_logs_route, methods=["GET"], response_model=AuditLogListResponse)
+activity_router.add_api_route("/user/{user_id}/summary", get_user_activity_summary_route, methods=["GET"], response_model=UserActivitySummaryResponse)

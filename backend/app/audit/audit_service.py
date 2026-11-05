@@ -12,8 +12,10 @@ from app.audit.audit_repository import (
     get_user_activity_logs,
     get_user_activity_summary,
 )
+from app.client.client_repository import get_all_clients_with_user_counts, get_client_by_id
 from app.core.roles import ADMIN_ROLE, CLIENT_ADMIN_ROLE, SUPERADMIN_ROLE, USER_ROLE
 from app.user.user_model import User
+from app.user.user_repository import get_users_by_client_id, get_user_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -335,4 +337,200 @@ def get_my_activity_summary(
         end_date=parsed_end,
         search=search,
     )
+
+
+def list_audit_companies_for_actor(db: Session, actor: User) -> list[dict]:
+    """
+    List active companies for audit selection (Super Admin only).
+    """
+    actor_role = str(actor.role).lower()
+    if actor_role not in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        raise PermissionError("Access denied. Only Super Admin can view all companies.")
+
+    clients_data = get_all_clients_with_user_counts(db)
+    return [
+        {
+            "id": client.id,
+            "name": client.name,
+            "company_code": client.company_code,
+            "is_active": client.is_active,
+            "user_count": total_users,
+        }
+        for client, total_users, _ in clients_data
+    ]
+
+
+def list_company_users_for_actor(
+    db: Session,
+    actor: User,
+    company_id: int | None = None,
+) -> list[dict]:
+    """
+    List users belonging to a company with role authorization:
+    - Super Admin: can list users for any valid company_id.
+    - Client Admin: can only list users for their own company (actor.client_id).
+    - Regular Users: denied.
+    """
+    actor_role = str(actor.role).lower()
+
+    if actor_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        if company_id is None:
+            raise ValueError("company_id is required for Super Admin to list company users.")
+        target_client_id = company_id
+        client = get_client_by_id(db, company_id)
+        if not client:
+            raise ValueError(f"Company #{company_id} not found.")
+        company_name = client.name
+    elif actor_role == CLIENT_ADMIN_ROLE:
+        if not actor.client_id:
+            raise PermissionError("Client account is not linked to any company.")
+        if company_id is not None and company_id != actor.client_id:
+            raise PermissionError("Access denied: You cannot view users belonging to another company.")
+        target_client_id = actor.client_id
+        company_name = actor.client_name
+    else:
+        raise PermissionError("Access denied. Only Client and Super Admin roles can access company users.")
+
+    users = get_users_by_client_id(db, target_client_id)
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "role": u.role,
+            "is_active": u.is_active,
+            "client_id": u.client_id,
+            "company_name": u.client_name or company_name,
+        }
+        for u in users
+    ]
+
+
+def list_user_activity_logs_for_actor(
+    db: Session,
+    actor: User,
+    target_user_id: int,
+    company_id: int | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    module: str | None = None,
+    action: str | None = None,
+    status: str | None = None,
+    start_date: datetime | str | None = None,
+    end_date: datetime | str | None = None,
+    search: str | None = None,
+) -> tuple[list[AuditLog], int, int]:
+    """
+    Retrieve activity logs of a specific target user with company authorization:
+    - Client Admin: target_user MUST belong to actor.client_id.
+    - Super Admin: if company_id is provided, target_user MUST belong to that company.
+    - Others: denied.
+    """
+    actor_role = str(actor.role).lower()
+    target_user = get_user_by_id(db, target_user_id)
+    if not target_user:
+        raise ValueError(f"User #{target_user_id} not found.")
+
+    if actor_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        if company_id is not None and target_user.client_id != company_id:
+            raise PermissionError(f"User #{target_user_id} does not belong to company #{company_id}.")
+    elif actor_role == CLIENT_ADMIN_ROLE:
+        if not actor.client_id or target_user.client_id != actor.client_id:
+            raise PermissionError("Access denied: You cannot view audit logs of users belonging to another company.")
+    else:
+        raise PermissionError("Access denied. Only Client and Super Admin roles can view user audit logs.")
+
+    parsed_start = None
+    parsed_end = None
+    if isinstance(start_date, str) and start_date.strip():
+        try:
+            parsed_start = datetime.fromisoformat(start_date.strip())
+        except ValueError:
+            pass
+    elif isinstance(start_date, datetime):
+        parsed_start = start_date
+
+    if isinstance(end_date, str) and end_date.strip():
+        try:
+            parsed_end = datetime.fromisoformat(end_date.strip())
+        except ValueError:
+            pass
+    elif isinstance(end_date, datetime):
+        parsed_end = end_date
+
+    return get_user_activity_logs(
+        db=db,
+        user_id=target_user.id,
+        page=page,
+        page_size=page_size,
+        module=module,
+        action=action,
+        status=status,
+        start_date=parsed_start,
+        end_date=parsed_end,
+        search=search,
+    )
+
+
+def get_user_activity_summary_for_actor(
+    db: Session,
+    actor: User,
+    target_user_id: int,
+    company_id: int | None = None,
+    module: str | None = None,
+    action: str | None = None,
+    status: str | None = None,
+    start_date: datetime | str | None = None,
+    end_date: datetime | str | None = None,
+    search: str | None = None,
+) -> dict:
+    """
+    Retrieve statistics & charts of a specific target user with company authorization:
+    - Client Admin: target_user MUST belong to actor.client_id.
+    - Super Admin: if company_id is provided, target_user MUST belong to that company.
+    - Others: denied.
+    """
+    actor_role = str(actor.role).lower()
+    target_user = get_user_by_id(db, target_user_id)
+    if not target_user:
+        raise ValueError(f"User #{target_user_id} not found.")
+
+    if actor_role in {SUPERADMIN_ROLE, ADMIN_ROLE}:
+        if company_id is not None and target_user.client_id != company_id:
+            raise PermissionError(f"User #{target_user_id} does not belong to company #{company_id}.")
+    elif actor_role == CLIENT_ADMIN_ROLE:
+        if not actor.client_id or target_user.client_id != actor.client_id:
+            raise PermissionError("Access denied: You cannot view audit statistics of users belonging to another company.")
+    else:
+        raise PermissionError("Access denied. Only Client and Super Admin roles can view user audit statistics.")
+
+    parsed_start = None
+    parsed_end = None
+    if isinstance(start_date, str) and start_date.strip():
+        try:
+            parsed_start = datetime.fromisoformat(start_date.strip())
+        except ValueError:
+            pass
+    elif isinstance(start_date, datetime):
+        parsed_start = start_date
+
+    if isinstance(end_date, str) and end_date.strip():
+        try:
+            parsed_end = datetime.fromisoformat(end_date.strip())
+        except ValueError:
+            pass
+    elif isinstance(end_date, datetime):
+        parsed_end = end_date
+
+    return get_user_activity_summary(
+        db=db,
+        user_id=target_user.id,
+        module=module,
+        action=action,
+        status=status,
+        start_date=parsed_start,
+        end_date=parsed_end,
+        search=search,
+    )
+
 

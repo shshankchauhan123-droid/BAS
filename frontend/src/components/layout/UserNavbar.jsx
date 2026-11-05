@@ -297,6 +297,8 @@ function UserNavbar() {
 
   const isClientAdmin = userRole === "client_admin";
   const isNormalUser = userRole === "user";
+  const canViewAuditLogs =
+    userRole === "client_admin" || userRole === "superadmin";
 
   const homePath = isSuperAdmin
     ? "/superadmin"
@@ -342,6 +344,17 @@ function UserNavbar() {
   // ROUTE HIGHLIGHTING
   const isActive = (path) => {
     const currentPath = location.pathname;
+
+    if (path === "/audit-logs") {
+      return (
+        currentPath === "/audit-logs" ||
+        currentPath.startsWith("/audit-logs/") ||
+        currentPath === "/superadmin/audit-logs" ||
+        currentPath.startsWith("/superadmin/audit-logs/") ||
+        currentPath === "/client-admin/audit-logs" ||
+        currentPath.startsWith("/client-admin/audit-logs/")
+      );
+    }
 
     if (path === "/superadmin") {
       return (
@@ -925,6 +938,27 @@ function UserNavbar() {
           ],
         },
       ],
+    },
+    {
+      label: "Audit & Activity Logs",
+      path: "/audit-logs",
+      visible: canViewAuditLogs,
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          className="w-5 h-5 shrink-0"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="M12 7v5l4 2" />
+        </svg>
+      ),
     },
     {
       label: "Help & Support",

@@ -115,3 +115,34 @@ class LogActivityRequest(BaseModel):
     entity_name: str | None = None
     status: str = "SUCCESS"
     details: dict[str, Any] | None = None
+
+
+class AuditCompanyItem(BaseModel):
+    id: int
+    name: str
+    company_code: str
+    is_active: bool = True
+    user_count: int = 0
+
+
+class AuditCompanyListResponse(BaseModel):
+    success: bool = True
+    message: str = "Companies retrieved successfully"
+    data: list[AuditCompanyItem]
+
+
+class AuditCompanyUserItem(BaseModel):
+    id: int
+    username: str
+    email: str
+    role: str
+    is_active: bool = True
+    client_id: int | None = None
+    company_name: str | None = None
+
+
+class AuditCompanyUserListResponse(BaseModel):
+    success: bool = True
+    message: str = "Company users retrieved successfully"
+    data: list[AuditCompanyUserItem]
+
